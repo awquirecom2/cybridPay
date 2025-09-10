@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { DollarSign, Percent, Calendar, Save, Edit } from "lucide-react"
+import { DollarSign, Percent, Calendar, Save, Edit, TrendingUp, Building, Receipt } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -79,6 +79,24 @@ export function FeeConfiguration() {
     { tier: "Enterprise", minVolume: "$500K+", maxVolume: "∞", percentage: "1.5%", flatFee: "$0.15" }
   ]
 
+  // Partner revenue tracking data
+  const partnerRevenue = {
+    transak: {
+      configuredFee: "1.2%", // Partner fee percentage on Transak transactions
+      monthlyVolume: "$1,250,000",
+      estimatedRevenue: "$15,000",
+      lastPayout: "$12,500",
+      nextPayoutDate: "2024-02-01"
+    },
+    cybrid: {
+      accumulatedFees: "$8,750", // Trade fees accumulated in bank-level fees account
+      monthlyVolume: "$950,000",
+      averageFeeRate: "0.92%",
+      lastInvoice: "$7,200",
+      nextInvoiceDate: "2024-02-15"
+    }
+  }
+
   const handleSaveGlobalFees = () => {
     console.log('Saving global fees:', globalFees)
     setEditingGlobal(false)
@@ -112,6 +130,14 @@ export function FeeConfiguration() {
 
   const samplePreview = calculateFeePreview("100", globalFees.percentage, globalFees.flatFee)
 
+  const handleUpdatePartnerFee = (provider: string, newFee: string) => {
+    console.log(`Updating ${provider} partner fee to ${newFee}`)
+    toast({
+      title: "Partner fee updated",
+      description: `${provider} partner fee has been updated to ${newFee}%.`,
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -120,6 +146,118 @@ export function FeeConfiguration() {
           Configure global and per-merchant fee structures for payment processing
         </p>
       </div>
+
+      {/* Partner Revenue Tracking */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Partner Revenue Tracking
+          </CardTitle>
+          <CardDescription>
+            Track revenue earned from Transak and Cybrid partner programs
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Transak Partner Revenue */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  <h3 className="font-semibold">Transak Partner Revenue</h3>
+                </div>
+                <Badge variant="default">Active Partner</Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Configured Fee</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.transak.configuredFee}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Monthly Volume</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.transak.monthlyVolume}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Est. Monthly Revenue</p>
+                  <p className="font-mono font-bold text-lg text-green-600">{partnerRevenue.transak.estimatedRevenue}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Last Payout</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.transak.lastPayout}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Next Payout</p>
+                  <p className="text-xs text-muted-foreground">{new Date(partnerRevenue.transak.nextPayoutDate).toLocaleDateString()}</p>
+                </div>
+                <Button variant="outline" size="sm" data-testid="button-view-transak-dashboard">
+                  <Receipt className="h-3 w-3 mr-1" />
+                  View Dashboard
+                </Button>
+              </div>
+            </div>
+
+            {/* Cybrid Partner Revenue */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  <h3 className="font-semibold">Cybrid Partner Revenue</h3>
+                </div>
+                <Badge variant="default">Active Partner</Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Avg. Fee Rate</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.cybrid.averageFeeRate}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Monthly Volume</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.cybrid.monthlyVolume}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Accumulated Fees</p>
+                  <p className="font-mono font-bold text-lg text-green-600">{partnerRevenue.cybrid.accumulatedFees}</p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="text-muted-foreground">Last Invoice</p>
+                  <p className="font-mono font-bold text-lg">{partnerRevenue.cybrid.lastInvoice}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">Next Invoice</p>
+                  <p className="text-xs text-muted-foreground">{new Date(partnerRevenue.cybrid.nextInvoiceDate).toLocaleDateString()}</p>
+                </div>
+                <Button variant="outline" size="sm" data-testid="button-view-cybrid-fees">
+                  <Receipt className="h-3 w-3 mr-1" />
+                  View Fees Account
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Total Partner Revenue Summary */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-green-900">Total Monthly Partner Revenue</h3>
+                <p className="text-sm text-green-700">Combined earnings from both partner programs</p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-green-900">$23,750</p>
+                <p className="text-xs text-green-600">+12% from last month</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Global Fee Settings */}
       <Card>
