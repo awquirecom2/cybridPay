@@ -14,8 +14,7 @@ import { FeeConfiguration } from "@/components/admin/fee-configuration";
 import { WebhookManagement } from "@/components/admin/webhook-management";
 import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
 import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
-import { ApiKeys } from "@/components/merchant/api-keys";
-import { Integrations } from "@/components/merchant/integrations";
+import { ManageIntegrations } from "@/components/merchant/manage-integrations";
 import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
 import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
 import { Accounts } from "@/components/merchant/accounts";
@@ -52,8 +51,7 @@ function Router() {
       <Route path="/merchant/onboarding" component={KybOnboarding} />
       <Route path="/merchant/receive-crypto" component={ReceiveCrypto} />
       <Route path="/merchant/offramp-crypto" component={OfframpCrypto} />
-      <Route path="/merchant/api-keys" component={ApiKeys} />
-      <Route path="/merchant/integrations" component={Integrations} />
+      <Route path="/merchant/manage-integrations" component={ManageIntegrations} />
       <Route path="/merchant/accounts" component={Accounts} />
       
       
