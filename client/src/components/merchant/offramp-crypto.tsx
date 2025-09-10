@@ -64,6 +64,7 @@ export function OfframpCrypto() {
 
   const transakPayoutMethods = [
     { value: "bank_transfer", label: "Bank Transfer" },
+    { value: "debit_card", label: "Debit Card" },
     { value: "sepa_transfer", label: "SEPA Transfer (EUR)" },
     { value: "gbp_transfer", label: "UK Bank Transfer (GBP)" }
   ]
@@ -93,7 +94,8 @@ export function OfframpCrypto() {
           transakFee: (parseFloat(data.cryptoAmount) * 0.01).toFixed(2), // 1% fee
           networkFee: data.cryptoCurrency === 'ETH' ? "12.00" : "2.00"
         },
-        processingTime: data.payoutMethod === 'wire' ? '1-2 hours' : '1-3 business days'
+        processingTime: data.payoutMethod === 'debit_card' ? '5-30 minutes' : 
+                         data.payoutMethod === 'wire' ? '1-2 hours' : '1-3 business days'
       }
 
       setPayoutDetails(mockQuote)
