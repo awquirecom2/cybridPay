@@ -1,0 +1,129 @@
+import { Switch, Route, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { AppSidebar } from "@/components/app-sidebar";
+import { LandingPage } from "@/components/landing-page";
+import { AdminDashboard } from "@/components/admin/admin-dashboard";
+import { MerchantManagement } from "@/components/admin/merchant-management";
+import { FeeConfiguration } from "@/components/admin/fee-configuration";
+import { WebhookManagement } from "@/components/admin/webhook-management";
+import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
+import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
+import { ApiKeys } from "@/components/merchant/api-keys";
+import { Integrations } from "@/components/merchant/integrations";
+import { PaymentFlow } from "@/components/customer/payment-flow";
+import NotFound from "@/pages/not-found";
+
+function Router() {
+  const [location] = useLocation();
+  
+  // Determine user role based on current path
+  const getUserRole = (path: string): "admin" | "merchant" | "customer" => {
+    if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/merchant')) return 'merchant';
+    return 'customer';
+  };
+
+  const userRole = getUserRole(location);
+  const isPortalRoute = location.startsWith('/admin') || location.startsWith('/merchant');
+  
+  return (
+    <Switch>
+      {/* Landing Page */}
+      <Route path="/" component={LandingPage} />
+      
+      {/* Admin Portal Routes */}
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/merchants" component={MerchantManagement} />
+      <Route path="/admin/permissions" component={() => <div className="p-6">Permissions management coming soon...</div>} />
+      <Route path="/admin/fees" component={FeeConfiguration} />
+      <Route path="/admin/webhooks" component={WebhookManagement} />
+      <Route path="/admin/settings" component={() => <div className="p-6">Admin settings coming soon...</div>} />
+      
+      {/* Merchant Portal Routes */}
+      <Route path="/merchant" component={MerchantDashboard} />
+      <Route path="/merchant/onboarding" component={KybOnboarding} />
+      <Route path="/merchant/api-keys" component={ApiKeys} />
+      <Route path="/merchant/integrations" component={Integrations} />
+      <Route path="/merchant/accounts" component={() => <div className="p-6">Account management coming soon...</div>} />
+      <Route path="/merchant/analytics" component={() => <div className="p-6">Analytics dashboard coming soon...</div>} />
+      
+      {/* Customer Payment Routes */}
+      <Route path="/pay/:merchantId">
+        {(params) => <PaymentFlow merchantId={params.merchantId} />}
+      </Route>
+      
+      {/* Fallback to 404 */}
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function AppLayout() {
+  const [location] = useLocation();
+  const isLandingPage = location === '/';
+  const isPaymentPage = location.startsWith('/pay/');
+  const isPortalRoute = location.startsWith('/admin') || location.startsWith('/merchant');
+  
+  // Determine user role based on current path
+  const getUserRole = (path: string): "admin" | "merchant" | "customer" => {
+    if (path.startsWith('/admin')) return 'admin';
+    if (path.startsWith('/merchant')) return 'merchant';
+    return 'customer';
+  };
+
+  const userRole = getUserRole(location);
+
+  // For landing page and payment flow, render without sidebar
+  if (isLandingPage || isPaymentPage) {
+    return <Router />;
+  }
+
+  // For portal routes, render with sidebar
+  if (isPortalRoute) {
+    const style = {
+      "--sidebar-width": "20rem",       // 320px for better content
+      "--sidebar-width-icon": "4rem",   // default icon width
+    };
+
+    return (
+      <SidebarProvider style={style as React.CSSProperties}>
+        <div className="flex h-screen w-full">
+          <AppSidebar userRole={userRole} />
+          <div className="flex flex-col flex-1">
+            <header className="flex items-center justify-between p-4 border-b bg-card/50 backdrop-blur">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <ThemeToggle />
+            </header>
+            <main className="flex-1 overflow-auto p-6">
+              <Router />
+            </main>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  // Fallback for other routes
+  return <Router />;
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="dark" storageKey="cryptopay-theme">
+        <TooltipProvider>
+          <AppLayout />
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
