@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,10 +7,21 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/hooks/use-toast"
 
 export function MerchantManagement() {
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [newMerchant, setNewMerchant] = useState({
+    name: "",
+    email: "",
+    businessType: "",
+    website: ""
+  })
 
   // TODO: remove mock functionality - replace with real merchant data
   const mockMerchants = [
@@ -53,6 +64,16 @@ export function MerchantManagement() {
       dateOnboarded: "2024-01-22",
       integrations: [],
       volume: "$0"
+    },
+    {
+      id: "merch_005",
+      name: "E-commerce Plus",
+      email: "admin@ecommerceplus.com",
+      status: "deactivated",
+      kybStatus: "verified",
+      dateOnboarded: "2024-01-05",
+      integrations: ["transak"],
+      volume: "$75,000"
     }
   ]
 
@@ -60,7 +81,8 @@ export function MerchantManagement() {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
       pending: { variant: "secondary" as const, icon: Clock, text: "Pending" },
-      rejected: { variant: "destructive" as const, icon: XCircle, text: "Rejected" }
+      rejected: { variant: "destructive" as const, icon: XCircle, text: "Rejected" },
+      deactivated: { variant: "outline" as const, icon: Ban, text: "Deactivated" }
     }
     const config = variants[status as keyof typeof variants]
     const Icon = config.icon
@@ -96,8 +118,61 @@ export function MerchantManagement() {
   })
 
   const handleMerchantAction = (action: string, merchantId: string) => {
-    console.log(`${action} triggered for merchant: ${merchantId}`)
-    // TODO: Implement real merchant actions
+    const merchant = mockMerchants.find(m => m.id === merchantId)
+    if (!merchant) return
+
+    switch (action) {
+      case 'approve':
+        toast({
+          title: "Merchant Approved",
+          description: `${merchant.name} has been approved and can now access the platform.`,
+        })
+        break
+      case 'reject':
+        toast({
+          title: "Merchant Rejected",
+          description: `${merchant.name} application has been rejected.`,
+          variant: "destructive"
+        })
+        break
+      case 'deactivate':
+        toast({
+          title: "Merchant Deactivated",
+          description: `${merchant.name} has been deactivated and cannot process payments.`,
+          variant: "destructive"
+        })
+        break
+      case 'reactivate':
+        toast({
+          title: "Merchant Reactivated",
+          description: `${merchant.name} has been reactivated and can process payments.`,
+        })
+        break
+      default:
+        console.log(`${action} triggered for merchant: ${merchantId}`)
+    }
+  }
+
+  const handleCreateMerchant = async () => {
+    if (!newMerchant.name || !newMerchant.email) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // TODO: Implement real merchant creation API call
+    console.log('Creating new merchant:', newMerchant)
+    
+    toast({
+      title: "Merchant Created",
+      description: `${newMerchant.name} has been added to the system. They will receive onboarding instructions via email.`,
+    })
+    
+    setShowCreateDialog(false)
+    setNewMerchant({ name: "", email: "", businessType: "", website: "" })
   }
 
   return (
@@ -109,10 +184,83 @@ export function MerchantManagement() {
             Manage merchant accounts, KYB status, and integrations
           </p>
         </div>
-        <Button data-testid="button-add-merchant">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Merchant
-        </Button>
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-add-merchant">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Merchant
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Create New Merchant
+              </DialogTitle>
+              <DialogDescription>
+                Add a new merchant to the platform. They will receive onboarding instructions via email.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Business Name *</Label>
+                <Input
+                  id="name"
+                  value={newMerchant.name}
+                  onChange={(e) => setNewMerchant(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="TechCorp Inc"
+                  data-testid="input-merchant-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Contact Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newMerchant.email}
+                  onChange={(e) => setNewMerchant(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="admin@techcorp.com"
+                  data-testid="input-merchant-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="businessType">Business Type</Label>
+                <Select value={newMerchant.businessType} onValueChange={(value) => setNewMerchant(prev => ({ ...prev, businessType: value }))}>
+                  <SelectTrigger data-testid="select-merchant-business-type">
+                    <SelectValue placeholder="Select business type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ecommerce">E-commerce</SelectItem>
+                    <SelectItem value="saas">Software as a Service</SelectItem>
+                    <SelectItem value="gaming">Gaming & Entertainment</SelectItem>
+                    <SelectItem value="fintech">Financial Technology</SelectItem>
+                    <SelectItem value="marketplace">Marketplace</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="website">Website URL</Label>
+                <Input
+                  id="website"
+                  value={newMerchant.website}
+                  onChange={(e) => setNewMerchant(prev => ({ ...prev, website: e.target.value }))}
+                  placeholder="https://techcorp.com"
+                  data-testid="input-merchant-website"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateMerchant} data-testid="button-create-merchant">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create Merchant
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats Cards */}
@@ -122,7 +270,7 @@ export function MerchantManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Merchants</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-merchants">4</div>
+            <div className="text-2xl font-bold" data-testid="text-total-merchants">5</div>
           </CardContent>
         </Card>
         <Card>
@@ -146,7 +294,7 @@ export function MerchantManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Volume</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-volume">$455K</div>
+            <div className="text-2xl font-bold" data-testid="text-total-volume">$530K</div>
           </CardContent>
         </Card>
       </div>
@@ -180,6 +328,7 @@ export function MerchantManagement() {
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="deactivated">Deactivated</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -252,6 +401,21 @@ export function MerchantManagement() {
                                 Reject
                               </DropdownMenuItem>
                             </>
+                          )}
+                          {merchant.status === 'approved' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('deactivate', merchant.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Deactivate
+                            </DropdownMenuItem>
+                          )}
+                          {merchant.status === 'deactivated' && (
+                            <DropdownMenuItem onClick={() => handleMerchantAction('reactivate', merchant.id)}>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Reactivate
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
