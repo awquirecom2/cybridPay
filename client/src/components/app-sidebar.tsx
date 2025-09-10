@@ -2,7 +2,7 @@ import { useState } from "react"
 import { 
   Users, Settings, CreditCard, Webhook, 
   Key, Building, BarChart3, Wallet,
-  Home, FileText, Shield, Globe
+  Home, FileText, Shield, Globe, ArrowDownToLine, ArrowUpFromLine
 } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import {
@@ -45,10 +45,11 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   const merchantItems = [
     { title: "Dashboard", url: "/merchant", icon: Home },
     { title: "Onboarding", url: "/merchant/onboarding", icon: FileText },
+    { title: "Receive Crypto", url: "/merchant/receive-crypto", icon: ArrowDownToLine },
+    { title: "Offramp Crypto", url: "/merchant/offramp-crypto", icon: ArrowUpFromLine },
     { title: "API Keys", url: "/merchant/api-keys", icon: Key },
     { title: "Integrations", url: "/merchant/integrations", icon: Globe },
     { title: "Accounts", url: "/merchant/accounts", icon: Wallet },
-    { title: "Analytics", url: "/merchant/analytics", icon: BarChart3 },
   ]
 
   const items = userRole === "admin" ? adminItems : merchantItems

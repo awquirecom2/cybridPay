@@ -18,17 +18,10 @@ export function LandingPage() {
     },
     {
       title: "Merchant Portal", 
-      description: "Complete your KYB onboarding, manage API keys and configure payment integrations",
+      description: "Complete KYB onboarding, receive crypto payments and manage offramp transactions",
       icon: Building,
       href: "/merchant",
-      features: ["KYB Onboarding", "API Key Management", "Transak Integration", "Cybrid Setup"]
-    },
-    {
-      title: "Customer Payment",
-      description: "Secure fiat-to-crypto payment processing with real-time transaction updates",
-      icon: Wallet,
-      href: "/pay/demo-merchant",
-      features: ["Fiat-to-Crypto", "Real-time Updates", "Multiple Currencies", "Secure Processing"]
+      features: ["KYB Onboarding", "Receive Crypto", "Offramp Crypto", "Cybrid Custodian"]
     }
   ]
 
@@ -108,7 +101,7 @@ export function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {portals.map((portal) => (
               <Card key={portal.title} className="hover-elevate transition-all duration-200 group">
                 <CardHeader className="text-center pb-4">

@@ -26,11 +26,12 @@ export function MerchantDashboard() {
     { account: 'Fiat Account', balance: '12,450.00', change: '+5.2%', address: 'USD-ACCOUNT-001' },
   ]
 
-  const recentTransactions = [
-    { id: 'tx_001', type: 'Purchase', amount: '$245.00', crypto: '0.15 ETH', status: 'completed', time: '2 minutes ago' },
-    { id: 'tx_002', type: 'Purchase', amount: '$1,200.00', crypto: '1,200 USDC', status: 'completed', time: '15 minutes ago' },
-    { id: 'tx_003', type: 'Withdrawal', amount: '$500.00', crypto: '500 USDT', status: 'pending', time: '1 hour ago' },
-    { id: 'tx_004', type: 'Purchase', amount: '$75.50', crypto: '75.5 USDC', status: 'completed', time: '2 hours ago' },
+  const recentOrders = [
+    { id: 'ord_001', category: 'Crypto Received', amount: '$245.00', crypto: '245 USDC', customer: 'john@example.com', status: 'completed', time: '2 minutes ago' },
+    { id: 'ord_002', category: 'Crypto Received', amount: '$1,200.00', crypto: '1,200 USDC', customer: 'sarah@company.com', status: 'completed', time: '15 minutes ago' },
+    { id: 'ord_003', category: 'Payouts', amount: '$500.00', crypto: '500 USDT', method: 'ACH Transfer', status: 'processing', time: '1 hour ago' },
+    { id: 'ord_004', category: 'Crypto Received', amount: '$75.50', crypto: '75.5 USDC', customer: 'mike@startup.io', status: 'completed', time: '2 hours ago' },
+    { id: 'ord_005', category: 'Payouts', amount: '$850.00', crypto: '850 USDC', method: 'Wire Transfer', status: 'completed', time: '3 hours ago' },
   ]
 
   const kybProgress = {
@@ -56,9 +57,10 @@ export function MerchantDashboard() {
     const variants = {
       completed: { variant: "default" as const, icon: CheckCircle },
       pending: { variant: "secondary" as const, icon: Clock },
+      processing: { variant: "secondary" as const, icon: Clock },
       failed: { variant: "destructive" as const, icon: Clock }
     }
-    const config = variants[status as keyof typeof variants]
+    const config = variants[status as keyof typeof variants] || variants.completed
     const Icon = config.icon
     
     return (
@@ -229,31 +231,39 @@ export function MerchantDashboard() {
         </Card>
       </div>
 
-      {/* Recent Transactions */}
+      {/* Recent Orders */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Latest payment activity on your account</CardDescription>
+            <CardTitle>Recent Orders</CardTitle>
+            <CardDescription>Latest crypto received and payout activity</CardDescription>
           </div>
-          <Button variant="outline" size="sm" data-testid="button-view-all-transactions">
+          <Button variant="outline" size="sm" data-testid="button-view-all-orders">
             View All
           </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {recentTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`transaction-${transaction.id}`}>
-                <div className="space-y-1">
+            {recentOrders.map((order) => (
+              <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`order-${order.id}`}>
+                <div className="space-y-1 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{transaction.type}</span>
-                    {getStatusBadge(transaction.status)}
+                    <Badge variant={order.category === 'Crypto Received' ? 'default' : 'secondary'} className="text-xs">
+                      {order.category}
+                    </Badge>
+                    {getStatusBadge(order.status)}
                   </div>
-                  <p className="text-sm text-muted-foreground">{transaction.time}</p>
+                  <div className="text-sm text-muted-foreground">
+                    {order.category === 'Crypto Received' 
+                      ? `From: ${order.customer}` 
+                      : `Method: ${order.method}`
+                    }
+                  </div>
+                  <p className="text-xs text-muted-foreground">{order.time}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold">{transaction.amount}</p>
-                  <p className="text-sm text-muted-foreground">{transaction.crypto}</p>
+                  <p className="font-bold">{order.amount}</p>
+                  <p className="text-sm text-muted-foreground">{order.crypto}</p>
                 </div>
               </div>
             ))}

@@ -16,7 +16,9 @@ import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
 import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
 import { ApiKeys } from "@/components/merchant/api-keys";
 import { Integrations } from "@/components/merchant/integrations";
-import { PaymentFlow } from "@/components/customer/payment-flow";
+import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
+import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
+import { Accounts } from "@/components/merchant/accounts";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -48,15 +50,12 @@ function Router() {
       {/* Merchant Portal Routes */}
       <Route path="/merchant" component={MerchantDashboard} />
       <Route path="/merchant/onboarding" component={KybOnboarding} />
+      <Route path="/merchant/receive-crypto" component={ReceiveCrypto} />
+      <Route path="/merchant/offramp-crypto" component={OfframpCrypto} />
       <Route path="/merchant/api-keys" component={ApiKeys} />
       <Route path="/merchant/integrations" component={Integrations} />
-      <Route path="/merchant/accounts" component={() => <div className="p-6">Account management coming soon...</div>} />
-      <Route path="/merchant/analytics" component={() => <div className="p-6">Analytics dashboard coming soon...</div>} />
+      <Route path="/merchant/accounts" component={Accounts} />
       
-      {/* Customer Payment Routes */}
-      <Route path="/pay/:merchantId">
-        {(params) => <PaymentFlow merchantId={params.merchantId} />}
-      </Route>
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
@@ -67,7 +66,6 @@ function Router() {
 function AppLayout() {
   const [location] = useLocation();
   const isLandingPage = location === '/';
-  const isPaymentPage = location.startsWith('/pay/');
   const isPortalRoute = location.startsWith('/admin') || location.startsWith('/merchant');
   
   // Determine user role based on current path
@@ -79,8 +77,8 @@ function AppLayout() {
 
   const userRole = getUserRole(location);
 
-  // For landing page and payment flow, render without sidebar
-  if (isLandingPage || isPaymentPage) {
+  // For landing page, render without sidebar
+  if (isLandingPage) {
     return <Router />;
   }
 
