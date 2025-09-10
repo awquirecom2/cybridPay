@@ -1,0 +1,158 @@
+1. Administration Portal
+1.1. Merchant Management
+
+View merchant list (ID, name, email, status, integrations enabled)
+
+Search, filter, and sort merchants by status, date onboarded, or name
+
+Merchant detail view: contact info, KYB status, Cybrid & Transak keys, transaction summary
+
+Actions: Approve/Reject KYB, Enable/Disable Cybrid, Enable/Disable Transak, Regenerate merchant API key
+
+1.2. Permissions & Roles
+
+Define roles (Super-Admin, Compliance, Support)
+
+Grant/revoke access to merchant management, webhook logs, system settings
+
+1.3. Payment Fee Configuration
+
+Configure global and per-merchant fee rates (percentage or flat + percentage)
+
+Schedule fee changes effective dates
+
+Preview fee impact calculation on sample transaction
+
+1.4. Webhook Configuration
+
+View all incoming Transak & Cybrid webhook events
+
+Enable/disable specific webhook event types per merchant
+
+Retry failed webhooks manually
+
+2. Merchant Portal
+2.1. Onboarding & KYB
+
+Fill KYB form: business details, address, directors
+
+Upload required documents (PDF/JPEG) via drag-and-drop
+
+View KYB status timeline (submitted → in review → approved/rejected)
+
+2.2. API Key Management
+
+View current merchant API key (masked)
+
+Regenerate API key with confirmation modal
+
+Copy-to-clipboard functionality
+
+2.3. Integration Setup
+
+Transak
+
+Enter Transak API key & partner secret
+
+Test connection button shows live/staging connectivity status
+
+Cybrid
+
+Generate Cybrid Customer token
+
+Connect Plaid for payout bank account
+
+View Cybrid deposit address for each trading account
+
+2.4. Account Dashboards
+
+Fiat Account: balance, pending deposits/withdrawals, transaction list
+
+Crypto Accounts: USDC & USDT trading balances, deposit addresses, trade history
+
+3. Customer-Facing Payment Flow
+3.1. Payment Initialization
+
+Merchant-specific URL (e.g., /pay/{merchantId})
+
+Display amount entry form with preset or custom fiat/crypto options
+
+Validate input (min/max limits per currency)
+
+3.2. Transak Widget Integration
+
+Load secure widget URL via SDK
+
+Display in modal or embedded iframe
+
+Show loading spinner until widget ready
+
+Handle Transak events:
+
+ORDER_CREATED → show “Processing…”
+
+ORDER_SUCCESSFUL → transition to “Complete” page
+
+WALLET_REDIRECTION → redirect to internal withdrawal flow
+
+3.3. Post-Payment Confirmation
+
+Show transaction summary: fiat spent, crypto received, fees
+
+Email receipt to customer email on file
+
+Provide link to view on-chain transaction
+
+4. Webhook Handlers & Background Services
+4.1. Transak Webhook
+
+Validate signature (if available)
+
+Update PaymentSession status (initiated → completed/failed)
+
+On completion:
+
+Record Transaction in database
+
+Notify merchant via email or webhook callback endpoint
+
+4.2. Cybrid Webhook
+
+Handle events:
+
+customer.verification.completed → update merchant KYB status
+
+deposit_address.created → save deposit address for crypto account
+
+transfer.completed → reconcile on-chain deposits to merchant accounts
+
+4.3. Retry & Alerting
+
+Automatic retry logic for transient failures (3 attempts, exponential back-off)
+
+Alert admin via Slack/email for repeated webhook failures
+
+5. Platform Services
+5.1. Authentication & Security
+
+OAuth2 machine-to-machine for Cybrid (Client Credentials flow)
+
+JWT session tokens for user login (NextAuth)
+
+Role-based access control (RBAC) middleware on API routes
+
+5.2. Data Persistence
+
+PostgreSQL via Prisma ORM
+
+Models: Merchant, MerchantAPIKey, PaymentSession, Transaction, User
+
+Auditing fields: createdAt, updatedAt, performedBy
+
+5.3. Logging & Monitoring
+
+Structured logs for API calls, errors, and webhook events
+
+Integrate Sentry for exception tracking
+
+Dashboard for key metrics: onboarding rate, transaction volume, error rates
