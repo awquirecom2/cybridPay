@@ -200,7 +200,7 @@ export function ApiKeys() {
                 <Label className="text-sm font-medium">Public Key</Label>
                 <div className="flex items-center gap-2">
                   <Input 
-                    value={apiKey.key} 
+                    defaultValue={apiKey.key} 
                     readOnly 
                     className="font-mono text-sm"
                     data-testid={`input-public-key-${apiKey.id}`}
@@ -224,7 +224,7 @@ export function ApiKeys() {
                 <Label className="text-sm font-medium">Secret Key</Label>
                 <div className="flex items-center gap-2">
                   <Input 
-                    value={showSecrets[apiKey.id] ? apiKey.secret : maskSecret(apiKey.secret)}
+                    defaultValue={showSecrets[apiKey.id] ? apiKey.secret : maskSecret(apiKey.secret)}
                     readOnly 
                     className="font-mono text-sm"
                     type={showSecrets[apiKey.id] ? "text" : "password"}
