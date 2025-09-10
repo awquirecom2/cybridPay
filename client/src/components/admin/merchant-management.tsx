@@ -24,7 +24,7 @@ export function MerchantManagement() {
   })
 
   // TODO: remove mock functionality - replace with real merchant data
-  const mockMerchants = [
+  const [merchants, setMerchants] = useState([
     {
       id: "merch_001",
       name: "TechCorp Inc",
@@ -75,7 +75,7 @@ export function MerchantManagement() {
       integrations: ["transak"],
       volume: "$75,000"
     }
-  ]
+  ])
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -99,6 +99,7 @@ export function MerchantManagement() {
     const variants = {
       verified: { variant: "default" as const, text: "Verified" },
       review: { variant: "secondary" as const, text: "In Review" },
+      pending: { variant: "secondary" as const, text: "Pending" },
       failed: { variant: "destructive" as const, text: "Failed" }
     }
     const config = variants[kybStatus as keyof typeof variants]
@@ -110,7 +111,7 @@ export function MerchantManagement() {
     )
   }
 
-  const filteredMerchants = mockMerchants.filter(merchant => {
+  const filteredMerchants = merchants.filter(merchant => {
     const matchesSearch = merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          merchant.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || merchant.status === statusFilter
@@ -118,8 +119,26 @@ export function MerchantManagement() {
   })
 
   const handleMerchantAction = (action: string, merchantId: string) => {
-    const merchant = mockMerchants.find(m => m.id === merchantId)
+    const merchant = merchants.find(m => m.id === merchantId)
     if (!merchant) return
+
+    setMerchants(prev => prev.map(m => {
+      if (m.id === merchantId) {
+        switch (action) {
+          case 'approve':
+            return { ...m, status: 'approved' }
+          case 'reject':
+            return { ...m, status: 'rejected' }
+          case 'deactivate':
+            return { ...m, status: 'deactivated' }
+          case 'reactivate':
+            return { ...m, status: 'approved' }
+          default:
+            return m
+        }
+      }
+      return m
+    }))
 
     switch (action) {
       case 'approve':
@@ -164,7 +183,18 @@ export function MerchantManagement() {
     }
 
     // TODO: Implement real merchant creation API call
-    console.log('Creating new merchant:', newMerchant)
+    const newMerchantData = {
+      id: `merch_${Date.now()}`,
+      name: newMerchant.name,
+      email: newMerchant.email,
+      status: 'pending',
+      kybStatus: 'pending',
+      dateOnboarded: new Date().toISOString().split('T')[0],
+      integrations: [],
+      volume: '$0'
+    }
+    
+    setMerchants(prev => [...prev, newMerchantData])
     
     toast({
       title: "Merchant Created",
@@ -270,7 +300,7 @@ export function MerchantManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Merchants</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-merchants">5</div>
+            <div className="text-2xl font-bold" data-testid="text-total-merchants">{merchants.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -278,7 +308,7 @@ export function MerchantManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600" data-testid="text-approved-merchants">2</div>
+            <div className="text-2xl font-bold text-green-600" data-testid="text-approved-merchants">{merchants.filter(m => m.status === 'approved').length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -286,7 +316,7 @@ export function MerchantManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Pending Review</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-merchants">1</div>
+            <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-merchants">{merchants.filter(m => m.status === 'pending').length}</div>
           </CardContent>
         </Card>
         <Card>

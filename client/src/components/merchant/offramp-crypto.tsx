@@ -95,18 +95,20 @@ export function OfframpCrypto() {
           networkFee: data.cryptoCurrency === 'ETH' ? "12.00" : "2.00"
         },
         processingTime: data.payoutMethod === 'debit_card' ? '5-30 minutes' : 
-                         data.payoutMethod === 'wire' ? '1-2 hours' : '1-3 business days'
+                         data.payoutMethod === 'bank_transfer' ? '1-2 hours' :
+                         data.payoutMethod === 'sepa_transfer' ? '1-2 hours' :
+                         data.payoutMethod === 'gbp_transfer' ? '1-2 hours' : '1-3 business days'
       }
 
       setPayoutDetails(mockQuote)
       
       // Generate Transak offramp widget link
-      const baseUrl = process.env.NODE_ENV === 'production' 
+      const baseUrl = import.meta.env.MODE === 'production' 
         ? 'https://global.transak.com' 
         : 'https://global-stg.transak.com'
         
       const params = new URLSearchParams({
-        apiKey: process.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
+        apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
         cryptoAmount: data.cryptoAmount,
         cryptoCurrency: data.cryptoCurrency,
         fiatCurrency: data.fiatCurrency,
