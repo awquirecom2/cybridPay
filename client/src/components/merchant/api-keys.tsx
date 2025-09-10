@@ -437,60 +437,6 @@ export function ApiKeys() {
         </CardContent>
       </Card>
 
-      {/* Integration Examples */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Integration Examples</CardTitle>
-          <CardDescription>
-            Quick start code examples for integrating with CryptoPay
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {/* JavaScript Example */}
-            <div>
-              <h3 className="font-semibold text-sm mb-3">JavaScript / Node.js</h3>
-              <div className="bg-muted/50 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                <pre className="whitespace-pre-wrap">
-{`const cryptopay = require('@cryptopay/sdk');
-
-const client = cryptopay({
-  publicKey: 'pk_live_1234567890abcdef',
-  secretKey: 'sk_live_abcdef1234567890fedcba0987654321'
-});
-
-const payment = await client.payments.create({
-  amount: 100,
-  currency: 'USD',
-  crypto: 'USDC'
-});`}
-                </pre>
-              </div>
-            </div>
-
-            {/* Python Example */}
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Python</h3>
-              <div className="bg-muted/50 p-4 rounded-lg font-mono text-sm overflow-x-auto">
-                <pre className="whitespace-pre-wrap">
-{`import cryptopay
-
-client = cryptopay.Client(
-    public_key='pk_live_1234567890abcdef',
-    secret_key='sk_live_abcdef1234567890fedcba0987654321'
-)
-
-payment = client.payments.create(
-    amount=100,
-    currency='USD',
-    crypto='USDC'
-)`}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Security Notice */}
       <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
