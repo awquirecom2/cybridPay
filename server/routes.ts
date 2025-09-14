@@ -51,6 +51,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupMerchantAuth(app);
   setupAdminAuth(app);
 
+  // Development-only test account seeding endpoint
+  app.post("/api/dev/seed-test-accounts", async (req, res) => {
+    // Only allow in development environment
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: "Seeding not allowed in production" });
+    }
+
+    // Temporarily disable secret requirement for testing
+    // const seedSecret = req.headers['x-seed-secret'];
+    // if (!seedSecret || seedSecret !== process.env.SEED_SECRET) {
+    //   return res.status(403).json({ error: "Invalid seed secret" });
+    // }
+
+    try {
+      const results = {
+        admins: [] as any[],
+        merchants: [] as any[],
+        message: "Test accounts seeded successfully"
+      };
+
+      // Create admin test accounts
+      const adminAccounts = [
+        {
+          username: "admin.alice",
+          password: "Admin!Pass123",
+          email: "alice.admin@example.com",
+          firstName: "Alice",
+          lastName: "Administrator",
+          role: "super_admin",
+          status: "active"
+        },
+        {
+          username: "admin.bob", 
+          password: "Admin!Pass456",
+          email: "bob.admin@example.com",
+          firstName: "Bob",
+          lastName: "Manager",
+          role: "admin",
+          status: "active"
+        }
+      ];
+
+      for (const adminData of adminAccounts) {
+        // Check if admin already exists
+        const existingAdmin = await storage.getAdminByUsername(adminData.username);
+        if (!existingAdmin) {
+          const hashedPassword = await hashAdminPassword(adminData.password);
+          const admin = await storage.createAdmin({
+            ...adminData,
+            password: hashedPassword
+          });
+          results.admins.push({
+            username: adminData.username,
+            password: adminData.password, // Return plaintext for testing
+            email: adminData.email,
+            role: adminData.role,
+            id: admin.id
+          });
+        } else {
+          results.admins.push({
+            username: adminData.username,
+            password: adminData.password, // Return plaintext for testing
+            message: "Already exists"
+          });
+        }
+      }
+
+      // Create merchant test accounts  
+      const merchantAccounts = [
+        {
+          username: "merchant.delta",
+          password: "Merchant!Pass123", 
+          email: "delta@example.com",
+          name: "Delta Tech",
+          businessType: "Technology",
+          status: "approved",
+          kybStatus: "verified"
+        },
+        {
+          username: "merchant.echo",
+          password: "Merchant!Pass456",
+          email: "echo@example.com", 
+          name: "Echo Commerce",
+          businessType: "E-commerce",
+          status: "approved",
+          kybStatus: "verified"
+        }
+      ];
+
+      for (const merchantData of merchantAccounts) {
+        // Check if merchant already exists
+        const existingMerchant = await storage.getMerchantByUsername(merchantData.username);
+        if (!existingMerchant) {
+          const hashedPassword = await hashPassword(merchantData.password);
+          const merchant = await storage.createMerchant({
+            ...merchantData,
+            password: hashedPassword
+          });
+          results.merchants.push({
+            username: merchantData.username,
+            password: merchantData.password, // Return plaintext for testing
+            email: merchantData.email,
+            name: merchantData.name,
+            status: merchantData.status,
+            id: merchant.id
+          });
+        } else {
+          results.merchants.push({
+            username: merchantData.username,
+            password: merchantData.password, // Return plaintext for testing
+            message: "Already exists"
+          });
+        }
+      }
+
+      res.status(200).json(results);
+    } catch (error) {
+      console.error("Error seeding test accounts:", error);
+      res.status(500).json({ error: "Failed to seed test accounts" });
+    }
+  });
+
   // Admin routes for merchant management
   app.get("/api/admin/merchants", async (req, res) => {
     try {

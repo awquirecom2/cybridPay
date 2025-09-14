@@ -46,15 +46,15 @@ export function initAuthCore(app: Express): void {
       if (typeof obj === 'string') {
         console.log('Legacy session detected, attempting dual lookup for ID:', obj);
         // Try admin first, then merchant
-        let user = await storage.getAdmin(obj);
-        if (user) {
+        let adminUser = await storage.getAdmin(obj);
+        if (adminUser) {
           console.log('Found admin user in legacy session');
-          return done(null, user as any);
+          return done(null, adminUser as any);
         }
-        user = await storage.getMerchant(obj);
-        if (user) {
+        let merchantUser = await storage.getMerchant(obj);
+        if (merchantUser) {
           console.log('Found merchant user in legacy session');
-          return done(null, user as any);
+          return done(null, merchantUser as any);
         }
         console.log('No user found for legacy session ID');
         return done(null, false);
