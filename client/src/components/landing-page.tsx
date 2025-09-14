@@ -13,14 +13,14 @@ export function LandingPage() {
       title: "Administration Portal",
       description: "Manage merchants, configure fees, handle permissions and monitor webhooks",
       icon: Shield,
-      href: "/admin",
+      href: "/admin/login",
       features: ["Merchant Management", "Role-based Access", "Fee Configuration", "Webhook Monitoring"]
     },
     {
       title: "Merchant Portal", 
       description: "Complete KYB onboarding, receive crypto payments and manage offramp transactions",
       icon: Building,
-      href: "/merchant",
+      href: "/merchant/login",
       features: ["KYB Onboarding", "Receive Crypto", "Offramp Crypto", "Cybrid Custodian"]
     }
   ]
