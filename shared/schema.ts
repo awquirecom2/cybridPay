@@ -63,3 +63,35 @@ export const adminCreateMerchantSchema = insertMerchantSchema.omit({
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
 export type AdminCreateMerchant = z.infer<typeof adminCreateMerchantSchema>;
 export type Merchant = typeof merchants.$inferSelect;
+
+// Admins table for admin portal authentication and management
+export const admins = pgTable("admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  email: text("email").notNull().unique(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  role: text("role").notNull().default("admin"), // admin, super_admin
+  status: text("status").notNull().default("active"), // active, suspended
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").default(sql`NOW()`),
+  updatedAt: timestamp("updated_at").default(sql`NOW()`)
+});
+
+export const insertAdminSchema = createInsertSchema(admins).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true
+});
+
+// Admin login schema (only username/password needed for login)
+export const adminLoginSchema = insertAdminSchema.pick({
+  username: true,
+  password: true
+});
+
+export type InsertAdmin = z.infer<typeof insertAdminSchema>;
+export type AdminLogin = z.infer<typeof adminLoginSchema>;
+export type Admin = typeof admins.$inferSelect;

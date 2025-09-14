@@ -21,6 +21,7 @@ import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
 import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
 import { Accounts } from "@/components/merchant/accounts";
 import MerchantLogin from "@/pages/merchant-login";
+import AdminLogin from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -41,8 +42,9 @@ function Router() {
       {/* Landing Page */}
       <Route path="/" component={LandingPage} />
       
-      {/* Merchant Authentication */}
+      {/* Authentication Routes */}
       <Route path="/merchant/login" component={MerchantLogin} />
+      <Route path="/admin/login" component={AdminLogin} />
       
       {/* Admin Portal Routes */}
       <Route path="/admin" component={AdminDashboard} />

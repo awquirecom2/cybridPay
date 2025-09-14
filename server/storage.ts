@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, users, merchants } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, users, merchants, admins } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -23,6 +23,16 @@ export interface IStorage {
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   updateMerchant(id: string, updates: Partial<InsertMerchant>): Promise<Merchant | undefined>;
   deleteMerchant(id: string): Promise<boolean>;
+  
+  // Admin methods
+  getAdmin(id: string): Promise<Admin | undefined>;
+  getAdminByUsername(username: string): Promise<Admin | undefined>;
+  getAdminByEmail(email: string): Promise<Admin | undefined>;
+  getAllAdmins(): Promise<Admin[]>;
+  createAdmin(admin: InsertAdmin): Promise<Admin>;
+  updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined>;
+  updateAdminLastLogin(id: string): Promise<void>;
+  deleteAdmin(id: string): Promise<boolean>;
   
   sessionStore: session.Store;
 }
@@ -90,6 +100,50 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMerchant(id: string): Promise<boolean> {
     const result = await db.delete(merchants).where(eq(merchants.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Admin methods
+  async getAdmin(id: string): Promise<Admin | undefined> {
+    const result = await db.select().from(admins).where(eq(admins.id, id));
+    return result[0];
+  }
+
+  async getAdminByUsername(username: string): Promise<Admin | undefined> {
+    const result = await db.select().from(admins).where(eq(admins.username, username));
+    return result[0];
+  }
+
+  async getAdminByEmail(email: string): Promise<Admin | undefined> {
+    const result = await db.select().from(admins).where(eq(admins.email, email));
+    return result[0];
+  }
+
+  async getAllAdmins(): Promise<Admin[]> {
+    return await db.select().from(admins);
+  }
+
+  async createAdmin(admin: InsertAdmin): Promise<Admin> {
+    const result = await db.insert(admins).values(admin).returning();
+    return result[0];
+  }
+
+  async updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined> {
+    const result = await db.update(admins)
+      .set(updates)
+      .where(eq(admins.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateAdminLastLogin(id: string): Promise<void> {
+    await db.update(admins)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(admins.id, id));
+  }
+
+  async deleteAdmin(id: string): Promise<boolean> {
+    const result = await db.delete(admins).where(eq(admins.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

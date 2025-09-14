@@ -2,17 +2,50 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
-import { adminCreateMerchantSchema } from "@shared/schema";
+import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
+import { adminCreateMerchantSchema, insertAdminSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup merchant authentication
-  setupMerchantAuth(app);
-
-  // Utility function to sanitize merchant data (remove password)
+  // Utility functions to sanitize data (remove passwords)
   const sanitizeMerchant = (merchant: any) => {
     const { password, ...sanitized } = merchant;
     return sanitized;
   };
+
+  const sanitizeAdmin = (admin: any) => {
+    const { password, ...sanitized } = admin;
+    return sanitized;
+  };
+
+  // Bootstrap route to create first admin (must be defined BEFORE admin auth middleware)
+  app.post("/api/admin/bootstrap", async (req, res) => {
+    try {
+      const existingAdmins = await storage.getAllAdmins();
+      if (existingAdmins.length > 0) {
+        return res.status(403).json({ error: "Admin bootstrap not allowed - admins already exist" });
+      }
+
+      const adminData = insertAdminSchema.parse(req.body);
+      const hashedPassword = await hashAdminPassword(adminData.password);
+
+      const admin = await storage.createAdmin({
+        ...adminData,
+        password: hashedPassword
+      });
+
+      res.status(201).json({
+        success: true,
+        admin: sanitizeAdmin(admin)
+      });
+    } catch (error) {
+      console.error("Error bootstrapping admin:", error);
+      res.status(400).json({ error: "Failed to create admin" });
+    }
+  });
+
+  // Setup authentication systems (AFTER bootstrap route)
+  setupMerchantAuth(app);
+  setupAdminAuth(app);
 
   // Admin routes for merchant management
   app.get("/api/admin/merchants", async (req, res) => {
