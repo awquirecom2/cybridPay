@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { initAuthCore } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema } from "@shared/schema";
@@ -43,7 +44,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Setup authentication systems (AFTER bootstrap route)
+  // Initialize authentication core (session, passport) FIRST
+  initAuthCore(app);
+  
+  // Setup authentication systems (AFTER auth core)
   setupMerchantAuth(app);
   setupAdminAuth(app);
 

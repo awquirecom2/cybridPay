@@ -1,17 +1,10 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { Merchant } from "@shared/schema";
-
-declare global {
-  namespace Express {
-    interface User extends Merchant {}
-  }
-}
+import { requireMerchant } from "./auth-core";
 
 const scryptAsync = promisify(scrypt);
 
@@ -35,27 +28,8 @@ export function generateMerchantCredentials() {
 }
 
 export function setupMerchantAuth(app: Express) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',
-    name: 'cryptopay.sid', // Custom session name to avoid default
-    resave: false,
-    saveUninitialized: false,
-    rolling: true, // Extend session on activity
-    store: storage.sessionStore,
-    cookie: {
-      secure: isProduction, // HTTPS only in production
-      httpOnly: true, // Prevent XSS attacks
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: isProduction ? 'strict' : 'lax', // CSRF protection
-    },
-  };
-
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
+  // Note: Session configuration and passport serialization/deserialization
+  // are now handled by auth-core.ts to avoid duplication and conflicts
 
   // Merchant-specific Passport strategy
   passport.use("merchant-local", 
@@ -70,48 +44,6 @@ export function setupMerchantAuth(app: Express) {
       return done(null, merchant);
     }),
   );
-
-  // Enhanced serialization to handle both admin and merchant users
-  passport.serializeUser((user: any, done) => {
-    // Determine user type based on presence of 'role' field (admins have role, merchants don't)
-    const userType = 'role' in user ? 'admin' : 'merchant';
-    done(null, { id: user.id, type: userType });
-  });
-  
-  passport.deserializeUser(async (obj: any, done) => {
-    try {
-      // Handle legacy string IDs (backward compatibility)
-      if (typeof obj === 'string') {
-        console.log('Legacy session detected, attempting dual lookup for ID:', obj);
-        // Try admin first, then merchant
-        let user = await storage.getAdmin(obj);
-        if (user) {
-          console.log('Found admin user in legacy session');
-          return done(null, user as any);
-        }
-        user = await storage.getMerchant(obj);
-        if (user) {
-          console.log('Found merchant user in legacy session');
-          return done(null, user);
-        }
-        console.log('No user found for legacy session ID');
-        return done(null, false);
-      }
-      
-      // Handle new object format { id, type }
-      if (obj && obj.type === 'admin') {
-        const admin = await storage.getAdmin(obj.id);
-        done(null, admin as any);
-      } else if (obj && obj.type === 'merchant') {
-        const merchant = await storage.getMerchant(obj.id);
-        done(null, merchant);
-      } else {
-        done(null, false);
-      }
-    } catch (error) {
-      done(error);
-    }
-  });
 
   // Utility function to sanitize merchant data (remove password)
   const sanitizeMerchant = (merchant: any) => {
