@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,11 +23,12 @@ export default function AdminLogin() {
     retry: false,
   });
 
-  // Redirect if already logged in
-  if (adminProfile) {
-    setLocation('/admin');
-    return null;
-  }
+  // Redirect if already logged in (moved to useEffect to avoid render-time state updates)
+  useEffect(() => {
+    if (adminProfile) {
+      setLocation('/admin');
+    }
+  }, [adminProfile, setLocation]);
 
   const form = useForm<AdminLogin>({
     resolver: zodResolver(adminLoginSchema),

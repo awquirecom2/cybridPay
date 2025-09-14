@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AdminProtectedRoute, MerchantProtectedRoute } from "@/components/protected-route";
 import { LandingPage } from "@/components/landing-page";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { MerchantManagement } from "@/components/admin/merchant-management";
@@ -46,21 +47,69 @@ function Router() {
       <Route path="/merchant/login" component={MerchantLogin} />
       <Route path="/admin/login" component={AdminLogin} />
       
-      {/* Admin Portal Routes */}
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/merchants" component={MerchantManagement} />
-      <Route path="/admin/permissions" component={UserManagement} />
-      <Route path="/admin/fees" component={FeeConfiguration} />
-      <Route path="/admin/webhooks" component={WebhookManagement} />
-      <Route path="/admin/settings" component={PlatformSettings} />
+      {/* Admin Portal Routes - Protected */}
+      <Route path="/admin">
+        <AdminProtectedRoute>
+          <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/merchants">
+        <AdminProtectedRoute>
+          <MerchantManagement />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/permissions">
+        <AdminProtectedRoute>
+          <UserManagement />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/fees">
+        <AdminProtectedRoute>
+          <FeeConfiguration />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/webhooks">
+        <AdminProtectedRoute>
+          <WebhookManagement />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/settings">
+        <AdminProtectedRoute>
+          <PlatformSettings />
+        </AdminProtectedRoute>
+      </Route>
       
-      {/* Merchant Portal Routes */}
-      <Route path="/merchant" component={MerchantDashboard} />
-      <Route path="/merchant/onboarding" component={KybOnboarding} />
-      <Route path="/merchant/receive-crypto" component={ReceiveCrypto} />
-      <Route path="/merchant/offramp-crypto" component={OfframpCrypto} />
-      <Route path="/merchant/manage-integrations" component={ManageIntegrations} />
-      <Route path="/merchant/accounts" component={Accounts} />
+      {/* Merchant Portal Routes - Protected */}
+      <Route path="/merchant">
+        <MerchantProtectedRoute>
+          <MerchantDashboard />
+        </MerchantProtectedRoute>
+      </Route>
+      <Route path="/merchant/onboarding">
+        <MerchantProtectedRoute>
+          <KybOnboarding />
+        </MerchantProtectedRoute>
+      </Route>
+      <Route path="/merchant/receive-crypto">
+        <MerchantProtectedRoute>
+          <ReceiveCrypto />
+        </MerchantProtectedRoute>
+      </Route>
+      <Route path="/merchant/offramp-crypto">
+        <MerchantProtectedRoute>
+          <OfframpCrypto />
+        </MerchantProtectedRoute>
+      </Route>
+      <Route path="/merchant/manage-integrations">
+        <MerchantProtectedRoute>
+          <ManageIntegrations />
+        </MerchantProtectedRoute>
+      </Route>
+      <Route path="/merchant/accounts">
+        <MerchantProtectedRoute>
+          <Accounts />
+        </MerchantProtectedRoute>
+      </Route>
       
       
       {/* Fallback to 404 */}

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,11 +29,12 @@ export default function MerchantLogin() {
     retry: false
   })
 
-  // Redirect if already authenticated
-  if (merchant) {
-    setLocation('/merchant')
-    return null
-  }
+  // Redirect if already authenticated (moved to useEffect to avoid render-time state updates)
+  useEffect(() => {
+    if (merchant) {
+      setLocation('/merchant')
+    }
+  }, [merchant, setLocation])
 
   // Login mutation
   const loginMutation = useMutation({
