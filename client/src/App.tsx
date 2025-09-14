@@ -12,6 +12,8 @@ import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { MerchantManagement } from "@/components/admin/merchant-management";
 import { FeeConfiguration } from "@/components/admin/fee-configuration";
 import { WebhookManagement } from "@/components/admin/webhook-management";
+import { PlatformSettings } from "@/components/admin/platform-settings";
+import { UserManagement } from "@/components/admin/user-management";
 import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
 import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
 import { ManageIntegrations } from "@/components/merchant/manage-integrations";
@@ -41,10 +43,10 @@ function Router() {
       {/* Admin Portal Routes */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/merchants" component={MerchantManagement} />
-      <Route path="/admin/permissions" component={() => <div className="p-6">Permissions management coming soon...</div>} />
+      <Route path="/admin/permissions" component={UserManagement} />
       <Route path="/admin/fees" component={FeeConfiguration} />
       <Route path="/admin/webhooks" component={WebhookManagement} />
-      <Route path="/admin/settings" component={() => <div className="p-6">Admin settings coming soon...</div>} />
+      <Route path="/admin/settings" component={PlatformSettings} />
       
       {/* Merchant Portal Routes */}
       <Route path="/merchant" component={MerchantDashboard} />

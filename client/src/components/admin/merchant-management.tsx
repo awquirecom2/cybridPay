@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 
@@ -16,11 +17,30 @@ export function MerchantManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [selectedMerchant, setSelectedMerchant] = useState<any>(null)
   const [newMerchant, setNewMerchant] = useState({
     name: "",
     email: "",
     businessType: "",
     website: ""
+  })
+  const [editMerchant, setEditMerchant] = useState({
+    name: "",
+    email: "",
+    businessType: "",
+    website: "",
+    phone: "",
+    address: "",
+    description: "",
+    kybStatus: "",
+    customFeeEnabled: false,
+    customFeePercentage: "2.5",
+    customFlatFee: "0.30",
+    payoutMethod: "bank_transfer",
+    bankAccountNumber: "",
+    bankRoutingNumber: "",
+    notes: ""
   })
 
   // TODO: remove mock functionality - replace with real merchant data
@@ -33,7 +53,19 @@ export function MerchantManagement() {
       kybStatus: "verified",
       dateOnboarded: "2024-01-15",
       integrations: ["transak", "cybrid"],
-      volume: "$125,000"
+      volume: "$125,000",
+      businessType: "Technology",
+      website: "https://techcorp.com",
+      phone: "+1-555-0101",
+      address: "123 Tech Street, San Francisco, CA 94105",
+      description: "Leading technology solutions provider",
+      customFeeEnabled: true,
+      customFeePercentage: "2.0",
+      customFlatFee: "0.25",
+      payoutMethod: "bank_transfer",
+      bankAccountNumber: "****1234",
+      bankRoutingNumber: "****5678",
+      notes: "High volume merchant, preferred partner"
     },
     {
       id: "merch_002", 
@@ -43,7 +75,19 @@ export function MerchantManagement() {
       kybStatus: "review",
       dateOnboarded: "2024-01-20",
       integrations: ["transak"],
-      volume: "$45,000"
+      volume: "$45,000",
+      businessType: "Digital Services",
+      website: "https://digitalgoods.com",
+      phone: "+1-555-0202",
+      address: "456 Digital Ave, New York, NY 10001",
+      description: "Digital goods marketplace",
+      customFeeEnabled: false,
+      customFeePercentage: "2.5",
+      customFlatFee: "0.30",
+      payoutMethod: "debit_card",
+      bankAccountNumber: "",
+      bankRoutingNumber: "",
+      notes: "Pending KYB verification"
     },
     {
       id: "merch_003",
@@ -53,7 +97,19 @@ export function MerchantManagement() {
       kybStatus: "verified", 
       dateOnboarded: "2024-01-10",
       integrations: ["transak", "cybrid"],
-      volume: "$285,000"
+      volume: "$285,000",
+      businessType: "E-commerce",
+      website: "https://cryptoshop.io",
+      phone: "+1-555-0303",
+      address: "789 Crypto Blvd, Austin, TX 78701",
+      description: "Cryptocurrency trading platform",
+      customFeeEnabled: true,
+      customFeePercentage: "1.8",
+      customFlatFee: "0.20",
+      payoutMethod: "bank_transfer",
+      bankAccountNumber: "****9876",
+      bankRoutingNumber: "****4321",
+      notes: "Enterprise client with volume discounts"
     },
     {
       id: "merch_004",
@@ -63,7 +119,19 @@ export function MerchantManagement() {
       kybStatus: "failed",
       dateOnboarded: "2024-01-22",
       integrations: [],
-      volume: "$0"
+      volume: "$0",
+      businessType: "Gaming",
+      website: "https://gamefi.game",
+      phone: "+1-555-0404",
+      address: "321 Gaming Way, Los Angeles, CA 90210",
+      description: "GameFi and NFT marketplace",
+      customFeeEnabled: false,
+      customFeePercentage: "2.5",
+      customFlatFee: "0.30",
+      payoutMethod: "bank_transfer",
+      bankAccountNumber: "",
+      bankRoutingNumber: "",
+      notes: "KYB failed - high risk jurisdiction"
     },
     {
       id: "merch_005",
@@ -73,7 +141,19 @@ export function MerchantManagement() {
       kybStatus: "verified",
       dateOnboarded: "2024-01-05",
       integrations: ["transak"],
-      volume: "$75,000"
+      volume: "$75,000",
+      businessType: "E-commerce",
+      website: "https://ecommerceplus.com",
+      phone: "+1-555-0505",
+      address: "654 Commerce St, Chicago, IL 60601",
+      description: "Online retail platform",
+      customFeeEnabled: false,
+      customFeePercentage: "2.5",
+      customFlatFee: "0.30",
+      payoutMethod: "debit_card",
+      bankAccountNumber: "****5555",
+      bankRoutingNumber: "****1111",
+      notes: "Temporarily deactivated for compliance review"
     }
   ])
 
@@ -121,6 +201,29 @@ export function MerchantManagement() {
   const handleMerchantAction = (action: string, merchantId: string) => {
     const merchant = merchants.find(m => m.id === merchantId)
     if (!merchant) return
+
+    if (action === 'edit') {
+      setSelectedMerchant(merchant)
+      setEditMerchant({
+        name: merchant.name,
+        email: merchant.email,
+        businessType: merchant.businessType || "",
+        website: merchant.website || "",
+        phone: merchant.phone || "",
+        address: merchant.address || "",
+        description: merchant.description || "",
+        kybStatus: merchant.kybStatus,
+        customFeeEnabled: merchant.customFeeEnabled || false,
+        customFeePercentage: merchant.customFeePercentage || "2.5",
+        customFlatFee: merchant.customFlatFee || "0.30",
+        payoutMethod: merchant.payoutMethod || "bank_transfer",
+        bankAccountNumber: merchant.bankAccountNumber || "",
+        bankRoutingNumber: merchant.bankRoutingNumber || "",
+        notes: merchant.notes || ""
+      })
+      setShowEditDialog(true)
+      return
+    }
 
     setMerchants(prev => prev.map(m => {
       if (m.id === merchantId) {
@@ -191,7 +294,19 @@ export function MerchantManagement() {
       kybStatus: 'pending',
       dateOnboarded: new Date().toISOString().split('T')[0],
       integrations: [],
-      volume: '$0'
+      volume: '$0',
+      businessType: newMerchant.businessType || "",
+      website: newMerchant.website || "",
+      phone: "",
+      address: "",
+      description: "",
+      customFeeEnabled: false,
+      customFeePercentage: "2.5",
+      customFlatFee: "0.30",
+      payoutMethod: "bank_transfer",
+      bankAccountNumber: "",
+      bankRoutingNumber: "",
+      notes: "New merchant - pending onboarding"
     }
     
     setMerchants(prev => [...prev, newMerchantData])
@@ -203,6 +318,64 @@ export function MerchantManagement() {
     
     setShowCreateDialog(false)
     setNewMerchant({ name: "", email: "", businessType: "", website: "" })
+  }
+
+  const handleUpdateMerchant = async () => {
+    if (!editMerchant.name || !editMerchant.email || !selectedMerchant) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // TODO: Implement real merchant update API call
+    setMerchants(prev => prev.map(m => 
+      m.id === selectedMerchant.id 
+        ? { 
+            ...m, 
+            ...editMerchant,
+            businessType: editMerchant.businessType,
+            website: editMerchant.website,
+            phone: editMerchant.phone,
+            address: editMerchant.address,
+            description: editMerchant.description,
+            customFeeEnabled: editMerchant.customFeeEnabled,
+            customFeePercentage: editMerchant.customFeePercentage,
+            customFlatFee: editMerchant.customFlatFee,
+            payoutMethod: editMerchant.payoutMethod,
+            bankAccountNumber: editMerchant.bankAccountNumber,
+            bankRoutingNumber: editMerchant.bankRoutingNumber,
+            notes: editMerchant.notes
+          }
+        : m
+    ))
+    
+    toast({
+      title: "Merchant Updated",
+      description: `${editMerchant.name} profile has been updated successfully.`,
+    })
+    
+    setShowEditDialog(false)
+    setSelectedMerchant(null)
+    setEditMerchant({
+      name: "",
+      email: "",
+      businessType: "",
+      website: "",
+      phone: "",
+      address: "",
+      description: "",
+      kybStatus: "",
+      customFeeEnabled: false,
+      customFeePercentage: "2.5",
+      customFlatFee: "0.30",
+      payoutMethod: "bank_transfer",
+      bankAccountNumber: "",
+      bankRoutingNumber: "",
+      notes: ""
+    })
   }
 
   return (
@@ -292,6 +465,231 @@ export function MerchantManagement() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Edit Merchant Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Merchant Profile
+            </DialogTitle>
+            <DialogDescription>
+              Update merchant profile, settings, and financial configuration.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Business Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editMerchant.name}
+                    onChange={(e) => setEditMerchant(prev => ({...prev, name: e.target.value}))}
+                    data-testid="input-edit-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email Address</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editMerchant.email}
+                    onChange={(e) => setEditMerchant(prev => ({...prev, email: e.target.value}))}
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-business-type">Business Type</Label>
+                  <Select value={editMerchant.businessType} onValueChange={(value) => setEditMerchant(prev => ({...prev, businessType: value}))}>
+                    <SelectTrigger data-testid="select-edit-business-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Technology">Technology</SelectItem>
+                      <SelectItem value="E-commerce">E-commerce</SelectItem>
+                      <SelectItem value="Digital Services">Digital Services</SelectItem>
+                      <SelectItem value="Gaming">Gaming</SelectItem>
+                      <SelectItem value="Fintech">Fintech</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-website">Website URL</Label>
+                  <Input
+                    id="edit-website"
+                    value={editMerchant.website}
+                    onChange={(e) => setEditMerchant(prev => ({...prev, website: e.target.value}))}
+                    data-testid="input-edit-website"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone Number</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editMerchant.phone}
+                    onChange={(e) => setEditMerchant(prev => ({...prev, phone: e.target.value}))}
+                    data-testid="input-edit-phone"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-kyb-status">KYB Status</Label>
+                  <Select value={editMerchant.kybStatus} onValueChange={(value) => setEditMerchant(prev => ({...prev, kybStatus: value}))}>
+                    <SelectTrigger data-testid="select-edit-kyb-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="review">In Review</SelectItem>
+                      <SelectItem value="verified">Verified</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-address">Business Address</Label>
+                <Input
+                  id="edit-address"
+                  value={editMerchant.address}
+                  onChange={(e) => setEditMerchant(prev => ({...prev, address: e.target.value}))}
+                  placeholder="123 Business St, City, State 12345"
+                  data-testid="input-edit-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Business Description</Label>
+                <Input
+                  id="edit-description"
+                  value={editMerchant.description}
+                  onChange={(e) => setEditMerchant(prev => ({...prev, description: e.target.value}))}
+                  placeholder="Brief description of business"
+                  data-testid="input-edit-description"
+                />
+              </div>
+            </div>
+
+            {/* Financial Configuration */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Financial Configuration</h3>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="custom-fees"
+                  checked={editMerchant.customFeeEnabled}
+                  onCheckedChange={(checked) => setEditMerchant(prev => ({...prev, customFeeEnabled: checked}))}
+                  data-testid="switch-custom-fees"
+                />
+                <Label htmlFor="custom-fees">Enable Custom Fee Structure</Label>
+              </div>
+              
+              {editMerchant.customFeeEnabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-fee-percentage">Fee Percentage (%)</Label>
+                    <Input
+                      id="edit-fee-percentage"
+                      type="number"
+                      step="0.1"
+                      value={editMerchant.customFeePercentage}
+                      onChange={(e) => setEditMerchant(prev => ({...prev, customFeePercentage: e.target.value}))}
+                      data-testid="input-edit-fee-percentage"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-flat-fee">Flat Fee ($)</Label>
+                    <Input
+                      id="edit-flat-fee"
+                      type="number"
+                      step="0.01"
+                      value={editMerchant.customFlatFee}
+                      onChange={(e) => setEditMerchant(prev => ({...prev, customFlatFee: e.target.value}))}
+                      data-testid="input-edit-flat-fee"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payout Configuration */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Payout Configuration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-payout-method">Preferred Payout Method</Label>
+                  <Select value={editMerchant.payoutMethod} onValueChange={(value) => setEditMerchant(prev => ({...prev, payoutMethod: value}))}>
+                    <SelectTrigger data-testid="select-edit-payout-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="debit_card">Debit Card</SelectItem>
+                      <SelectItem value="sepa_transfer">SEPA Transfer</SelectItem>
+                      <SelectItem value="gbp_transfer">UK Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {(editMerchant.payoutMethod === "bank_transfer" || editMerchant.payoutMethod === "sepa_transfer" || editMerchant.payoutMethod === "gbp_transfer") && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-bank-account">Bank Account Number</Label>
+                    <Input
+                      id="edit-bank-account"
+                      value={editMerchant.bankAccountNumber}
+                      onChange={(e) => setEditMerchant(prev => ({...prev, bankAccountNumber: e.target.value}))}
+                      placeholder="****1234"
+                      data-testid="input-edit-bank-account"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-routing-number">Routing Number</Label>
+                    <Input
+                      id="edit-routing-number"
+                      value={editMerchant.bankRoutingNumber}
+                      onChange={(e) => setEditMerchant(prev => ({...prev, bankRoutingNumber: e.target.value}))}
+                      placeholder="****5678"
+                      data-testid="input-edit-routing-number"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notes and Comments */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold border-b pb-2">Admin Notes</h3>
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Internal Notes</Label>
+                <textarea
+                  id="edit-notes"
+                  className="w-full p-3 border rounded-md resize-none"
+                  rows={3}
+                  value={editMerchant.notes}
+                  onChange={(e) => setEditMerchant(prev => ({...prev, notes: e.target.value}))}
+                  placeholder="Internal notes about this merchant..."
+                  data-testid="textarea-edit-notes"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2 pt-6 border-t">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateMerchant} data-testid="button-update-merchant">
+              <Edit className="h-4 w-4 mr-2" />
+              Update Merchant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
