@@ -91,7 +91,11 @@ export function setupAdminAuth(app: Express): void {
   app.post("/api/admin/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.status(200).json({ success: true });
+      req.session.destroy((err) => {
+        if (err) return next(err);
+        res.clearCookie('cryptopay.sid');
+        res.status(200).json({ success: true });
+      });
     });
   });
 

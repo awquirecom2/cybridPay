@@ -63,25 +63,18 @@ export function setupMerchantAuth(app: Express) {
   app.post("/api/merchant/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.status(200).json({ success: true });
+      req.session.destroy((err) => {
+        if (err) return next(err);
+        res.clearCookie('cryptopay.sid');
+        res.status(200).json({ success: true });
+      });
     });
   });
 
-  app.get("/api/merchant/profile", (req, res) => {
-    if (!req.isAuthenticated() || !req.user) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
+  app.get("/api/merchant/profile", requireMerchant, (req, res) => {
     res.json(sanitizeMerchant(req.user));
   });
 
-  // Middleware to protect merchant routes
-  app.use("/api/merchant", (req, res, next) => {
-    if (req.path === "/login" || req.path === "/logout") {
-      return next();
-    }
-    if (!req.isAuthenticated() || !req.user) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-    next();
-  });
+  // Merchant routes protected by requireMerchant middleware are handled individually
+  // No global middleware needed here as each route now has specific protection
 }

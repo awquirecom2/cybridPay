@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initAuthCore } from "./auth-core";
+import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema } from "@shared/schema";
@@ -58,11 +58,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ error: "Seeding not allowed in production" });
     }
 
-    // Temporarily disable secret requirement for testing
-    // const seedSecret = req.headers['x-seed-secret'];
-    // if (!seedSecret || seedSecret !== process.env.SEED_SECRET) {
-    //   return res.status(403).json({ error: "Invalid seed secret" });
-    // }
+    // Require secret header for additional security
+    const seedSecret = req.headers['x-seed-secret'];
+    if (!seedSecret || seedSecret !== (process.env.SEED_SECRET || 'dev-seed-secret')) {
+      return res.status(403).json({ error: "Invalid seed secret" });
+    }
 
     try {
       const results = {
@@ -173,8 +173,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes for merchant management
-  app.get("/api/admin/merchants", async (req, res) => {
+  // Admin routes for merchant management (require admin authentication)
+  app.get("/api/admin/merchants", requireAdmin, async (req, res) => {
     try {
       const merchants = await storage.getAllMerchants();
       // Remove password hashes from response
@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/merchants", async (req, res) => {
+  app.post("/api/admin/merchants", requireAdmin, async (req, res) => {
     try {
       // Use admin-specific schema that doesn't require username/password
       const merchantData = adminCreateMerchantSchema.parse(req.body);
@@ -217,7 +217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/merchants/:id", async (req, res) => {
+  app.put("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -227,14 +227,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Merchant not found" });
       }
       
-      res.json(merchant);
+      res.json(sanitizeMerchant(merchant));
     } catch (error) {
       console.error("Error updating merchant:", error);
       res.status(400).json({ error: "Failed to update merchant" });
     }
   });
 
-  app.delete("/api/admin/merchants/:id", async (req, res) => {
+  app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteMerchant(id);
@@ -250,8 +250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Merchant portal routes (protected by authentication middleware)
-  app.get("/api/merchant/dashboard", async (req, res) => {
+  // Merchant portal routes (require merchant authentication)
+  app.get("/api/merchant/dashboard", requireMerchant, async (req, res) => {
     // Return merchant-specific dashboard data
     res.json({
       transactions: [],

@@ -76,7 +76,12 @@ export function initAuthCore(app: Express): void {
   });
 }
 
-// Utility functions for checking user types
+// Helper function to get authoritative session type
+function getSessionType(req: any): string | undefined {
+  return req.session?.passport?.user?.type;
+}
+
+// Utility functions for display logic only (not security)  
 export function isAdmin(user: any): user is any {
   return user && 'role' in user;
 }
@@ -85,9 +90,9 @@ export function isMerchant(user: any): user is any {
   return user && !('role' in user) && 'name' in user;
 }
 
-// Portal protection middleware
+// Portal protection middleware using authoritative session type
 export function requireAdmin(req: any, res: any, next: any) {
-  if (!req.isAuthenticated() || !req.user || !isAdmin(req.user)) {
+  if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'admin') {
     return res.status(401).json({ error: "Admin authentication required" });
   }
   
@@ -99,7 +104,7 @@ export function requireAdmin(req: any, res: any, next: any) {
 }
 
 export function requireMerchant(req: any, res: any, next: any) {
-  if (!req.isAuthenticated() || !req.user || !isMerchant(req.user)) {
+  if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'merchant') {
     return res.status(401).json({ error: "Merchant authentication required" });
   }
   
