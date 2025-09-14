@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 
 export function MerchantManagement() {
   const { toast } = useToast()
@@ -43,119 +45,70 @@ export function MerchantManagement() {
     notes: ""
   })
 
-  // TODO: remove mock functionality - replace with real merchant data
-  const [merchants, setMerchants] = useState([
-    {
-      id: "merch_001",
-      name: "TechCorp Inc",
-      email: "admin@techcorp.com",
-      status: "approved",
-      kybStatus: "verified",
-      dateOnboarded: "2024-01-15",
-      integrations: ["transak", "cybrid"],
-      volume: "$125,000",
-      businessType: "Technology",
-      website: "https://techcorp.com",
-      phone: "+1-555-0101",
-      address: "123 Tech Street, San Francisco, CA 94105",
-      description: "Leading technology solutions provider",
-      customFeeEnabled: true,
-      customFeePercentage: "2.0",
-      customFlatFee: "0.25",
-      payoutMethod: "bank_transfer",
-      bankAccountNumber: "****1234",
-      bankRoutingNumber: "****5678",
-      notes: "High volume merchant, preferred partner"
-    },
-    {
-      id: "merch_002", 
-      name: "Digital Goods Ltd",
-      email: "finance@digitalgoods.com",
-      status: "pending",
-      kybStatus: "review",
-      dateOnboarded: "2024-01-20",
-      integrations: ["transak"],
-      volume: "$45,000",
-      businessType: "Digital Services",
-      website: "https://digitalgoods.com",
-      phone: "+1-555-0202",
-      address: "456 Digital Ave, New York, NY 10001",
-      description: "Digital goods marketplace",
-      customFeeEnabled: false,
-      customFeePercentage: "2.5",
-      customFlatFee: "0.30",
-      payoutMethod: "debit_card",
-      bankAccountNumber: "",
-      bankRoutingNumber: "",
-      notes: "Pending KYB verification"
-    },
-    {
-      id: "merch_003",
-      name: "CryptoShop",
-      email: "payments@cryptoshop.io",
-      status: "approved",
-      kybStatus: "verified", 
-      dateOnboarded: "2024-01-10",
-      integrations: ["transak", "cybrid"],
-      volume: "$285,000",
-      businessType: "E-commerce",
-      website: "https://cryptoshop.io",
-      phone: "+1-555-0303",
-      address: "789 Crypto Blvd, Austin, TX 78701",
-      description: "Cryptocurrency trading platform",
-      customFeeEnabled: true,
-      customFeePercentage: "1.8",
-      customFlatFee: "0.20",
-      payoutMethod: "bank_transfer",
-      bankAccountNumber: "****9876",
-      bankRoutingNumber: "****4321",
-      notes: "Enterprise client with volume discounts"
-    },
-    {
-      id: "merch_004",
-      name: "GameFi Platform",
-      email: "business@gamefi.game",
-      status: "rejected",
-      kybStatus: "failed",
-      dateOnboarded: "2024-01-22",
-      integrations: [],
-      volume: "$0",
-      businessType: "Gaming",
-      website: "https://gamefi.game",
-      phone: "+1-555-0404",
-      address: "321 Gaming Way, Los Angeles, CA 90210",
-      description: "GameFi and NFT marketplace",
-      customFeeEnabled: false,
-      customFeePercentage: "2.5",
-      customFlatFee: "0.30",
-      payoutMethod: "bank_transfer",
-      bankAccountNumber: "",
-      bankRoutingNumber: "",
-      notes: "KYB failed - high risk jurisdiction"
-    },
-    {
-      id: "merch_005",
-      name: "E-commerce Plus",
-      email: "admin@ecommerceplus.com",
-      status: "deactivated",
-      kybStatus: "verified",
-      dateOnboarded: "2024-01-05",
-      integrations: ["transak"],
-      volume: "$75,000",
-      businessType: "E-commerce",
-      website: "https://ecommerceplus.com",
-      phone: "+1-555-0505",
-      address: "654 Commerce St, Chicago, IL 60601",
-      description: "Online retail platform",
-      customFeeEnabled: false,
-      customFeePercentage: "2.5",
-      customFlatFee: "0.30",
-      payoutMethod: "debit_card",
-      bankAccountNumber: "****5555",
-      bankRoutingNumber: "****1111",
-      notes: "Temporarily deactivated for compliance review"
+  // State for showing generated credentials
+  const [showCredentials, setShowCredentials] = useState(false)
+  const [generatedCredentials, setGeneratedCredentials] = useState(null)
+
+  // Fetch merchants from API
+  const { data: merchants = [], isLoading: merchantsLoading, refetch: refetchMerchants } = useQuery({
+    queryKey: ['/api/admin/merchants'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/merchants')
+      if (!response.ok) throw new Error('Failed to fetch merchants')
+      return response.json()
     }
-  ])
+  })
+
+  // Create merchant mutation
+  const createMerchantMutation = useMutation({
+    mutationFn: async (merchantData: any) => {
+      const response = await apiRequest('POST', '/api/admin/merchants', merchantData)
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      setGeneratedCredentials(data.credentials)
+      setShowCredentials(true)
+      setShowCreateDialog(false)
+      setNewMerchant({ name: "", email: "", businessType: "", website: "" })
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Merchant Created",
+        description: "New merchant has been created successfully with login credentials.",
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: "Failed to create merchant. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  // Update merchant mutation
+  const updateMerchantMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+      const response = await apiRequest('PUT', `/api/admin/merchants/${id}`, updates)
+      return await response.json()
+    },
+    onSuccess: () => {
+      setShowEditDialog(false)
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Merchant Updated",
+        description: "Merchant information has been updated successfully.",
+      })
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update merchant. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -225,23 +178,29 @@ export function MerchantManagement() {
       return
     }
 
-    setMerchants(prev => prev.map(m => {
-      if (m.id === merchantId) {
-        switch (action) {
-          case 'approve':
-            return { ...m, status: 'approved' }
-          case 'reject':
-            return { ...m, status: 'rejected' }
-          case 'deactivate':
-            return { ...m, status: 'deactivated' }
-          case 'reactivate':
-            return { ...m, status: 'approved' }
-          default:
-            return m
-        }
-      }
-      return m
-    }))
+    // Update merchant status via API
+    let newStatus = ''
+    switch (action) {
+      case 'approve':
+        newStatus = 'approved'
+        break
+      case 'reject':
+        newStatus = 'rejected'
+        break
+      case 'deactivate':
+        newStatus = 'deactivated'
+        break
+      case 'reactivate':
+        newStatus = 'approved'
+        break
+      default:
+        return
+    }
+
+    updateMerchantMutation.mutate({
+      id: merchantId,
+      updates: { status: newStatus }
+    })
 
     switch (action) {
       case 'approve':
@@ -285,39 +244,7 @@ export function MerchantManagement() {
       return
     }
 
-    // TODO: Implement real merchant creation API call
-    const newMerchantData = {
-      id: `merch_${Date.now()}`,
-      name: newMerchant.name,
-      email: newMerchant.email,
-      status: 'pending',
-      kybStatus: 'pending',
-      dateOnboarded: new Date().toISOString().split('T')[0],
-      integrations: [],
-      volume: '$0',
-      businessType: newMerchant.businessType || "",
-      website: newMerchant.website || "",
-      phone: "",
-      address: "",
-      description: "",
-      customFeeEnabled: false,
-      customFeePercentage: "2.5",
-      customFlatFee: "0.30",
-      payoutMethod: "bank_transfer",
-      bankAccountNumber: "",
-      bankRoutingNumber: "",
-      notes: "New merchant - pending onboarding"
-    }
-    
-    setMerchants(prev => [...prev, newMerchantData])
-    
-    toast({
-      title: "Merchant Created",
-      description: `${newMerchant.name} has been added to the system. They will receive onboarding instructions via email.`,
-    })
-    
-    setShowCreateDialog(false)
-    setNewMerchant({ name: "", email: "", businessType: "", website: "" })
+    createMerchantMutation.mutate(newMerchant)
   }
 
   const handleUpdateMerchant = async () => {
@@ -330,51 +257,9 @@ export function MerchantManagement() {
       return
     }
 
-    // TODO: Implement real merchant update API call
-    setMerchants(prev => prev.map(m => 
-      m.id === selectedMerchant.id 
-        ? { 
-            ...m, 
-            ...editMerchant,
-            businessType: editMerchant.businessType,
-            website: editMerchant.website,
-            phone: editMerchant.phone,
-            address: editMerchant.address,
-            description: editMerchant.description,
-            customFeeEnabled: editMerchant.customFeeEnabled,
-            customFeePercentage: editMerchant.customFeePercentage,
-            customFlatFee: editMerchant.customFlatFee,
-            payoutMethod: editMerchant.payoutMethod,
-            bankAccountNumber: editMerchant.bankAccountNumber,
-            bankRoutingNumber: editMerchant.bankRoutingNumber,
-            notes: editMerchant.notes
-          }
-        : m
-    ))
-    
-    toast({
-      title: "Merchant Updated",
-      description: `${editMerchant.name} profile has been updated successfully.`,
-    })
-    
-    setShowEditDialog(false)
-    setSelectedMerchant(null)
-    setEditMerchant({
-      name: "",
-      email: "",
-      businessType: "",
-      website: "",
-      phone: "",
-      address: "",
-      description: "",
-      kybStatus: "",
-      customFeeEnabled: false,
-      customFeePercentage: "2.5",
-      customFlatFee: "0.30",
-      payoutMethod: "bank_transfer",
-      bankAccountNumber: "",
-      bankRoutingNumber: "",
-      notes: ""
+    updateMerchantMutation.mutate({
+      id: selectedMerchant.id,
+      updates: editMerchant
     })
   }
 
@@ -686,6 +571,65 @@ export function MerchantManagement() {
             <Button onClick={handleUpdateMerchant} data-testid="button-update-merchant">
               <Edit className="h-4 w-4 mr-2" />
               Update Merchant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Credentials Display Dialog */}
+      <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Merchant Credentials Generated
+            </DialogTitle>
+            <DialogDescription>
+              Here are the login credentials for the new merchant. Please share these securely with the merchant.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {generatedCredentials && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg space-y-3">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Username</Label>
+                  <div className="mt-1 p-2 bg-background rounded border font-mono text-sm">
+                    {generatedCredentials.username}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Password</Label>
+                  <div className="mt-1 p-2 bg-background rounded border font-mono text-sm">
+                    {generatedCredentials.password}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="w-4 h-4 rounded-full bg-amber-500 flex-shrink-0 mt-0.5"></div>
+                <div className="text-sm text-amber-800 dark:text-amber-200">
+                  <p className="font-medium">Important:</p>
+                  <p>Store these credentials securely. The merchant will use these to access their portal at <code>/merchant/login</code>.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCredentials(false)}>
+              Close
+            </Button>
+            <Button 
+              onClick={() => {
+                if (generatedCredentials) {
+                  navigator.clipboard.writeText(`Username: ${generatedCredentials.username}\nPassword: ${generatedCredentials.password}`)
+                  toast({ title: "Copied!", description: "Credentials copied to clipboard" })
+                }
+              }}
+              data-testid="button-copy-credentials"
+            >
+              Copy Credentials
             </Button>
           </DialogFooter>
         </DialogContent>
