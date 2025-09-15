@@ -286,6 +286,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get specific Transak credentials for a merchant (for form pre-population)
+  app.get("/api/merchant/credentials/transak", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const credentials = await storage.getMerchantCredentials(merchantId, 'transak');
+      
+      if (!credentials) {
+        return res.json({
+          provider: 'transak',
+          environment: 'staging',
+          hasApiKey: false,
+          hasApiSecret: false,
+          isActive: false
+        });
+      }
+      
+      // Return credentials without sensitive data but with environment for form
+      res.json({
+        provider: 'transak',
+        environment: credentials.environment,
+        hasApiKey: !!credentials.encryptedApiKey,
+        hasApiSecret: !!credentials.encryptedApiSecret,
+        isActive: credentials.isActive,
+        createdAt: credentials.createdAt
+      });
+    } catch (error) {
+      console.error("Error fetching Transak credentials:", error);
+      res.status(500).json({ error: "Failed to fetch Transak credentials" });
+    }
+  });
+
   // Save/update Transak credentials
   app.post("/api/merchant/credentials/transak", requireMerchant, async (req, res) => {
     try {
