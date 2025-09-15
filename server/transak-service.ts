@@ -78,7 +78,6 @@ export class TransakService {
     
     const defaultHeaders = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
       'X-API-KEY': this.apiKey,
     };
 
