@@ -86,10 +86,19 @@ export class PublicTransakService {
     return this.makePublicRequest(url);
   }
 
-  // GET fiat currencies from public endpoint
+  // GET fiat currencies from public endpoint - using exact user-specified endpoint
   static async getFiatCurrencies() {
-    const url = `${this.STAGING_BASE_URL}/fiat/public/v1/currencies/fiat-currencies?apiKey=${this.PUBLIC_API_KEY}`;
-    return this.makePublicRequest(url);
+    const url = 'https://api-stg.transak.com/fiat/public/v1/currencies/fiat-currencies';
+    const options = {method: 'GET', headers: {accept: 'application/json'}};
+    
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak Fiat Currencies API error ${response.status}: ${errorText}`);
+    }
+    
+    return response.json();
   }
 
 

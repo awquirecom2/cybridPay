@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,12 +19,18 @@ export function OfframpCrypto() {
   const [payoutDetails, setPayoutDetails] = useState<any>(null)
   const [paymentLink, setPaymentLink] = useState("")
 
+  // Fetch fiat currencies with payment methods using the exact user-specified fetch
+  const { data: fiatCurrenciesData, isLoading: isLoadingPaymentMethods } = useQuery({
+    queryKey: ['/api/public/transak/fiat-currencies'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
+
   const transakForm = useForm({
     defaultValues: {
       cryptoAmount: "",
       cryptoCurrency: "USDC",
       fiatCurrency: "USD",
-      payoutMethod: "bank_transfer"
+      payoutMethod: "credit_debit_card" // Use the actual API method ID
     }
   })
 
@@ -62,12 +69,36 @@ export function OfframpCrypto() {
     { value: "BTC", label: "BTC - Bitcoin" }
   ]
 
-  const transakPayoutMethods = [
-    { value: "bank_transfer", label: "Bank Transfer" },
-    { value: "debit_card", label: "Debit Card" },
-    { value: "sepa_transfer", label: "SEPA Transfer (EUR)" },
-    { value: "gbp_transfer", label: "UK Bank Transfer (GBP)" }
-  ]
+  // Get USD payment methods from Transak API that support payouts
+  const transakPayoutMethods = (() => {
+    if (fiatCurrenciesData && (fiatCurrenciesData as any)?.response) {
+      const currencies = (fiatCurrenciesData as any).response;
+      
+      // Find USD currency
+      const usdCurrency = currencies.find((curr: any) => curr.symbol === 'USD');
+      
+      if (usdCurrency && usdCurrency.supportedPaymentMethods) {
+        // Filter payment methods that support payout (isPayOutAllowed: true)
+        return usdCurrency.supportedPaymentMethods
+          .filter((method: any) => method.isPayOutAllowed === true)
+          .map((method: any) => ({
+            value: method.id,
+            label: method.name || method.id.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+            processingTime: method.processingTime,
+            minAmount: method.minAmountForPayOut,
+            maxAmount: method.maxAmountForPayOut,
+            icon: method.icon
+          }));
+      }
+    }
+    
+    // Fallback to hardcoded methods if API data unavailable
+    return [
+      { value: "credit_debit_card", label: "Card Payment", processingTime: "1-3 minutes" },
+      { value: "bank_transfer", label: "Bank Transfer", processingTime: "1-2 hours" },
+      { value: "wire_transfer", label: "Wire Transfer", processingTime: "1-2 business days" }
+    ];
+  })()
 
   const cybridPayoutMethods = [
     { value: "ach", label: "ACH Transfer" },
@@ -360,7 +391,7 @@ export function OfframpCrypto() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {transakPayoutMethods.map((method) => (
+                                  {transakPayoutMethods.map((method: any) => (
                                     <SelectItem key={method.value} value={method.value}>
                                       {method.label}
                                     </SelectItem>
