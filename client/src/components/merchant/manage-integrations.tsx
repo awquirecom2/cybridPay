@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Key, Save, Eye, EyeOff, AlertTriangle, CheckCircle, ExternalLink, Globe, Building, TestTube } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,17 +9,35 @@ import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery, useMutation } from "@tanstack/react-query"
+import { apiRequest, queryClient } from "@/lib/queryClient"
 
 export function ManageIntegrations() {
   const { toast } = useToast()
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   
-  // Stored credentials - in real implementation these would come from backend
+  // Fetch existing Transak credentials from backend
+  const { data: existingTransakCredentials, isLoading: isLoadingCredentials } = useQuery({
+    queryKey: ['/api/merchant/credentials/transak'],
+  })
+
+  // Stored credentials state
   const [transakCredentials, setTransakCredentials] = useState({
     apiKey: "",
     apiSecret: "", 
     environment: "staging"
   })
+
+  // Update local state when credentials are loaded
+  useEffect(() => {
+    if (existingTransakCredentials) {
+      setTransakCredentials(prev => ({
+        ...prev,
+        environment: (existingTransakCredentials as any).environment || 'staging'
+        // API key and secret remain empty for security - only show if they exist
+      }))
+    }
+  }, [existingTransakCredentials])
 
   const [cybridCredentials, setCybridCredentials] = useState({
     organizationGuid: "",
@@ -37,12 +55,12 @@ export function ManageIntegrations() {
     cybrid: true
   })
 
-  // TODO: remove mock functionality - replace with real integration status
+  // Integration status based on fetched credentials
   const integrationStatus = {
     transak: {
-      connected: transakCredentials.apiKey && transakCredentials.apiSecret,
-      lastTest: "2024-01-21 14:30:00",
-      status: "operational",
+      connected: (existingTransakCredentials as any)?.hasApiKey && (existingTransakCredentials as any)?.hasApiSecret,
+      lastTest: (existingTransakCredentials as any)?.createdAt ? new Date((existingTransakCredentials as any).createdAt).toLocaleString() : "Never",
+      status: isLoadingCredentials ? "loading" : ((existingTransakCredentials as any)?.isActive ? "operational" : "inactive"),
       supportedCountries: 95,
       supportedCurrencies: 45
     },
@@ -69,15 +87,60 @@ export function ManageIntegrations() {
     setUnsavedChanges(prev => ({ ...prev, cybrid: true }))
   }
 
-  const saveTransakCredentials = async () => {
-    // TODO: Implement real API call to save credentials (never log secrets)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  // Mutation for saving Transak credentials
+  const saveTransakMutation = useMutation({
+    mutationFn: async (credentials: { apiKey: string; apiSecret: string; environment: string }) => {
+      const response = await apiRequest('POST', '/api/merchant/credentials/transak', credentials)
+      return await response.json()
+    },
+    onSuccess: () => {
+      setUnsavedChanges(prev => ({ ...prev, transak: false }))
+      // Clear sensitive data from state for security
+      setTransakCredentials(prev => ({
+        ...prev,
+        apiKey: "",
+        apiSecret: ""
+      }))
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant/credentials/transak'] })
+      toast({
+        title: "Transak Credentials Saved",
+        description: "Your Transak API credentials have been securely stored.",
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save Transak credentials",
+        variant: "destructive"
+      })
+    }
+  })
+
+  const saveTransakCredentials = () => {
+    // Build payload with only fields that have values
+    const payload: any = {
+      environment: transakCredentials.environment
+    }
     
-    setUnsavedChanges(prev => ({ ...prev, transak: false }))
-    toast({
-      title: "Transak Credentials Saved",
-      description: "Your Transak API credentials have been securely stored.",
-    })
+    // Only include credentials if they are provided (allows environment-only updates)
+    if (transakCredentials.apiKey) {
+      payload.apiKey = transakCredentials.apiKey
+    }
+    if (transakCredentials.apiSecret) {
+      payload.apiSecret = transakCredentials.apiSecret
+    }
+    
+    // For new integrations, require both credentials
+    if (!(existingTransakCredentials as any)?.hasApiKey && (!transakCredentials.apiKey || !transakCredentials.apiSecret)) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both API key and API secret for initial setup",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    saveTransakMutation.mutate(payload)
   }
 
   const saveCybridCredentials = async () => {
@@ -91,14 +154,29 @@ export function ManageIntegrations() {
     })
   }
 
-  const testTransakConnection = async () => {
-    // TODO: Implement real API call to test credentials server-side
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    toast({
-      title: "Connection Successful",
-      description: "Successfully connected to Transak API.",
-    })
+  // Mutation for testing Transak connection
+  const testTransakMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/transak/access-token')
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Connection Successful",
+        description: `Successfully connected to Transak API. Token expires in ${data.expiresIn} seconds.`,
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to Transak API. Please check your credentials.",
+        variant: "destructive"
+      })
+    }
+  })
+
+  const testTransakConnection = () => {
+    testTransakMutation.mutate()
   }
 
   const testCybridConnection = async () => {
