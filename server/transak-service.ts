@@ -192,4 +192,33 @@ export class TransakService {
       body: JSON.stringify(params),
     });
   }
+
+  // POST /partners/api/v2/refresh-token - Generate access token using stored credentials
+  async generateAccessToken(): Promise<{ accessToken: string; expiresIn: number }> {
+    const baseUrl = this.baseUrl.replace('/api/v2', ''); // Remove /api/v2 for partners endpoint
+    const url = `${baseUrl}/partners/api/v2/refresh-token`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-secret': this.apiSecret,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        apiKey: this.apiKey
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak access token generation failed ${response.status}: ${errorText}`);
+    }
+
+    const result = await response.json();
+    return {
+      accessToken: result.accessToken || result.access_token,
+      expiresIn: result.expiresIn || result.expires_in || 3600 // Default 1 hour
+    };
+  }
 }
