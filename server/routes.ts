@@ -502,17 +502,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET payment methods for USDC/USD - Public endpoint
-  app.get("/api/public/transak/payment-methods-usdc-usd", async (req, res) => {
-    try {
-      const paymentMethods = await PublicTransakService.getPaymentMethodsForUSDC();
-      res.json(paymentMethods);
-    } catch (error) {
-      console.error("Error fetching USDC/USD payment methods:", error);
-      res.status(500).json({ error: "Failed to fetch payment methods" });
-    }
-  });
-
   const httpServer = createServer(app);
 
   return httpServer;

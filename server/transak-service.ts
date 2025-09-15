@@ -103,54 +103,6 @@ export class PublicTransakService {
     const url = `${this.STAGING_BASE_URL}/cryptocoverage/api/v1/public/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;
     return this.makePublicRequest(url);
   }
-
-  // GET payment methods for USDC crypto and USD fiat
-  static async getPaymentMethodsForUSDC() {
-    try {
-      // Get fiat currencies which includes payment methods data
-      const fiatData = await this.getFiatCurrencies();
-      
-      // Find USD currency data
-      const usdCurrency = fiatData.response?.find((currency: any) => currency.symbol === 'USD');
-      
-      if (!usdCurrency || !usdCurrency.paymentOptions) {
-        throw new Error('USD payment methods not found');
-      }
-
-      // Return payment methods with enhanced metadata for USDC/USD
-      return {
-        cryptoCurrency: 'USDC',
-        fiatCurrency: 'USD',
-        supportingCountries: usdCurrency.supportingCountries || [],
-        paymentMethods: usdCurrency.paymentOptions.map((method: any) => ({
-          id: method.id,
-          name: method.name,
-          displayText: method.displayText,
-          processingTime: method.processingTime,
-          icon: method.icon,
-          limitCurrency: method.limitCurrency,
-          maxAmount: method.maxAmount,
-          minAmount: method.minAmount,
-          defaultAmount: method.defaultAmount,
-          isActive: method.isActive,
-          provider: method.provider,
-          displayMessage: method.displayMessage || '',
-          // Additional metadata for better UX
-          isInstant: method.processingTime?.includes('minute') || method.processingTime?.includes('instant'),
-          isBankTransfer: method.id?.includes('bank_transfer'),
-          isCardPayment: method.id === 'credit_debit_card',
-          isMobilePayment: ['apple_pay', 'google_pay'].includes(method.id),
-          supportedCountries: method.supportedCountryCode || usdCurrency.supportingCountries,
-          isPayOutAllowed: method.isPayOutAllowed,
-          minAmountForPayOut: method.minAmountForPayOut,
-          maxAmountForPayOut: method.maxAmountForPayOut
-        }))
-      };
-    } catch (error) {
-      console.error('Error fetching USDC/USD payment methods:', error);
-      throw error;
-    }
-  }
 }
 
 export class TransakService {
