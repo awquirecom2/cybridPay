@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery } from "@tanstack/react-query"
 
 export function ReceiveCrypto() {
   const { toast } = useToast()
@@ -31,14 +32,42 @@ export function ReceiveCrypto() {
     custodianAccountCreated: true // This should come from real data
   }
 
-  const supportedCrypto = [
+  // Fetch real crypto currencies from Transak API
+  const { data: cryptoCurrenciesData, isLoading: isLoadingCrypto, error: cryptoError } = useQuery({
+    queryKey: ['/api/public/transak/crypto-currencies'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
+
+  // Fetch real fiat currencies from Transak API
+  const { data: fiatCurrenciesData, isLoading: isLoadingFiat, error: fiatError } = useQuery({
+    queryKey: ['/api/public/transak/fiat-currencies'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
+
+  // Fetch countries from Transak API
+  const { data: countriesData, isLoading: isLoadingCountries, error: countriesError } = useQuery({
+    queryKey: ['/api/public/transak/countries'],
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  })
+
+  // Transform crypto currencies data for dropdown
+  const supportedCrypto = (cryptoCurrenciesData as any)?.response?.map((crypto: { symbol: string, name: string }) => ({
+    value: crypto.symbol,
+    label: `${crypto.symbol} - ${crypto.name}`
+  })) || [
+    // Fallback options if API fails
     { value: "USDC", label: "USDC - USD Coin" },
     { value: "USDT", label: "USDT - Tether" },
     { value: "ETH", label: "ETH - Ethereum" },
     { value: "BTC", label: "BTC - Bitcoin" }
   ]
 
-  const supportedFiat = [
+  // Transform fiat currencies data for dropdown
+  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string }) => ({
+    value: fiat.symbol,
+    label: `${fiat.symbol} - ${fiat.name}`
+  })) || [
+    // Fallback options if API fails
     { value: "USD", label: "USD - US Dollar" },
     { value: "EUR", label: "EUR - Euro" },
     { value: "GBP", label: "GBP - British Pound" }
