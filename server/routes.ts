@@ -454,10 +454,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           walletAddress as string
         );
         
-        // If successful, return the validation result (which should include isValid)
-        // Ensure we always return isValid boolean
+        // If successful, return the validation result
+        // Transak returns {response: true, success: true} for valid addresses
         res.json({
-          isValid: validation?.isValid === true || validation?.valid === true || false,
+          isValid: validation?.response === true && validation?.success === true,
           ...validation
         });
       } catch (validationError: any) {
