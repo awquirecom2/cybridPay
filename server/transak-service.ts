@@ -97,9 +97,9 @@ export class PublicTransakService {
   // Note: /getcurrencies endpoint doesn't exist in Transak API
   // Use getCryptoCurrencies() instead which has all the network and image data
 
-  // GET verify wallet address - Using correct Transak v2 API endpoint
+  // GET verify wallet address - Using correct Transak public API endpoint from documentation
   static async verifyWalletAddress(cryptoCurrency: string, network: string, walletAddress: string) {
-    const url = `https://api-stg.transak.com/api/v2/wallet/verify?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;
+    const url = `https://api-stg.transak.com/cryptocoverage/api/v1/public/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;
     return this.makePublicRequest(url);
   }
 }
