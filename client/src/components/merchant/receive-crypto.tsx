@@ -11,6 +11,34 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast"
 import { useQuery } from "@tanstack/react-query"
 
+// Crypto Icon Component
+const CryptoIcon = ({ crypto, className = "w-6 h-6" }: { crypto: string, className?: string }) => {
+  // Color mapping for major cryptocurrencies
+  const cryptoColors: { [key: string]: string } = {
+    'BTC': '#f7931a',
+    'ETH': '#627eea', 
+    'USDC': '#2775ca',
+    'USDT': '#26a17b',
+    'DAI': '#ffb700',
+    'MATIC': '#8247e5',
+    'BNB': '#f3ba2f',
+    'AVAX': '#e84142',
+    'SOL': '#9945ff',
+    'WBTC': '#f09242'
+  };
+
+  const color = cryptoColors[crypto] || '#6b7280'; // Default gray for unknown cryptos
+
+  return (
+    <div 
+      className={`${className} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+      style={{ backgroundColor: color }}
+    >
+      {crypto.slice(0, crypto.length > 4 ? 2 : crypto.length)}
+    </div>
+  );
+};
+
 export function ReceiveCrypto() {
   const { toast } = useToast()
   const [isCreatingQuote, setIsCreatingQuote] = useState(false)
@@ -481,8 +509,17 @@ export function ReceiveCrypto() {
                             </SelectTrigger>
                             <SelectContent>
                               {supportedCryptoNetworks.map((cryptoNetwork) => (
-                                <SelectItem key={cryptoNetwork.key} value={cryptoNetwork.value}>
-                                  {cryptoNetwork.label}
+                                <SelectItem key={cryptoNetwork.key} value={cryptoNetwork.value} className="flex justify-between items-center py-3">
+                                  <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-3">
+                                      <CryptoIcon crypto={cryptoNetwork.crypto} className="w-6 h-6 flex-shrink-0" />
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-foreground">{cryptoNetwork.crypto}</span>
+                                        <span className="text-muted-foreground">{cryptoNetwork.cryptoName}</span>
+                                      </div>
+                                    </div>
+                                    <span className="text-sm text-muted-foreground ml-4">{cryptoNetwork.networkDisplayName}</span>
+                                  </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
