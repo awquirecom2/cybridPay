@@ -229,11 +229,11 @@ export function ReceiveCrypto() {
   })()
 
   // Transform fiat currencies data for dropdown - ensure unique keys
-  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string, paymentOptions?: string[] }, index: number) => ({
+  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string, supportedPaymentMethods?: any[] }, index: number) => ({
     value: fiat.symbol,
     label: `${fiat.symbol} - ${fiat.name}`,
     key: `${fiat.symbol}-${index}`, // Add unique key to prevent React warnings
-    paymentOptions: fiat.paymentOptions || [] // Store payment options for dynamic selection
+    paymentOptions: fiat.supportedPaymentMethods?.map((method: any) => method.id) || [] // Extract payment method IDs from supportedPaymentMethods
   })).filter((fiat: { value: string, label: string, key: string, paymentOptions: string[] }, index: number, self: any[]) => 
     index === self.findIndex((f: any) => f.value === fiat.value) // Remove duplicates
   ) || [
