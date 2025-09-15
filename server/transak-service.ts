@@ -92,17 +92,7 @@ export class PublicTransakService {
     return this.makePublicRequest(url);
   }
 
-  // GET countries from public endpoint  
-  static async getCountries() {
-    const url = `${this.STAGING_BASE_URL}/fiat/public/v1/get/country`;
-    return this.makePublicRequest(url);
-  }
 
-  // GET networks from public endpoint
-  static async getNetworks() {
-    const url = `${this.STAGING_BASE_URL}/networks`;
-    return this.makePublicRequest(url);
-  }
 
   // Note: /getcurrencies endpoint doesn't exist in Transak API
   // Use getCryptoCurrencies() instead which has all the network and image data
@@ -149,15 +139,7 @@ export class TransakService {
     return response.json();
   }
 
-  // GET /currencies - Fetch supported crypto/fiat options
-  async getCurrencies() {
-    return this.makeRequest('/currencies');
-  }
 
-  // GET /networks - Fetch blockchain networks
-  async getNetworks() {
-    return this.makeRequest('/networks');
-  }
 
   // POST /pricing - Get real-time pricing
   async getPricing(params: {

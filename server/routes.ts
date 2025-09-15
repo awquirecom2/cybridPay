@@ -372,29 +372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Transak API endpoints
-  // GET /currencies - Fetch supported crypto/fiat options
-  app.get("/api/transak/currencies", requireMerchant, async (req, res) => {
-    try {
-      const transak = await getTransakService(req.user!.id);
-      const currencies = await transak.getCurrencies();
-      res.json(currencies);
-    } catch (error) {
-      console.error("Error fetching currencies:", error);
-      res.status(500).json({ error: "Failed to fetch currencies" });
-    }
-  });
 
-  // GET /networks - Fetch blockchain networks
-  app.get("/api/transak/networks", requireMerchant, async (req, res) => {
-    try {
-      const transak = await getTransakService(req.user!.id);
-      const networks = await transak.getNetworks();
-      res.json(networks);
-    } catch (error) {
-      console.error("Error fetching networks:", error);
-      res.status(500).json({ error: "Failed to fetch networks" });
-    }
-  });
 
   // POST /pricing - Get real-time pricing
   app.post("/api/transak/pricing", requireMerchant, async (req, res) => {
@@ -455,27 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET countries - Public endpoint for Receive Crypto page
-  app.get("/api/public/transak/countries", async (req, res) => {
-    try {
-      const countries = await PublicTransakService.getCountries();
-      res.json(countries);
-    } catch (error) {
-      console.error("Error fetching countries:", error);
-      res.status(500).json({ error: "Failed to fetch countries" });
-    }
-  });
 
-  // GET networks - Public endpoint for Receive Crypto page
-  app.get("/api/public/transak/networks", async (req, res) => {
-    try {
-      const networks = await PublicTransakService.getNetworks();
-      res.json(networks);
-    } catch (error) {
-      console.error("Error fetching networks:", error);
-      res.status(500).json({ error: "Failed to fetch networks" });
-    }
-  });
 
   // Note: /getcurrencies endpoint doesn't exist in Transak API
   // The crypto-currencies endpoint already has all needed data including networks and images
