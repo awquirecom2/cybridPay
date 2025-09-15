@@ -229,42 +229,51 @@ export function ReceiveCrypto() {
   })()
 
   // Transform fiat currencies data for dropdown - ensure unique keys
-  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string, supportedPaymentMethods?: any[] }, index: number) => ({
+  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string }, index: number) => ({
     value: fiat.symbol,
     label: `${fiat.symbol} - ${fiat.name}`,
-    key: `${fiat.symbol}-${index}`, // Add unique key to prevent React warnings
-    paymentOptions: fiat.supportedPaymentMethods?.map((method: any) => method.id) || [] // Extract payment method IDs from supportedPaymentMethods
-  })).filter((fiat: { value: string, label: string, key: string, paymentOptions: string[] }, index: number, self: any[]) => 
+    key: `${fiat.symbol}-${index}` // Add unique key to prevent React warnings
+  })).filter((fiat: { value: string, label: string, key: string }, index: number, self: any[]) => 
     index === self.findIndex((f: any) => f.value === fiat.value) // Remove duplicates
   ) || [
     // Fallback options if API fails
-    { value: "USD", label: "USD - US Dollar", key: "fallback-usd", paymentOptions: ["credit_debit_card", "bank_transfer"] },
-    { value: "EUR", label: "EUR - Euro", key: "fallback-eur", paymentOptions: ["credit_debit_card", "sepa_bank_transfer"] },
-    { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp", paymentOptions: ["credit_debit_card", "gbp_bank_transfer"] }
+    { value: "USD", label: "USD - US Dollar", key: "fallback-usd" },
+    { value: "EUR", label: "EUR - Euro", key: "fallback-eur" },
+    { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp" }
   ]
 
-  // Get dynamic payment methods based on selected fiat currency
-  const selectedFiatData = supportedFiat.find((fiat: { value: string, paymentOptions: string[] }) => fiat.value === form.watch("fiatCurrency"))
-  const availablePaymentMethods = selectedFiatData?.paymentOptions || ["credit_debit_card", "bank_transfer"]
-
-  // All possible payment methods (for labeling)
-  const allPaymentMethods = [
-    { value: "credit_debit_card", label: "Credit/Debit Card" },
-    { value: "bank_transfer", label: "Bank Transfer" },
-    { value: "sepa_bank_transfer", label: "SEPA Transfer (EUR)" },
-    { value: "gbp_bank_transfer", label: "UK Bank Transfer (GBP)" },
-    { value: "wire_transfer", label: "Wire Transfer" },
-    { value: "ach_transfer", label: "ACH Transfer" },
-    { value: "ideal", label: "iDEAL" },
-    { value: "sofort", label: "SOFORT" },
-    { value: "bancontact", label: "Bancontact" },
-    { value: "giropay", label: "Giropay" }
-  ]
-
-  // Filter payment methods to only show those supported by selected fiat currency
-  const paymentMethods = allPaymentMethods.filter(method => 
-    availablePaymentMethods.includes(method.value)
-  )
+  // Collect all payment methods from all currencies in Transak API response
+  const paymentMethods = (() => {
+    const allMethodsMap = new Map<string, string>()
+    
+    // Extract all payment methods from all currencies
+    if ((fiatCurrenciesData as any)?.response) {
+      (fiatCurrenciesData as any).response.forEach((fiat: { supportedPaymentMethods?: any[] }) => {
+        if (fiat.supportedPaymentMethods) {
+          fiat.supportedPaymentMethods.forEach((method: any) => {
+            if (method.id && method.name) {
+              allMethodsMap.set(method.id, method.name)
+            }
+          })
+        }
+      })
+    }
+    
+    // Convert map to array format for dropdown
+    const methodsFromAPI = Array.from(allMethodsMap.entries()).map(([id, name]) => ({
+      value: id,
+      label: name
+    }))
+    
+    // Return API methods if available, otherwise fallback
+    return methodsFromAPI.length > 0 ? methodsFromAPI : [
+      { value: "credit_debit_card", label: "Credit/Debit Card" },
+      { value: "bank_transfer", label: "Bank Transfer" },
+      { value: "wire_transfer", label: "Wire Transfer" },
+      { value: "apple_pay", label: "Apple Pay" },
+      { value: "google_pay", label: "Google Pay" }
+    ]
+  })()
 
   // Wallet validation function using combined crypto-network selection
   const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
