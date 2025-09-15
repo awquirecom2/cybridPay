@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, users, merchants, admins } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, users, merchants, admins, merchantCredentials } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -33,6 +33,13 @@ export interface IStorage {
   updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined>;
   updateAdminLastLogin(id: string): Promise<void>;
   deleteAdmin(id: string): Promise<boolean>;
+
+  // Merchant credentials methods
+  getMerchantCredentials(merchantId: string, provider: string): Promise<MerchantCredentials | undefined>;
+  getAllMerchantCredentials(merchantId: string): Promise<MerchantCredentials[]>;
+  createMerchantCredentials(credentials: InsertMerchantCredentials): Promise<MerchantCredentials>;
+  updateMerchantCredentials(merchantId: string, provider: string, updates: Partial<InsertMerchantCredentials>): Promise<MerchantCredentials | undefined>;
+  deleteMerchantCredentials(merchantId: string, provider: string): Promise<boolean>;
   
   sessionStore: session.Store;
 }
@@ -144,6 +151,46 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAdmin(id: string): Promise<boolean> {
     const result = await db.delete(admins).where(eq(admins.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Merchant credentials methods
+  async getMerchantCredentials(merchantId: string, provider: string): Promise<MerchantCredentials | undefined> {
+    const result = await db.select().from(merchantCredentials)
+      .where(and(
+        eq(merchantCredentials.merchantId, merchantId),
+        eq(merchantCredentials.provider, provider)
+      ));
+    return result[0];
+  }
+
+  async getAllMerchantCredentials(merchantId: string): Promise<MerchantCredentials[]> {
+    return await db.select().from(merchantCredentials)
+      .where(eq(merchantCredentials.merchantId, merchantId));
+  }
+
+  async createMerchantCredentials(credentials: InsertMerchantCredentials): Promise<MerchantCredentials> {
+    const result = await db.insert(merchantCredentials).values(credentials).returning();
+    return result[0];
+  }
+
+  async updateMerchantCredentials(merchantId: string, provider: string, updates: Partial<InsertMerchantCredentials>): Promise<MerchantCredentials | undefined> {
+    const result = await db.update(merchantCredentials)
+      .set(updates)
+      .where(and(
+        eq(merchantCredentials.merchantId, merchantId),
+        eq(merchantCredentials.provider, provider)
+      ))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMerchantCredentials(merchantId: string, provider: string): Promise<boolean> {
+    const result = await db.delete(merchantCredentials)
+      .where(and(
+        eq(merchantCredentials.merchantId, merchantId),
+        eq(merchantCredentials.provider, provider)
+      ));
     return (result.rowCount || 0) > 0;
   }
 }

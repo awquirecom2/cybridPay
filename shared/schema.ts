@@ -95,3 +95,33 @@ export const adminLoginSchema = insertAdminSchema.pick({
 export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type AdminLogin = z.infer<typeof adminLoginSchema>;
 export type Admin = typeof admins.$inferSelect;
+
+// Merchant credentials table for storing encrypted API keys and secrets
+export const merchantCredentials = pgTable("merchant_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").notNull().references(() => merchants.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // 'transak', 'cybrid', etc.
+  encryptedApiKey: text("encrypted_api_key").notNull(),
+  encryptedApiSecret: text("encrypted_api_secret"),
+  environment: text("environment").notNull().default("staging"), // 'staging', 'production'
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`NOW()`),
+  updatedAt: timestamp("updated_at").default(sql`NOW()`)
+});
+
+export const insertMerchantCredentialsSchema = createInsertSchema(merchantCredentials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+// Transak credential input schema (before encryption)
+export const transakCredentialsSchema = z.object({
+  apiKey: z.string().min(1, "API Key is required"),
+  apiSecret: z.string().min(1, "API Secret is required"),
+  environment: z.enum(["staging", "production"]).default("staging")
+});
+
+export type InsertMerchantCredentials = z.infer<typeof insertMerchantCredentialsSchema>;
+export type TransakCredentials = z.infer<typeof transakCredentialsSchema>;
+export type MerchantCredentials = typeof merchantCredentials.$inferSelect;
