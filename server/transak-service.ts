@@ -98,6 +98,12 @@ export class PublicTransakService {
     return this.makePublicRequest(url);
   }
 
+  // GET networks from public endpoint
+  static async getNetworks() {
+    const url = `${this.STAGING_BASE_URL}/networks`;
+    return this.makePublicRequest(url);
+  }
+
   // GET verify wallet address - Public endpoint for wallet validation
   static async verifyWalletAddress(cryptoCurrency: string, network: string, walletAddress: string) {
     const url = `${this.STAGING_BASE_URL}/cryptocoverage/api/v1/public/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;

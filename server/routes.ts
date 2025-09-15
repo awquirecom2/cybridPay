@@ -466,6 +466,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET networks - Public endpoint for Receive Crypto page
+  app.get("/api/public/transak/networks", async (req, res) => {
+    try {
+      const networks = await PublicTransakService.getNetworks();
+      res.json(networks);
+    } catch (error) {
+      console.error("Error fetching networks:", error);
+      res.status(500).json({ error: "Failed to fetch networks" });
+    }
+  });
+
   // GET verify wallet address - Public endpoint for wallet validation
   app.get("/api/public/transak/verify-wallet-address", async (req, res) => {
     try {

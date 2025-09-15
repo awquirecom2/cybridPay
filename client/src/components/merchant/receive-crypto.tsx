@@ -25,7 +25,7 @@ export function ReceiveCrypto() {
   const form = useForm({
     defaultValues: {
       cryptoAmount: "",
-      cryptoCurrency: "USDC",
+      cryptoNetworkCombined: "USDC-ethereum", // Combined format: crypto-network
       fiatCurrency: "USD",
       paymentMethod: "credit_debit_card",
       walletAddress: "",
@@ -57,20 +57,66 @@ export function ReceiveCrypto() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   })
 
-  // Transform crypto currencies data for dropdown - ensure unique keys
-  const supportedCrypto = (cryptoCurrenciesData as any)?.response?.map((crypto: { symbol: string, name: string }, index: number) => ({
-    value: crypto.symbol,
-    label: `${crypto.symbol} - ${crypto.name}`,
-    key: `${crypto.symbol}-${index}` // Add unique key to prevent React warnings
-  })).filter((crypto: { value: string, label: string, key: string }, index: number, self: any[]) => 
-    index === self.findIndex((c: any) => c.value === crypto.value) // Remove duplicates
-  ) || [
-    // Fallback options if API fails
-    { value: "USDC", label: "USDC - USD Coin", key: "fallback-usdc" },
-    { value: "USDT", label: "USDT - Tether", key: "fallback-usdt" },
-    { value: "ETH", label: "ETH - Ethereum", key: "fallback-eth" },
-    { value: "BTC", label: "BTC - Bitcoin", key: "fallback-btc" }
-  ]
+  // Fetch networks from Transak API
+  const { data: networksData, isLoading: isLoadingNetworks, error: networksError } = useQuery({
+    queryKey: ['/api/public/transak/networks'],
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  })
+
+  // Create combined crypto-network options for dropdown
+  const supportedCryptoNetworks = (() => {
+    const cryptos = (cryptoCurrenciesData as any)?.response || [];
+    
+    // Common network mappings with display names
+    const commonNetworks = [
+      { code: 'ethereum', name: 'Ethereum', cryptos: ['USDC', 'USDT', 'ETH', 'WBTC', 'DAI'] },
+      { code: 'polygon', name: 'Polygon', cryptos: ['USDC', 'USDT', 'MATIC', 'DAI'] },
+      { code: 'binance', name: 'BNB Chain', cryptos: ['USDC', 'USDT', 'BNB'] },
+      { code: 'arbitrum', name: 'Arbitrum', cryptos: ['USDC', 'USDT', 'ETH'] },
+      { code: 'optimism', name: 'Optimism', cryptos: ['USDC', 'USDT', 'ETH'] },
+      { code: 'bitcoin', name: 'Bitcoin', cryptos: ['BTC'] },
+      { code: 'solana', name: 'Solana', cryptos: ['SOL', 'USDC'] },
+      { code: 'avalanche', name: 'Avalanche', cryptos: ['AVAX', 'USDC'] }
+    ];
+    
+    const combinations: Array<{value: string, label: string, crypto: string, network: string, key: string}> = [];
+    
+    // Create crypto-network combinations
+    cryptos.forEach((crypto: { symbol: string, name: string }, cryptoIndex: number) => {
+      // Find networks that support this crypto
+      const supportingNetworks = commonNetworks.filter(network => 
+        network.cryptos.includes(crypto.symbol)
+      );
+      
+      // If no specific networks found, default to ethereum for ERC-20 tokens and bitcoin for BTC
+      if (supportingNetworks.length === 0) {
+        const defaultNetwork = crypto.symbol === 'BTC' ? 'bitcoin' : 'ethereum';
+        const defaultNetworkName = crypto.symbol === 'BTC' ? 'Bitcoin' : 'Ethereum';
+        supportingNetworks.push({ code: defaultNetwork, name: defaultNetworkName, cryptos: [crypto.symbol] });
+      }
+      
+      supportingNetworks.forEach((network, networkIndex: number) => {
+        combinations.push({
+          value: `${crypto.symbol}-${network.code}`,
+          label: `${crypto.symbol} - ${network.name}`,
+          crypto: crypto.symbol,
+          network: network.code,
+          key: `${crypto.symbol}-${network.code}-${Date.now()}-${Math.random()}`
+        });
+      });
+    });
+
+    // Remove duplicates and return, or use fallback
+    return combinations.filter((combo, index, self) => 
+      index === self.findIndex(c => c.value === combo.value)
+    ).length > 0 ? combinations : [
+      // Fallback options if API fails
+      { value: "USDC-ethereum", label: "USDC - Ethereum", crypto: "USDC", network: "ethereum", key: "fallback-usdc-ethereum" },
+      { value: "USDT-ethereum", label: "USDT - Ethereum", crypto: "USDT", network: "ethereum", key: "fallback-usdt-ethereum" },
+      { value: "ETH-ethereum", label: "ETH - Ethereum", crypto: "ETH", network: "ethereum", key: "fallback-eth-ethereum" },
+      { value: "BTC-bitcoin", label: "BTC - Bitcoin", crypto: "BTC", network: "bitcoin", key: "fallback-btc-bitcoin" }
+    ];
+  })()
 
   // Transform fiat currencies data for dropdown - ensure unique keys
   const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string, paymentOptions?: string[] }, index: number) => ({
@@ -88,7 +134,7 @@ export function ReceiveCrypto() {
   ]
 
   // Get dynamic payment methods based on selected fiat currency
-  const selectedFiatData = supportedFiat.find(fiat => fiat.value === form.watch("fiatCurrency"))
+  const selectedFiatData = supportedFiat.find((fiat: { value: string, paymentOptions: string[] }) => fiat.value === form.watch("fiatCurrency"))
   const availablePaymentMethods = selectedFiatData?.paymentOptions || ["credit_debit_card", "bank_transfer"]
 
   // All possible payment methods (for labeling)
@@ -110,15 +156,19 @@ export function ReceiveCrypto() {
     availablePaymentMethods.includes(method.value)
   )
 
-  // Wallet validation function
-  const validateWalletAddress = async (address: string, cryptoCurrency: string) => {
-    if (!address || !cryptoCurrency) return
+  // Wallet validation function using combined crypto-network selection
+  const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
+    if (!address || !cryptoNetworkCombined) return
+    
+    // Parse crypto and network from combined value (e.g., "USDC-ethereum")
+    const [cryptoCurrency, network] = cryptoNetworkCombined.split('-')
+    if (!cryptoCurrency || !network) return
     
     setWalletValidation({ isValid: null, isValidating: true, error: null })
     
     try {
       const response = await fetch(
-        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=mainnet&walletAddress=${address}`
+        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${address}`
       )
       
       if (!response.ok) {
@@ -359,25 +409,28 @@ export function ReceiveCrypto() {
 
                   <FormField
                     control={form.control}
-                    name="cryptoCurrency"
+                    name="cryptoNetworkCombined"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cryptocurrency</FormLabel>
+                        <FormLabel>Cryptocurrency & Network</FormLabel>
                         <FormControl>
                           <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger data-testid="select-crypto-currency">
+                            <SelectTrigger data-testid="select-crypto-network">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {supportedCrypto.map((crypto: { value: string, label: string, key?: string }) => (
-                                <SelectItem key={crypto.key || crypto.value} value={crypto.value}>
-                                  {crypto.label}
+                              {supportedCryptoNetworks.map((cryptoNetwork) => (
+                                <SelectItem key={cryptoNetwork.key} value={cryptoNetwork.value}>
+                                  {cryptoNetwork.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </FormControl>
                         <FormMessage />
+                        {isLoadingNetworks && (
+                          <p className="text-sm text-muted-foreground">Loading networks...</p>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -479,7 +532,7 @@ export function ReceiveCrypto() {
                             {...field}
                             onBlur={() => {
                               field.onBlur()
-                              validateWalletAddress(field.value, form.watch("cryptoCurrency"))
+                              validateWalletAddress(field.value, form.watch("cryptoNetworkCombined"))
                             }}
                             data-testid="input-wallet-address"
                           />
