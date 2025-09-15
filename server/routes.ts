@@ -466,6 +466,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET verify wallet address - Public endpoint for wallet validation
+  app.get("/api/public/transak/verify-wallet-address", async (req, res) => {
+    try {
+      const { cryptoCurrency, network = 'mainnet', walletAddress } = req.query;
+      
+      if (!cryptoCurrency || !walletAddress) {
+        return res.status(400).json({ error: "cryptoCurrency and walletAddress are required" });
+      }
+
+      try {
+        const validation = await PublicTransakService.verifyWalletAddress(
+          cryptoCurrency as string,
+          network as string,
+          walletAddress as string
+        );
+        
+        // If successful, return the validation result (which should include isValid)
+        // Ensure we always return isValid boolean
+        res.json({
+          isValid: validation?.isValid === true || validation?.valid === true || false,
+          ...validation
+        });
+      } catch (validationError: any) {
+        // If validation fails due to invalid address, return isValid: false with 200 status
+        console.log("Wallet address validation failed:", validationError.message);
+        res.json({ 
+          isValid: false,
+          error: "Invalid wallet address format or unsupported network"
+        });
+      }
+    } catch (error) {
+      console.error("Error verifying wallet address:", error);
+      res.status(500).json({ error: "Failed to verify wallet address" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -16,13 +16,20 @@ export function ReceiveCrypto() {
   const [isCreatingQuote, setIsCreatingQuote] = useState(false)
   const [paymentLink, setPaymentLink] = useState("")
   const [quoteDetails, setQuoteDetails] = useState<any>(null)
+  const [walletValidation, setWalletValidation] = useState<{
+    isValid: boolean | null;
+    isValidating: boolean;
+    error: string | null;
+  }>({ isValid: null, isValidating: false, error: null })
   
   const form = useForm({
     defaultValues: {
       cryptoAmount: "",
       cryptoCurrency: "USDC",
       fiatCurrency: "USD",
-      paymentMethod: "credit_debit_card"
+      paymentMethod: "credit_debit_card",
+      walletAddress: "",
+      customerEmail: ""
     }
   })
 
@@ -50,35 +57,88 @@ export function ReceiveCrypto() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   })
 
-  // Transform crypto currencies data for dropdown
-  const supportedCrypto = (cryptoCurrenciesData as any)?.response?.map((crypto: { symbol: string, name: string }) => ({
+  // Transform crypto currencies data for dropdown - ensure unique keys
+  const supportedCrypto = (cryptoCurrenciesData as any)?.response?.map((crypto: { symbol: string, name: string }, index: number) => ({
     value: crypto.symbol,
-    label: `${crypto.symbol} - ${crypto.name}`
-  })) || [
+    label: `${crypto.symbol} - ${crypto.name}`,
+    key: `${crypto.symbol}-${index}` // Add unique key to prevent React warnings
+  })).filter((crypto: { value: string, label: string, key: string }, index: number, self: any[]) => 
+    index === self.findIndex((c: any) => c.value === crypto.value) // Remove duplicates
+  ) || [
     // Fallback options if API fails
-    { value: "USDC", label: "USDC - USD Coin" },
-    { value: "USDT", label: "USDT - Tether" },
-    { value: "ETH", label: "ETH - Ethereum" },
-    { value: "BTC", label: "BTC - Bitcoin" }
+    { value: "USDC", label: "USDC - USD Coin", key: "fallback-usdc" },
+    { value: "USDT", label: "USDT - Tether", key: "fallback-usdt" },
+    { value: "ETH", label: "ETH - Ethereum", key: "fallback-eth" },
+    { value: "BTC", label: "BTC - Bitcoin", key: "fallback-btc" }
   ]
 
-  // Transform fiat currencies data for dropdown
-  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string }) => ({
+  // Transform fiat currencies data for dropdown - ensure unique keys
+  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string, paymentOptions?: string[] }, index: number) => ({
     value: fiat.symbol,
-    label: `${fiat.symbol} - ${fiat.name}`
-  })) || [
+    label: `${fiat.symbol} - ${fiat.name}`,
+    key: `${fiat.symbol}-${index}`, // Add unique key to prevent React warnings
+    paymentOptions: fiat.paymentOptions || [] // Store payment options for dynamic selection
+  })).filter((fiat: { value: string, label: string, key: string, paymentOptions: string[] }, index: number, self: any[]) => 
+    index === self.findIndex((f: any) => f.value === fiat.value) // Remove duplicates
+  ) || [
     // Fallback options if API fails
-    { value: "USD", label: "USD - US Dollar" },
-    { value: "EUR", label: "EUR - Euro" },
-    { value: "GBP", label: "GBP - British Pound" }
+    { value: "USD", label: "USD - US Dollar", key: "fallback-usd", paymentOptions: ["credit_debit_card", "bank_transfer"] },
+    { value: "EUR", label: "EUR - Euro", key: "fallback-eur", paymentOptions: ["credit_debit_card", "sepa_bank_transfer"] },
+    { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp", paymentOptions: ["credit_debit_card", "gbp_bank_transfer"] }
   ]
 
-  const paymentMethods = [
+  // Get dynamic payment methods based on selected fiat currency
+  const selectedFiatData = supportedFiat.find(fiat => fiat.value === form.watch("fiatCurrency"))
+  const availablePaymentMethods = selectedFiatData?.paymentOptions || ["credit_debit_card", "bank_transfer"]
+
+  // All possible payment methods (for labeling)
+  const allPaymentMethods = [
     { value: "credit_debit_card", label: "Credit/Debit Card" },
     { value: "bank_transfer", label: "Bank Transfer" },
     { value: "sepa_bank_transfer", label: "SEPA Transfer (EUR)" },
-    { value: "gbp_bank_transfer", label: "UK Bank Transfer (GBP)" }
+    { value: "gbp_bank_transfer", label: "UK Bank Transfer (GBP)" },
+    { value: "wire_transfer", label: "Wire Transfer" },
+    { value: "ach_transfer", label: "ACH Transfer" },
+    { value: "ideal", label: "iDEAL" },
+    { value: "sofort", label: "SOFORT" },
+    { value: "bancontact", label: "Bancontact" },
+    { value: "giropay", label: "Giropay" }
   ]
+
+  // Filter payment methods to only show those supported by selected fiat currency
+  const paymentMethods = allPaymentMethods.filter(method => 
+    availablePaymentMethods.includes(method.value)
+  )
+
+  // Wallet validation function
+  const validateWalletAddress = async (address: string, cryptoCurrency: string) => {
+    if (!address || !cryptoCurrency) return
+    
+    setWalletValidation({ isValid: null, isValidating: true, error: null })
+    
+    try {
+      const response = await fetch(
+        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=mainnet&walletAddress=${address}`
+      )
+      
+      if (!response.ok) {
+        throw new Error('Validation failed')
+      }
+      
+      const result = await response.json()
+      setWalletValidation({ 
+        isValid: result.isValid === true, 
+        isValidating: false, 
+        error: result.isValid === false ? 'Invalid wallet address' : null 
+      })
+    } catch (error) {
+      setWalletValidation({ 
+        isValid: false, 
+        isValidating: false, 
+        error: 'Unable to validate wallet address' 
+      })
+    }
+  }
 
   const handleCreateQuote = async (data: any) => {
     if (!merchantStatus.kybCompleted) {
@@ -139,15 +199,16 @@ export function ReceiveCrypto() {
         : 'https://global-stg.transak.com'
         
       const params = new URLSearchParams({
-        apiKey: process.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
+        apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
         cryptoAmount: data.cryptoAmount,
         cryptoCurrency: data.cryptoCurrency,
         fiatCurrency: data.fiatCurrency,
         paymentMethod: data.paymentMethod,
         network: mockQuote.network,
         partnerOrderId: mockQuote.partnerOrderId,
-        email: '',
-        disableWalletAddressForm: 'false'
+        email: data.customerEmail || '',
+        walletAddress: data.walletAddress || '',
+        disableWalletAddressForm: (data.walletAddress && walletValidation.isValid) ? 'true' : 'false'
       })
       
       const generatedLink = `${baseUrl}?${params.toString()}`
@@ -308,8 +369,8 @@ export function ReceiveCrypto() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {supportedCrypto.map((crypto) => (
-                                <SelectItem key={crypto.value} value={crypto.value}>
+                              {supportedCrypto.map((crypto: { value: string, label: string, key?: string }) => (
+                                <SelectItem key={crypto.key || crypto.value} value={crypto.value}>
                                   {crypto.label}
                                 </SelectItem>
                               ))}
@@ -333,8 +394,8 @@ export function ReceiveCrypto() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {supportedFiat.map((fiat) => (
-                                <SelectItem key={fiat.value} value={fiat.value}>
+                              {supportedFiat.map((fiat: { value: string, label: string, key?: string }) => (
+                                <SelectItem key={fiat.key || fiat.value} value={fiat.value}>
                                   {fiat.label}
                                 </SelectItem>
                               ))}
@@ -367,6 +428,69 @@ export function ReceiveCrypto() {
                           </Select>
                         </FormControl>
                         <FormMessage />
+                        {paymentMethods.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No payment methods available for selected currency
+                          </p>
+                        )}
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="customerEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="customer@example.com"
+                            type="email"
+                            {...field}
+                            data-testid="input-customer-email"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="walletAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          Wallet Address
+                          {walletValidation.isValidating && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {walletValidation.isValid === true && (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          )}
+                          {walletValidation.isValid === false && (
+                            <AlertTriangle className="h-4 w-4 text-red-500" />
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Enter customer's wallet address"
+                            {...field}
+                            onBlur={() => {
+                              field.onBlur()
+                              validateWalletAddress(field.value, form.watch("cryptoCurrency"))
+                            }}
+                            data-testid="input-wallet-address"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        {walletValidation.error && (
+                          <p className="text-sm text-red-500">{walletValidation.error}</p>
+                        )}
+                        {walletValidation.isValid === true && (
+                          <p className="text-sm text-green-500">Valid wallet address</p>
+                        )}
                       </FormItem>
                     )}
                   />

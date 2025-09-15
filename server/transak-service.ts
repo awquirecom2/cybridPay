@@ -97,6 +97,12 @@ export class PublicTransakService {
     const url = `${this.STAGING_BASE_URL}/fiat/public/v1/get/country`;
     return this.makePublicRequest(url);
   }
+
+  // GET verify wallet address - Public endpoint for wallet validation
+  static async verifyWalletAddress(cryptoCurrency: string, network: string, walletAddress: string) {
+    const url = `${this.STAGING_BASE_URL}/cryptocoverage/api/v1/public/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;
+    return this.makePublicRequest(url);
+  }
 }
 
 export class TransakService {
