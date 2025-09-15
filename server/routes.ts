@@ -410,6 +410,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /access-token - Generate access token for Transak API using stored credentials
+  app.post("/api/transak/access-token", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const tokenData = await transak.generateAccessToken();
+      res.json({
+        success: true,
+        accessToken: tokenData.accessToken,
+        expiresIn: tokenData.expiresIn
+      });
+    } catch (error) {
+      console.error("Error generating access token:", error);
+      res.status(500).json({ error: "Failed to generate access token" });
+    }
+  });
+
   // Public Transak API endpoints (no authentication required)
   // GET crypto currencies - Public endpoint for Receive Crypto page
   app.get("/api/public/transak/crypto-currencies", async (req, res) => {
