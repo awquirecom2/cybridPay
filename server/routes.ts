@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema } from "@shared/schema";
+import { TransakService, CredentialEncryption } from "./transak-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Utility functions to sanitize data (remove passwords)
@@ -258,6 +259,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
       balance: "$0.00",
       integrations: req.user?.integrations || []
     });
+  });
+
+  // Merchant credential management routes
+  // Get all credentials for a merchant
+  app.get("/api/merchant/credentials", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const credentials = await storage.getAllMerchantCredentials(merchantId);
+      
+      // Return credentials without sensitive data
+      const safeCreds = credentials.map(cred => ({
+        id: cred.id,
+        provider: cred.provider,
+        environment: cred.environment,
+        isActive: cred.isActive,
+        createdAt: cred.createdAt,
+        hasApiKey: !!cred.encryptedApiKey,
+        hasApiSecret: !!cred.encryptedApiSecret
+      }));
+      
+      res.json(safeCreds);
+    } catch (error) {
+      console.error("Error fetching merchant credentials:", error);
+      res.status(500).json({ error: "Failed to fetch credentials" });
+    }
+  });
+
+  // Save/update Transak credentials
+  app.post("/api/merchant/credentials/transak", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const { apiKey, apiSecret, environment } = transakCredentialsSchema.parse(req.body);
+
+      // Encrypt credentials
+      const encryptedApiKey = CredentialEncryption.encrypt(apiKey);
+      const encryptedApiSecret = CredentialEncryption.encrypt(apiSecret);
+
+      // Check if credentials already exist
+      const existing = await storage.getMerchantCredentials(merchantId, 'transak');
+      
+      let result;
+      if (existing) {
+        // Update existing credentials
+        result = await storage.updateMerchantCredentials(merchantId, 'transak', {
+          encryptedApiKey,
+          encryptedApiSecret,
+          environment,
+          isActive: true
+        });
+      } else {
+        // Create new credentials
+        result = await storage.createMerchantCredentials({
+          merchantId,
+          provider: 'transak',
+          encryptedApiKey,
+          encryptedApiSecret,
+          environment,
+          isActive: true
+        });
+      }
+
+      res.json({
+        success: true,
+        provider: 'transak',
+        environment: result?.environment,
+        hasApiKey: true,
+        hasApiSecret: true
+      });
+    } catch (error) {
+      console.error("Error saving Transak credentials:", error);
+      res.status(400).json({ error: "Failed to save credentials" });
+    }
+  });
+
+  // Delete credentials
+  app.delete("/api/merchant/credentials/:provider", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const { provider } = req.params;
+      
+      const success = await storage.deleteMerchantCredentials(merchantId, provider);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Credentials not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting credentials:", error);
+      res.status(500).json({ error: "Failed to delete credentials" });
+    }
+  });
+
+  // Helper function to get Transak service for a merchant
+  const getTransakService = async (merchantId: string): Promise<TransakService> => {
+    const credentials = await storage.getMerchantCredentials(merchantId, 'transak');
+    
+    if (!credentials || !credentials.isActive) {
+      throw new Error('Transak credentials not configured');
+    }
+
+    const apiKey = CredentialEncryption.decrypt(credentials.encryptedApiKey);
+    const apiSecret = credentials.encryptedApiSecret ? 
+      CredentialEncryption.decrypt(credentials.encryptedApiSecret) : '';
+
+    return new TransakService({
+      apiKey,
+      apiSecret,
+      environment: credentials.environment as 'staging' | 'production'
+    });
+  };
+
+  // Transak API endpoints
+  // GET /currencies - Fetch supported crypto/fiat options
+  app.get("/api/transak/currencies", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const currencies = await transak.getCurrencies();
+      res.json(currencies);
+    } catch (error) {
+      console.error("Error fetching currencies:", error);
+      res.status(500).json({ error: "Failed to fetch currencies" });
+    }
+  });
+
+  // GET /networks - Fetch blockchain networks
+  app.get("/api/transak/networks", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const networks = await transak.getNetworks();
+      res.json(networks);
+    } catch (error) {
+      console.error("Error fetching networks:", error);
+      res.status(500).json({ error: "Failed to fetch networks" });
+    }
+  });
+
+  // POST /pricing - Get real-time pricing
+  app.post("/api/transak/pricing", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const pricing = await transak.getPricing(req.body);
+      res.json(pricing);
+    } catch (error) {
+      console.error("Error fetching pricing:", error);
+      res.status(500).json({ error: "Failed to fetch pricing" });
+    }
+  });
+
+  // POST /quote - Create transaction quote
+  app.post("/api/transak/quote", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const quote = await transak.createQuote(req.body);
+      res.json(quote);
+    } catch (error) {
+      console.error("Error creating quote:", error);
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+
+  // POST /validate-wallet - Validate wallet addresses
+  app.post("/api/transak/validate-wallet", requireMerchant, async (req, res) => {
+    try {
+      const transak = await getTransakService(req.user!.id);
+      const validation = await transak.validateWallet(req.body);
+      res.json(validation);
+    } catch (error) {
+      console.error("Error validating wallet:", error);
+      res.status(500).json({ error: "Failed to validate wallet" });
+    }
   });
 
   const httpServer = createServer(app);
