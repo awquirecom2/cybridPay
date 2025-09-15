@@ -69,8 +69,53 @@ export function ReceiveCrypto() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
 
-  // Create combined crypto-network options for dropdown
+  // Create combined crypto-network options for dropdown with new getcurrencies data
   const supportedCryptoNetworks = (() => {
+    // Try using the new getcurrencies endpoint first (preferred)
+    if (getCurrenciesData?.response && Array.isArray(getCurrenciesData.response)) {
+      const currencies = getCurrenciesData.response;
+      
+      const cryptoNetworkCombinations: Array<{
+        value: string;
+        label: string;
+        crypto: string;
+        cryptoName: string;
+        network: string;
+        networkDisplayName: string;
+        key: string;
+      }> = [];
+
+      currencies.forEach((currency: any, index: number) => {
+        // Extract crypto info and network from getcurrencies response
+        const cryptoSymbol = currency.symbol || currency.cryptoCurrency;
+        const cryptoName = currency.name || currency.coinName || cryptoSymbol;
+        const network = currency.network || currency.networkName;
+        const networkDisplayName = currency.networkDisplayName || currency.network || network;
+
+        if (cryptoSymbol && network) {
+          cryptoNetworkCombinations.push({
+            value: `${cryptoSymbol}-${network}`,
+            label: `${cryptoSymbol} ${cryptoName}`,
+            crypto: cryptoSymbol,
+            cryptoName: cryptoName,
+            network: network,
+            networkDisplayName: networkDisplayName,
+            key: `${cryptoSymbol}-${network}-${index}`
+          });
+        }
+      });
+
+      // Remove duplicates by value
+      const uniqueCombinations = cryptoNetworkCombinations.filter((combo, index, self) => 
+        index === self.findIndex(c => c.value === combo.value)
+      );
+
+      if (uniqueCombinations.length > 0) {
+        return uniqueCombinations;
+      }
+    }
+
+    // Fallback to old method if getcurrencies not available
     const cryptos = (cryptoCurrenciesData as any)?.response || [];
     
     // Common network mappings with display names
@@ -85,7 +130,15 @@ export function ReceiveCrypto() {
       { code: 'avalanche', name: 'Avalanche', cryptos: ['AVAX', 'USDC'] }
     ];
     
-    const combinations: Array<{value: string, label: string, crypto: string, network: string, key: string}> = [];
+    const combinations: Array<{
+      value: string;
+      label: string;
+      crypto: string;
+      cryptoName: string;
+      network: string;
+      networkDisplayName: string;
+      key: string;
+    }> = [];
     
     // Create crypto-network combinations
     cryptos.forEach((crypto: { symbol: string, name: string }, cryptoIndex: number) => {
@@ -104,10 +157,12 @@ export function ReceiveCrypto() {
       supportingNetworks.forEach((network, networkIndex: number) => {
         combinations.push({
           value: `${crypto.symbol}-${network.code}`,
-          label: `${crypto.symbol} - ${network.name}`,
+          label: `${crypto.symbol} ${crypto.name || crypto.symbol}`,
           crypto: crypto.symbol,
+          cryptoName: crypto.name || crypto.symbol,
           network: network.code,
-          key: `${crypto.symbol}-${network.code}-${Date.now()}-${Math.random()}`
+          networkDisplayName: network.name,
+          key: `${crypto.symbol}-${network.code}-${cryptoIndex}-${networkIndex}`
         });
       });
     });
@@ -117,10 +172,10 @@ export function ReceiveCrypto() {
       index === self.findIndex(c => c.value === combo.value)
     ).length > 0 ? combinations : [
       // Fallback options if API fails
-      { value: "USDC-ethereum", label: "USDC - Ethereum", crypto: "USDC", network: "ethereum", key: "fallback-usdc-ethereum" },
-      { value: "USDT-ethereum", label: "USDT - Ethereum", crypto: "USDT", network: "ethereum", key: "fallback-usdt-ethereum" },
-      { value: "ETH-ethereum", label: "ETH - Ethereum", crypto: "ETH", network: "ethereum", key: "fallback-eth-ethereum" },
-      { value: "BTC-bitcoin", label: "BTC - Bitcoin", crypto: "BTC", network: "bitcoin", key: "fallback-btc-bitcoin" }
+      { value: "USDC-ethereum", label: "USDC USD Coin", crypto: "USDC", cryptoName: "USD Coin", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-usdc-ethereum" },
+      { value: "USDT-ethereum", label: "USDT Tether", crypto: "USDT", cryptoName: "Tether", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-usdt-ethereum" },
+      { value: "ETH-ethereum", label: "ETH Ethereum", crypto: "ETH", cryptoName: "Ethereum", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-eth-ethereum" },
+      { value: "BTC-bitcoin", label: "BTC Bitcoin", crypto: "BTC", cryptoName: "Bitcoin", network: "bitcoin", networkDisplayName: "Bitcoin", key: "fallback-btc-bitcoin" }
     ];
   })()
 
