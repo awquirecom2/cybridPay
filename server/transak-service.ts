@@ -62,6 +62,43 @@ export class CredentialEncryption {
   }
 }
 
+// Public Transak API service for public endpoints (no authentication needed)
+export class PublicTransakService {
+  private static readonly STAGING_BASE_URL = 'https://api-stg.transak.com';
+  
+  // Public API key from the curl example (for fiat currencies)
+  private static readonly PUBLIC_API_KEY = 'c90712f1-d492-420a-adea-08396cc922cd';
+
+  private static async makePublicRequest(url: string) {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak Public API error ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  // GET crypto currencies from public endpoint
+  static async getCryptoCurrencies() {
+    const url = `${this.STAGING_BASE_URL}/cryptocoverage/api/v1/public/crypto-currencies`;
+    return this.makePublicRequest(url);
+  }
+
+  // GET fiat currencies from public endpoint
+  static async getFiatCurrencies() {
+    const url = `${this.STAGING_BASE_URL}/fiat/public/v1/currencies/fiat-currencies?apiKey=${this.PUBLIC_API_KEY}`;
+    return this.makePublicRequest(url);
+  }
+
+  // GET countries from public endpoint  
+  static async getCountries() {
+    const url = `${this.STAGING_BASE_URL}/fiat/public/v1/get/country`;
+    return this.makePublicRequest(url);
+  }
+}
+
 export class TransakService {
   private baseUrl: string;
   private apiKey: string;
