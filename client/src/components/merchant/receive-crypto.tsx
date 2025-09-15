@@ -63,6 +63,12 @@ export function ReceiveCrypto() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   })
 
+  // Fetch combined currencies data from Transak's /getcurrencies endpoint
+  const { data: getCurrenciesData, isLoading: isLoadingGetCurrencies, error: getCurrenciesError } = useQuery({
+    queryKey: ['/api/public/transak/getcurrencies'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
+
   // Create combined crypto-network options for dropdown
   const supportedCryptoNetworks = (() => {
     const cryptos = (cryptoCurrenciesData as any)?.response || [];
