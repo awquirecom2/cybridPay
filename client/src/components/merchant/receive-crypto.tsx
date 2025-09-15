@@ -11,9 +11,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast"
 import { useQuery } from "@tanstack/react-query"
 
-// Crypto Icon Component
-const CryptoIcon = ({ crypto, className = "w-6 h-6" }: { crypto: string, className?: string }) => {
-  // Color mapping for major cryptocurrencies
+// Crypto Icon Component with real Transak images
+const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: string, crypto: string, className?: string }) => {
+  // Fallback color mapping for cryptocurrencies if image fails
   const cryptoColors: { [key: string]: string } = {
     'BTC': '#f7931a',
     'ETH': '#627eea', 
@@ -27,8 +27,27 @@ const CryptoIcon = ({ crypto, className = "w-6 h-6" }: { crypto: string, classNa
     'WBTC': '#f09242'
   };
 
-  const color = cryptoColors[crypto] || '#6b7280'; // Default gray for unknown cryptos
+  const color = cryptoColors[crypto] || '#6b7280';
 
+  // If we have an image URL, use it
+  if (imageUrl) {
+    return (
+      <img 
+        src={imageUrl} 
+        alt={crypto}
+        className={`${className} rounded-full object-cover`}
+        onError={(e) => {
+          // Fallback to colored circle if image fails to load
+          const target = e.target as HTMLElement;
+          target.style.display = 'none';
+          const fallback = target.nextElementSibling as HTMLElement;
+          if (fallback) fallback.style.display = 'flex';
+        }}
+      />
+    );
+  }
+
+  // Fallback colored circle
   return (
     <div 
       className={`${className} rounded-full flex items-center justify-center text-white text-sm font-bold`}
@@ -91,17 +110,14 @@ export function ReceiveCrypto() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   })
 
-  // Fetch combined currencies data from Transak's /getcurrencies endpoint
-  const { data: getCurrenciesData, isLoading: isLoadingGetCurrencies, error: getCurrenciesError } = useQuery({
-    queryKey: ['/api/public/transak/getcurrencies'],
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  })
+  // Use the existing crypto-currencies endpoint which has all the data we need
+  // (The /getcurrencies endpoint doesn't exist in Transak API)
 
-  // Create combined crypto-network options for dropdown with new getcurrencies data
+  // Create combined crypto-network options for dropdown with real getcurrencies data
   const supportedCryptoNetworks = (() => {
-    // Try using the new getcurrencies endpoint first (preferred)
-    if (getCurrenciesData?.response && Array.isArray(getCurrenciesData.response)) {
-      const currencies = getCurrenciesData.response;
+    // Use the crypto-currencies endpoint which already has network and image data
+    if (cryptoCurrenciesData && (cryptoCurrenciesData as any)?.response && Array.isArray((cryptoCurrenciesData as any).response)) {
+      const currencies = (cryptoCurrenciesData as any).response;
       
       const cryptoNetworkCombinations: Array<{
         value: string;
@@ -110,32 +126,35 @@ export function ReceiveCrypto() {
         cryptoName: string;
         network: string;
         networkDisplayName: string;
+        imageUrl: string;
         key: string;
       }> = [];
 
       currencies.forEach((currency: any, index: number) => {
-        // Extract crypto info and network from getcurrencies response
-        const cryptoSymbol = currency.symbol || currency.cryptoCurrency;
-        const cryptoName = currency.name || currency.coinName || cryptoSymbol;
-        const network = currency.network || currency.networkName;
-        const networkDisplayName = currency.networkDisplayName || currency.network || network;
-
-        if (cryptoSymbol && network) {
+        // Extract crypto info and network from real getcurrencies response
+        const cryptoSymbol = currency.symbol;
+        const cryptoName = currency.name;
+        const network = currency.network?.name;
+        const imageUrl = currency.image?.thumb || currency.image?.small;
+        
+        // Only include if crypto is allowed and has required fields
+        if (cryptoSymbol && cryptoName && network && currency.isAllowed) {
           cryptoNetworkCombinations.push({
             value: `${cryptoSymbol}-${network}`,
             label: `${cryptoSymbol} ${cryptoName}`,
             crypto: cryptoSymbol,
             cryptoName: cryptoName,
             network: network,
-            networkDisplayName: networkDisplayName,
-            key: `${cryptoSymbol}-${network}-${index}`
+            networkDisplayName: network, // Use network name as display name
+            imageUrl: imageUrl || '',
+            key: `${currency.uniqueId || cryptoSymbol}-${network}-${index}`
           });
         }
       });
 
-      // Remove duplicates by value
+      // Remove duplicates by value and filter out invalid entries
       const uniqueCombinations = cryptoNetworkCombinations.filter((combo, index, self) => 
-        index === self.findIndex(c => c.value === combo.value)
+        index === self.findIndex(c => c.value === combo.value) && combo.crypto && combo.network
       );
 
       if (uniqueCombinations.length > 0) {
@@ -165,6 +184,7 @@ export function ReceiveCrypto() {
       cryptoName: string;
       network: string;
       networkDisplayName: string;
+      imageUrl: string;
       key: string;
     }> = [];
     
@@ -190,6 +210,7 @@ export function ReceiveCrypto() {
           cryptoName: crypto.name || crypto.symbol,
           network: network.code,
           networkDisplayName: network.name,
+          imageUrl: '', // No image URL in fallback
           key: `${crypto.symbol}-${network.code}-${cryptoIndex}-${networkIndex}`
         });
       });
@@ -200,10 +221,10 @@ export function ReceiveCrypto() {
       index === self.findIndex(c => c.value === combo.value)
     ).length > 0 ? combinations : [
       // Fallback options if API fails
-      { value: "USDC-ethereum", label: "USDC USD Coin", crypto: "USDC", cryptoName: "USD Coin", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-usdc-ethereum" },
-      { value: "USDT-ethereum", label: "USDT Tether", crypto: "USDT", cryptoName: "Tether", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-usdt-ethereum" },
-      { value: "ETH-ethereum", label: "ETH Ethereum", crypto: "ETH", cryptoName: "Ethereum", network: "ethereum", networkDisplayName: "Ethereum", key: "fallback-eth-ethereum" },
-      { value: "BTC-bitcoin", label: "BTC Bitcoin", crypto: "BTC", cryptoName: "Bitcoin", network: "bitcoin", networkDisplayName: "Bitcoin", key: "fallback-btc-bitcoin" }
+      { value: "USDC-ethereum", label: "USDC USD Coin", crypto: "USDC", cryptoName: "USD Coin", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-usdc-ethereum" },
+      { value: "USDT-ethereum", label: "USDT Tether", crypto: "USDT", cryptoName: "Tether", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-usdt-ethereum" },
+      { value: "ETH-ethereum", label: "ETH Ethereum", crypto: "ETH", cryptoName: "Ethereum", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-eth-ethereum" },
+      { value: "BTC-mainnet", label: "BTC Bitcoin", crypto: "BTC", cryptoName: "Bitcoin", network: "mainnet", networkDisplayName: "Bitcoin", imageUrl: "", key: "fallback-btc-mainnet" }
     ];
   })()
 
@@ -512,7 +533,11 @@ export function ReceiveCrypto() {
                                 <SelectItem key={cryptoNetwork.key} value={cryptoNetwork.value} className="flex justify-between items-center py-3">
                                   <div className="flex items-center justify-between w-full">
                                     <div className="flex items-center gap-3">
-                                      <CryptoIcon crypto={cryptoNetwork.crypto} className="w-6 h-6 flex-shrink-0" />
+                                      <CryptoIcon 
+                                        imageUrl={cryptoNetwork.imageUrl} 
+                                        crypto={cryptoNetwork.crypto} 
+                                        className="w-6 h-6 flex-shrink-0" 
+                                      />
                                       <div className="flex items-center gap-2">
                                         <span className="font-medium text-foreground">{cryptoNetwork.crypto}</span>
                                         <span className="text-muted-foreground">{cryptoNetwork.cryptoName}</span>

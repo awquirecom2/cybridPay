@@ -104,11 +104,8 @@ export class PublicTransakService {
     return this.makePublicRequest(url);
   }
 
-  // GET currencies - Public endpoint to get all supported currencies with network info
-  static async getCurrencies() {
-    const url = `${this.STAGING_BASE_URL}/getcurrencies`;
-    return this.makePublicRequest(url);
-  }
+  // Note: /getcurrencies endpoint doesn't exist in Transak API
+  // Use getCryptoCurrencies() instead which has all the network and image data
 
   // GET verify wallet address - Public endpoint for wallet validation
   static async verifyWalletAddress(cryptoCurrency: string, network: string, walletAddress: string) {

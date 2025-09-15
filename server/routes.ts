@@ -477,16 +477,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET currencies - Public endpoint to get all supported currencies with network info
-  app.get("/api/public/transak/getcurrencies", async (req, res) => {
-    try {
-      const currencies = await PublicTransakService.getCurrencies();
-      res.json(currencies);
-    } catch (error) {
-      console.error("Error fetching currencies:", error);
-      res.status(500).json({ error: "Failed to fetch currencies" });
-    }
-  });
+  // Note: /getcurrencies endpoint doesn't exist in Transak API
+  // The crypto-currencies endpoint already has all needed data including networks and images
 
   // GET verify wallet address - Public endpoint for wallet validation
   app.get("/api/public/transak/verify-wallet-address", async (req, res) => {
