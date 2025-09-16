@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowDownToLine, Copy, ExternalLink, Loader2, CheckCircle, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -61,7 +61,8 @@ const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: st
 
 export function ReceiveCrypto() {
   const { toast } = useToast()
-  const [isCreatingQuote, setIsCreatingQuote] = useState(false)
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false)
+  const [isCreatingPaymentLink, setIsCreatingPaymentLink] = useState(false)
   const [paymentLink, setPaymentLink] = useState("")
   const [quoteDetails, setQuoteDetails] = useState<any>(null)
   const [walletValidation, setWalletValidation] = useState<{
@@ -310,7 +311,65 @@ export function ReceiveCrypto() {
     }
   }
 
-  const handleCreateQuote = async (data: any) => {
+  // Real-time quote fetching function (without creating payment link)
+  const fetchQuote = async (formData: any) => {
+    if (!formData.cryptoAmount || !formData.cryptoNetworkCombined || !formData.fiatCurrency || !formData.paymentMethod) {
+      setQuoteDetails(null)
+      return
+    }
+
+    if (!merchantStatus.kybCompleted || !merchantStatus.custodianAccountCreated) {
+      return
+    }
+
+    setIsLoadingQuote(true)
+    console.log('Fetching real-time quote with data:', formData)
+
+    try {
+      const response = await apiRequest('POST', '/api/merchant/transak/pricing-quote', {
+        cryptoAmount: formData.cryptoAmount,
+        cryptoNetworkCombined: formData.cryptoNetworkCombined,
+        fiatCurrency: formData.fiatCurrency,
+        paymentMethod: formData.paymentMethod
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get pricing quote from server')
+      }
+
+      const transakQuote = await response.json()
+      console.log('Received real-time quote:', transakQuote)
+
+      const [cryptoCurrency, network] = formData.cryptoNetworkCombined.split('-')
+      
+      const formattedQuote = {
+        ...transakQuote,
+        cryptoCurrency: cryptoCurrency,
+        network: network
+      }
+
+      setQuoteDetails(formattedQuote)
+    } catch (error) {
+      console.error('Error fetching real-time quote:', error)
+      setQuoteDetails(null)
+    } finally {
+      setIsLoadingQuote(false)
+    }
+  }
+
+  // Watch form changes and trigger real-time quote updates with debouncing
+  const formValues = form.watch()
+  
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchQuote(formValues)
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(debounceTimer)
+  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.paymentMethod, merchantStatus.kybCompleted, merchantStatus.custodianAccountCreated])
+
+  // Function to create payment link with fresh quote to ensure no stale data
+  const handleCreatePaymentLink = async (data: any) => {
     if (!merchantStatus.kybCompleted) {
       toast({
         title: "KYB Required",
@@ -329,11 +388,26 @@ export function ReceiveCrypto() {
       return
     }
 
-    setIsCreatingQuote(true)
-    console.log('Creating Transak quote with data:', data)
+    // Check if current form values match the displayed quote to prevent stale quote usage
+    if (!quoteDetails || 
+        isLoadingQuote || 
+        !data.cryptoAmount || 
+        !data.cryptoNetworkCombined || 
+        !data.fiatCurrency || 
+        !data.paymentMethod) {
+      toast({
+        title: "Please Wait",
+        description: "Quote is updating. Please wait for the latest pricing before creating a payment link.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsCreatingPaymentLink(true)
+    console.log('Creating payment link with fresh quote verification')
 
     try {
-      // Call real Transak pricing API using platform-wide credentials
+      // Fetch fresh quote with current form values to prevent stale data
       const response = await apiRequest('POST', '/api/merchant/transak/pricing-quote', {
         cryptoAmount: data.cryptoAmount,
         cryptoNetworkCombined: data.cryptoNetworkCombined,
@@ -342,27 +416,22 @@ export function ReceiveCrypto() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get pricing quote from server')
+        throw new Error('Failed to get fresh pricing quote')
       }
 
-      // Backend already formats the Transak response properly
-      const transakQuote = await response.json()
-      console.log('Received formatted quote from backend:', transakQuote)
-
-      // Parse crypto and network from combined value for UI display
+      const freshQuote = await response.json()
       const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
       
-      // Use the properly formatted quote from backend with real Transak data
       const formattedQuote = {
-        ...transakQuote,
-        // Ensure we have the correct display values from form
+        ...freshQuote,
         cryptoCurrency: cryptoCurrency,
         network: network
       }
 
+      // Update the displayed quote with fresh data
       setQuoteDetails(formattedQuote)
-      
-      // Generate payment link with Transak widget parameters
+
+      // Generate payment link with fresh quote data
       const baseUrl = import.meta.env.PROD 
         ? 'https://global.transak.com' 
         : 'https://global-stg.transak.com'
@@ -384,19 +453,19 @@ export function ReceiveCrypto() {
       setPaymentLink(generatedLink)
       
       toast({
-        title: "Quote Created Successfully",
-        description: "Payment link generated for your customer.",
+        title: "Payment Link Created",
+        description: "Share this link with your customer to complete the payment.",
       })
       
     } catch (error) {
-      console.error('Error creating quote:', error)
+      console.error('Error creating payment link:', error)
       toast({
-        title: "Quote Creation Failed",
-        description: "Failed to create payment quote. Please try again.",
+        title: "Payment Link Creation Failed",
+        description: "Failed to create payment link. Please try again.",
         variant: "destructive"
       })
     } finally {
-      setIsCreatingQuote(false)
+      setIsCreatingPaymentLink(false)
     }
   }
 
@@ -504,7 +573,7 @@ export function ReceiveCrypto() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleCreateQuote)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(handleCreatePaymentLink)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -684,12 +753,12 @@ export function ReceiveCrypto() {
                 <div className="flex gap-2">
                   <Button 
                     type="submit" 
-                    disabled={isCreatingQuote}
+                    disabled={isCreatingPaymentLink || !quoteDetails}
                     className="flex-1"
-                    data-testid="button-create-quote"
+                    data-testid="button-create-payment-link"
                   >
-                    {isCreatingQuote && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Create Quote & Payment Link
+                    {isCreatingPaymentLink && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Create Payment Link
                   </Button>
                   {(paymentLink || quoteDetails) && (
                     <Button 
@@ -706,6 +775,18 @@ export function ReceiveCrypto() {
             </Form>
           </CardContent>
         </Card>
+
+        {/* Real-time Quote Display */}
+        {isLoadingQuote && (
+          <Card>
+            <CardContent className="flex items-center justify-center py-6">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Getting real-time pricing...</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quote Details & Payment Link */}
         {quoteDetails && (
