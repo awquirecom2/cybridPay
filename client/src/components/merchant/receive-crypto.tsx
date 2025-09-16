@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { ArrowDownToLine, Copy, ExternalLink, Loader2, CheckCircle, AlertTriangle } from "lucide-react"
+import { ArrowDownToLine, Copy, ExternalLink, Loader2, CheckCircle, AlertTriangle, CreditCard, Smartphone, Building2, Clock, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -244,41 +244,94 @@ export function ReceiveCrypto() {
     { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp" }
   ]
 
-  // Collect all payment methods from all currencies in Transak API response
+  // USD payment methods using exact Transak API payment method IDs
+  const usdPaymentMethods = [
+    {
+      value: "credit_debit_card",
+      label: "Credit/Debit Card",
+      description: "Visa, Mastercard accepted",
+      processingTime: "1-3 minutes",
+      feeLevel: "Higher",
+      icon: CreditCard,
+      minimumAmount: "$5",
+      maximumAmount: "$3,000",
+      dailyLimit: "$25,000",
+      note: "Most convenient option with instant processing"
+    },
+    {
+      value: "apple_pay",
+      label: "Apple Pay",
+      description: "Quick payment via Apple devices",
+      processingTime: "1-4 minutes",
+      feeLevel: "Standard",
+      icon: Smartphone,
+      minimumAmount: "$30",
+      maximumAmount: "$1,000",
+      dailyLimit: "$25,000",
+      note: "Secure and convenient for Apple users"
+    },
+    {
+      value: "google_pay",
+      label: "Google Pay",
+      description: "Quick payment via Google wallet",
+      processingTime: "1-4 minutes",
+      feeLevel: "Standard",
+      icon: Smartphone,
+      minimumAmount: "$30",
+      maximumAmount: "$1,000",
+      dailyLimit: "$25,000",
+      note: "Fast checkout with Google services"
+    },
+    {
+      value: "pm_wire",
+      label: "Wire Transfer",
+      description: "Direct bank-to-bank transfer",
+      processingTime: "1-2 days",
+      feeLevel: "Lower",
+      icon: Building2,
+      minimumAmount: "$20",
+      maximumAmount: "$75,000",
+      dailyLimit: "$75,000",
+      note: "High-value transfers with delayed processing"
+    }
+  ]
+
+  // Filter methods based on API availability or use all USD methods
   const paymentMethods = (() => {
+    // Check if we have API data for USD payment methods
     const allMethodsMap = new Map<string, string>()
     
-    // Extract all payment methods from all currencies
+    // Extract USD-specific payment methods from API if available
     if ((fiatCurrenciesData as any)?.response) {
-      (fiatCurrenciesData as any).response.forEach((fiat: { supportedPaymentMethods?: any[] }) => {
-        if (fiat.supportedPaymentMethods) {
-          fiat.supportedPaymentMethods.forEach((method: any) => {
-            if (method.id && method.name) {
-              allMethodsMap.set(method.id, method.name)
-            }
-          })
-        }
-      })
+      const usdFiat = (fiatCurrenciesData as any).response.find((fiat: any) => fiat.symbol === 'USD')
+      if (usdFiat?.supportedPaymentMethods) {
+        console.log('[ReceiveCrypto] USD supported payment methods from Transak API:', usdFiat.supportedPaymentMethods)
+        usdFiat.supportedPaymentMethods.forEach((method: any) => {
+          if (method.id && method.name) {
+            allMethodsMap.set(method.id, method.name)
+            console.log('[ReceiveCrypto] Found payment method:', method.id, method.name)
+          }
+        })
+      } else {
+        console.log('[ReceiveCrypto] No supportedPaymentMethods found for USD')
+      }
+    } else {
+      console.log('[ReceiveCrypto] No fiatCurrenciesData available')
     }
     
-    // Convert map to array format for dropdown
-    const methodsFromAPI = Array.from(allMethodsMap.entries()).map(([id, name]) => ({
-      value: id,
-      label: name
-    }))
+    console.log('[ReceiveCrypto] Available payment method IDs from API:', Array.from(allMethodsMap.keys()))
+    console.log('[ReceiveCrypto] Hardcoded payment method IDs:', usdPaymentMethods.map(m => m.value))
     
-    // Return API methods if available, otherwise fallback with official Transak payment method IDs
-    return methodsFromAPI.length > 0 ? methodsFromAPI : [
-      { value: "credit_debit_card", label: "Credit/Debit Card" },
-      { value: "sepa_bank_transfer", label: "SEPA Bank Transfer" },
-      { value: "gbp_bank_transfer", label: "GBP Bank Transfer" },
-      { value: "pm_us_wire_bank_transfer", label: "US Wire Transfer" },
-      { value: "apple_pay", label: "Apple Pay" },
-      { value: "google_pay", label: "Google Pay" },
-      { value: "pm_open_banking", label: "Open Banking" },
-      { value: "inr_bank_transfer", label: "INR Bank Transfer" },
-      { value: "inr_upi", label: "UPI" }
-    ]
+    // Filter our USD methods to only include those supported by API (if available)
+    if (allMethodsMap.size > 0) {
+      const validMethods = usdPaymentMethods.filter(method => allMethodsMap.has(method.value))
+      console.log('[ReceiveCrypto] Using filtered valid methods:', validMethods.map(m => m.value))
+      return validMethods
+    }
+    
+    // Return all USD methods if no API data available
+    console.log('[ReceiveCrypto] Using fallback hardcoded methods')
+    return usdPaymentMethods
   })()
 
   // Wallet validation function using combined crypto-network selection
@@ -707,26 +760,79 @@ export function ReceiveCrypto() {
                     control={form.control}
                     name="paymentMethod"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="col-span-2">
                         <FormLabel>Payment Method</FormLabel>
                         <FormControl>
                           <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger data-testid="select-payment-method">
-                              <SelectValue />
+                            <SelectTrigger data-testid="select-payment-method" className="min-h-16">
+                              <SelectValue>
+                                {field.value && (() => {
+                                  const selectedMethod = paymentMethods.find(m => m.value === field.value)
+                                  if (selectedMethod) {
+                                    const IconComponent = selectedMethod.icon
+                                    return (
+                                      <div className="flex items-center gap-3">
+                                        <IconComponent className="h-5 w-5 text-primary" />
+                                        <div className="flex flex-col items-start">
+                                          <span className="font-medium">{selectedMethod.label}</span>
+                                          <span className="text-sm text-muted-foreground">{selectedMethod.description}</span>
+                                        </div>
+                                      </div>
+                                    )
+                                  }
+                                  return null
+                                })()}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                              {paymentMethods.map((method) => (
-                                <SelectItem key={method.value} value={method.value}>
-                                  {method.label}
-                                </SelectItem>
-                              ))}
+                              {paymentMethods.map((method) => {
+                                const IconComponent = method.icon
+                                return (
+                                  <SelectItem 
+                                    key={method.value} 
+                                    value={method.value}
+                                    className="p-4 cursor-pointer"
+                                  >
+                                    <div className="flex items-start gap-3 w-full">
+                                      <IconComponent className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                                      <div className="flex-1 space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-medium">{method.label}</span>
+                                          <div className="flex items-center gap-2">
+                                            <Clock className="h-3 w-3 text-muted-foreground" />
+                                            <span className="text-xs text-muted-foreground">{method.processingTime}</span>
+                                          </div>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">{method.description}</p>
+                                        <div className="flex items-center justify-between text-xs">
+                                          <div className="flex items-center gap-1">
+                                            <DollarSign className="h-3 w-3" />
+                                            <span>Fee: {method.feeLevel}</span>
+                                          </div>
+                                          {method.minimumAmount && (
+                                            <span className="text-muted-foreground">
+                                              Min: {method.minimumAmount}
+                                            </span>
+                                          )}
+                                          <span className="text-muted-foreground">
+                                            Max: {method.maximumAmount}
+                                          </span>
+                                        </div>
+                                        {method.note && (
+                                          <p className="text-xs text-primary/80 italic">{method.note}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
                             </SelectContent>
                           </Select>
                         </FormControl>
                         <FormMessage />
                         {paymentMethods.length === 0 && (
                           <p className="text-sm text-muted-foreground">
-                            No payment methods available for selected currency
+                            No USD payment methods available
                           </p>
                         )}
                       </FormItem>
@@ -946,6 +1052,76 @@ export function ReceiveCrypto() {
           </Card>
         )}
       </div>
+
+      {/* USD Payment Methods Comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle>USD Payment Methods Available</CardTitle>
+          <CardDescription>
+            Compare processing times, fees, and limits for US customers
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {usdPaymentMethods.map((method) => {
+              const IconComponent = method.icon
+              return (
+                <Card key={method.value} className="relative">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <IconComponent className="h-5 w-5 text-primary mt-1 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div>
+                          <h4 className="font-semibold">{method.label}</h4>
+                          <p className="text-sm text-muted-foreground">{method.description}</p>
+                        </div>
+                        
+                        <div className="space-y-1 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Processing:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {method.processingTime}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Fees:</span>
+                            <span className="font-medium">{method.feeLevel}</span>
+                          </div>
+                          
+                          {method.minimumAmount && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Minimum:</span>
+                              <span className="font-medium">{method.minimumAmount}</span>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Daily Limit:</span>
+                            <span className="font-medium">{method.dailyLimit}</span>
+                          </div>
+                        </div>
+                        
+                        {method.note && (
+                          <div className="mt-2 p-2 bg-muted/50 rounded text-xs text-primary/80">
+                            {method.note}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+          
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/50 rounded-lg">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Note:</strong> All methods support USD payments for US customers. Processing times may vary based on bank processing schedules and weekends. Higher value transactions may require additional verification.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Instructions */}
       <Card>

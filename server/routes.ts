@@ -481,6 +481,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Debug logging - explicitly log to ensure visibility
+      console.error(`[DEBUG] PaymentMethod attempted: "${paymentMethod}"`);
+      console.error(`[DEBUG] Full pricing request:`, JSON.stringify({
+        cryptoAmount,
+        cryptoCurrency,
+        fiatCurrency,
+        network,
+        paymentMethod
+      }, null, 2));
+
       // Call Transak pricing API using platform-wide credentials
       const transakResponse = await PublicTransakService.getPricingQuote({
         cryptoAmount,
