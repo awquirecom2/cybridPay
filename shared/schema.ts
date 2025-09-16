@@ -137,6 +137,7 @@ export const createTransakSessionSchema = z.object({
   }),
   walletAddress: z.string().min(1, "Wallet address is required"),
   customerEmail: z.string().email("Valid customer email is required"),
+  orderType: z.enum(["BUY", "SELL"]).default("BUY"),
   referrerDomain: z.string().optional(),
   redirectURL: z.string().url().optional(),
   themeColor: z.string().regex(/^[0-9a-fA-F]{6}$/, "Theme color must be a valid hex color (6 characters)").optional()

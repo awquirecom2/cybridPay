@@ -134,7 +134,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
     { title: "Dashboard", url: "/merchant", icon: Home },
     { title: "Onboarding", url: "/merchant/onboarding", icon: FileText },
     { title: "Receive Crypto", url: "/merchant/receive-crypto", icon: ArrowDownToLine },
-    { title: "Offramp Crypto", url: "/merchant/offramp-crypto", icon: ArrowUpFromLine },
+    { title: "Sell Crypto", url: "/merchant/sell-crypto", icon: ArrowUpFromLine },
     { title: "Manage Integrations", url: "/merchant/manage-integrations", icon: Globe },
     { title: "Accounts", url: "/merchant/accounts", icon: Wallet },
   ]
