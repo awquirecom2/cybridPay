@@ -457,6 +457,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /test-pricing - Test endpoint to see raw Transak API response
+  app.get("/api/test/transak/pricing", async (req, res) => {
+    try {
+      console.log("Testing Transak pricing API with sample parameters...");
+      
+      // Test with sample buy order parameters from the documentation
+      const testParams = {
+        cryptoAmount: "100",
+        cryptoCurrency: "USDC", 
+        fiatCurrency: "USD",
+        network: "ethereum",
+        paymentMethod: "credit_debit_card"
+      };
+      
+      console.log("Test parameters:", testParams);
+      
+      const quote = await PublicTransakService.getPricingQuote(testParams);
+      
+      console.log("Transak API Response:", JSON.stringify(quote, null, 2));
+      
+      res.json({
+        message: "Transak pricing API test successful",
+        testParams,
+        transakResponse: quote
+      });
+    } catch (error) {
+      console.error("Error testing Transak pricing API:", error);
+      res.status(500).json({ 
+        error: "Failed to test Transak pricing API",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // POST /pricing-quote - Get pricing quote using platform-wide credentials
   app.post("/api/merchant/transak/pricing-quote", requireMerchant, async (req, res) => {
     try {
