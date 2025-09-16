@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building } from "lucide-react"
+import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building, Copy, Wallet, DollarSign, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,13 +11,74 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { apiRequest } from "@/lib/queryClient"
+
+// Crypto Icon Component with real Transak images
+const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: string, crypto: string, className?: string }) => {
+  // Fallback color mapping for cryptocurrencies if image fails
+  const cryptoColors: { [key: string]: string } = {
+    'BTC': '#f7931a',
+    'ETH': '#627eea', 
+    'USDC': '#2775ca',
+    'USDT': '#26a17b',
+    'DAI': '#ffb700',
+    'MATIC': '#8247e5',
+    'BNB': '#f3ba2f',
+    'AVAX': '#e84142',
+    'SOL': '#9945ff',
+    'WBTC': '#f09242'
+  };
+
+  const color = cryptoColors[crypto] || '#6b7280';
+
+  // If we have an image URL, use it
+  if (imageUrl) {
+    return (
+      <img 
+        src={imageUrl} 
+        alt={crypto}
+        className={`${className} rounded-full object-cover`}
+        onError={(e) => {
+          // Fallback to colored circle if image fails to load
+          const target = e.target as HTMLElement;
+          target.style.display = 'none';
+          const fallback = target.nextElementSibling as HTMLElement;
+          if (fallback) fallback.style.display = 'flex';
+        }}
+      />
+    );
+  }
+
+  // Fallback colored circle
+  return (
+    <div 
+      className={`${className} rounded-full flex items-center justify-center text-white text-sm font-bold`}
+      style={{ backgroundColor: color }}
+    >
+      {crypto.slice(0, crypto.length > 4 ? 2 : crypto.length)}
+    </div>
+  );
+};
 
 export function OfframpCrypto() {
   const { toast } = useToast()
   const [activeProvider, setActiveProvider] = useState<'transak' | 'cybrid'>('transak')
-  const [isCreatingPayout, setIsCreatingPayout] = useState(false)
+  const [isCreatingOfframp, setIsCreatingOfframp] = useState(false)
   const [payoutDetails, setPayoutDetails] = useState<any>(null)
   const [paymentLink, setPaymentLink] = useState("")
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false)
+  const [quoteDetails, setQuoteDetails] = useState<any>(null)
+  const [walletValidation, setWalletValidation] = useState<{
+    isValid: boolean | null;
+    isValidating: boolean;
+    error: string | null;
+  }>({ isValid: null, isValidating: false, error: null })
+
+  // Fetch real crypto currencies from Transak API
+  const { data: cryptoCurrenciesData, isLoading: isLoadingCrypto, error: cryptoError } = useQuery({
+    queryKey: ['/api/public/transak/crypto-currencies'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
 
   // Fetch fiat currencies with payment methods using the exact user-specified fetch
   const { data: fiatCurrenciesData, isLoading: isLoadingPaymentMethods } = useQuery({
@@ -28,9 +89,11 @@ export function OfframpCrypto() {
   const transakForm = useForm({
     defaultValues: {
       cryptoAmount: "",
-      cryptoCurrency: "USDC",
+      cryptoNetworkCombined: "USDC-ethereum", // Combined format: crypto-network
       fiatCurrency: "USD",
-      payoutMethod: "credit_debit_card" // Use the actual API method ID
+      payoutMethod: "credit_debit_card", // Use the actual API method ID
+      walletAddress: "",
+      customerEmail: ""
     }
   })
 
@@ -56,17 +119,81 @@ export function OfframpCrypto() {
     }
   }
 
+  // Create combined crypto-network options for dropdown with real API data
+  const supportedCryptoNetworks = (() => {
+    // Use the crypto-currencies endpoint which already has network and image data
+    if (cryptoCurrenciesData && (cryptoCurrenciesData as any)?.response && Array.isArray((cryptoCurrenciesData as any).response)) {
+      const currencies = (cryptoCurrenciesData as any).response;
+      
+      const cryptoNetworkCombinations: Array<{
+        value: string;
+        label: string;
+        crypto: string;
+        cryptoName: string;
+        network: string;
+        networkDisplayName: string;
+        imageUrl: string;
+        key: string;
+      }> = [];
+
+      currencies.forEach((currency: any, index: number) => {
+        // Extract crypto info and network from real API response
+        const cryptoSymbol = currency.symbol;
+        const cryptoName = currency.name;
+        const network = currency.network?.name;
+        const imageUrl = currency.image?.thumb || currency.image?.small;
+        
+        // Only include if crypto is allowed and has required fields
+        if (cryptoSymbol && cryptoName && network && currency.isAllowed) {
+          cryptoNetworkCombinations.push({
+            value: `${cryptoSymbol}-${network}`,
+            label: `${cryptoSymbol} ${cryptoName}`,
+            crypto: cryptoSymbol,
+            cryptoName: cryptoName,
+            network: network,
+            networkDisplayName: network,
+            imageUrl: imageUrl || '',
+            key: `${currency.uniqueId || cryptoSymbol}-${network}-${index}`
+          });
+        }
+      });
+
+      // Remove duplicates by value
+      const uniqueCombinations = cryptoNetworkCombinations.filter((combo, index, self) => 
+        index === self.findIndex(c => c.value === combo.value) && combo.crypto && combo.network
+      );
+
+      if (uniqueCombinations.length > 0) {
+        return uniqueCombinations;
+      }
+    }
+
+    // Fallback options if API fails
+    return [
+      { value: "USDC-ethereum", label: "USDC USD Coin", crypto: "USDC", cryptoName: "USD Coin", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-usdc-ethereum" },
+      { value: "USDT-ethereum", label: "USDT Tether", crypto: "USDT", cryptoName: "Tether", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-usdt-ethereum" },
+      { value: "ETH-ethereum", label: "ETH Ethereum", crypto: "ETH", cryptoName: "Ethereum", network: "ethereum", networkDisplayName: "Ethereum", imageUrl: "", key: "fallback-eth-ethereum" },
+      { value: "BTC-mainnet", label: "BTC Bitcoin", crypto: "BTC", cryptoName: "Bitcoin", network: "mainnet", networkDisplayName: "Bitcoin", imageUrl: "", key: "fallback-btc-mainnet" }
+    ];
+  })()
+
   // Mock bank accounts - should come from Cybrid API
   const bankAccounts = [
     { id: "bank_001", name: "Chase Business Checking", accountType: "checking", last4: "1234" },
     { id: "bank_002", name: "Wells Fargo Savings", accountType: "savings", last4: "5678" }
   ]
 
-  const supportedCrypto = [
-    { value: "USDC", label: "USDC - USD Coin" },
-    { value: "USDT", label: "USDT - Tether" },
-    { value: "ETH", label: "ETH - Ethereum" },
-    { value: "BTC", label: "BTC - Bitcoin" }
+  // Transform fiat currencies data for dropdown
+  const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string }, index: number) => ({
+    value: fiat.symbol,
+    label: `${fiat.symbol} - ${fiat.name}`,
+    key: `${fiat.symbol}-${index}`
+  })).filter((fiat: { value: string, label: string, key: string }, index: number, self: any[]) => 
+    index === self.findIndex((f: any) => f.value === fiat.value)
+  ) || [
+    { value: "USD", label: "USD - US Dollar", key: "fallback-usd" },
+    { value: "EUR", label: "EUR - Euro", key: "fallback-eur" },
+    { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp" }
   ]
 
   // Get USD payment methods from Transak API that support payouts
@@ -100,69 +227,238 @@ export function OfframpCrypto() {
     ];
   })()
 
+  // Wallet validation function using combined crypto-network selection
+  const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
+    if (!address || !cryptoNetworkCombined) return
+    
+    // Parse crypto and network from combined value (e.g., "USDC-ethereum")
+    const [cryptoCurrency, network] = cryptoNetworkCombined.split('-')
+    if (!cryptoCurrency || !network) return
+    
+    setWalletValidation({ isValid: null, isValidating: true, error: null })
+    
+    try {
+      const response = await fetch(
+        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${address}`
+      )
+      
+      if (!response.ok) {
+        throw new Error('Validation failed')
+      }
+      
+      const result = await response.json()
+      setWalletValidation({ 
+        isValid: result.isValid === true, 
+        isValidating: false, 
+        error: result.isValid === false ? 'Invalid wallet address' : null 
+      })
+    } catch (error) {
+      setWalletValidation({ 
+        isValid: false, 
+        isValidating: false, 
+        error: 'Unable to validate wallet address' 
+      })
+    }
+  }
+
+  // Real-time quote fetching function for offramp (without creating payment link)
+  const fetchOfframpQuote = async (formData: any) => {
+    if (!formData.cryptoAmount || !formData.cryptoNetworkCombined || !formData.fiatCurrency || !formData.payoutMethod) {
+      setQuoteDetails(null)
+      return
+    }
+
+    if (!merchantStatus.kybCompleted || !merchantStatus.custodianAccountCreated) {
+      return
+    }
+
+    setIsLoadingQuote(true)
+    console.log('Fetching real-time offramp quote with data:', formData)
+
+    try {
+      const response = await apiRequest('POST', '/api/merchant/transak/offramp-pricing-quote', {
+        cryptoAmount: formData.cryptoAmount,
+        cryptoNetworkCombined: formData.cryptoNetworkCombined,
+        fiatCurrency: formData.fiatCurrency,
+        payoutMethod: formData.payoutMethod,
+        walletAddress: formData.walletAddress
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get offramp pricing quote from server')
+      }
+
+      const transakQuote = await response.json()
+      console.log('Received real-time offramp quote:', transakQuote)
+
+      const [cryptoCurrency, network] = formData.cryptoNetworkCombined.split('-')
+      
+      const formattedQuote = {
+        ...transakQuote,
+        cryptoCurrency: cryptoCurrency,
+        network: network
+      }
+
+      setQuoteDetails(formattedQuote)
+    } catch (error) {
+      console.error('Error fetching real-time offramp quote:', error)
+      setQuoteDetails(null)
+    } finally {
+      setIsLoadingQuote(false)
+    }
+  }
+
+  // Watch form changes and trigger real-time quote updates with debouncing
+  const formValues = transakForm.watch()
+  
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchOfframpQuote(formValues)
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(debounceTimer)
+  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.payoutMethod, merchantStatus.kybCompleted, merchantStatus.custodianAccountCreated])
+
   const cybridPayoutMethods = [
     { value: "ach", label: "ACH Transfer" },
     { value: "wire", label: "Wire Transfer" }
   ]
 
-  const handleTransakPayout = async (data: any) => {
-    setIsCreatingPayout(true)
-    console.log('Creating Transak offramp quote:', data)
+  // Function to create Transak offramp session with fresh quote
+  const handleTransakOfframp = async (data: any) => {
+    if (!merchantStatus.kybCompleted) {
+      toast({
+        title: "KYB Required",
+        description: "Complete your KYB verification before creating offramp sessions.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    if (!merchantStatus.custodianAccountCreated) {
+      toast({
+        title: "Custodian Account Required", 
+        description: "Create your custodian account before accessing offramp functionality.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Check if current form values match the displayed quote
+    if (!quoteDetails || 
+        isLoadingQuote || 
+        !data.cryptoAmount || 
+        !data.cryptoNetworkCombined || 
+        !data.fiatCurrency || 
+        !data.payoutMethod ||
+        !data.walletAddress) {
+      toast({
+        title: "Please Wait",
+        description: "Quote is updating or missing required fields. Please ensure all fields are filled.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsCreatingOfframp(true)
+    console.log('Creating Transak offramp session with fresh quote verification')
 
     try {
-      // TODO: Implement real Transak offramp API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      const mockQuote = {
-        id: "offramp_" + Date.now(),
-        type: "transak",
+      // Fetch fresh quote with current form values to prevent stale data
+      const quoteResponse = await apiRequest('POST', '/api/merchant/transak/offramp-pricing-quote', {
         cryptoAmount: data.cryptoAmount,
-        cryptoCurrency: data.cryptoCurrency,
-        fiatAmount: (parseFloat(data.cryptoAmount) * (data.cryptoCurrency === 'USDC' ? 0.998 : 2495)).toFixed(2),
+        cryptoNetworkCombined: data.cryptoNetworkCombined,
         fiatCurrency: data.fiatCurrency,
         payoutMethod: data.payoutMethod,
-        fees: {
-          transakFee: (parseFloat(data.cryptoAmount) * 0.01).toFixed(2), // 1% fee
-          networkFee: data.cryptoCurrency === 'ETH' ? "12.00" : "2.00"
-        },
-        processingTime: data.payoutMethod === 'debit_card' ? '5-30 minutes' : 
-                         data.payoutMethod === 'bank_transfer' ? '1-2 hours' :
-                         data.payoutMethod === 'sepa_transfer' ? '1-2 hours' :
-                         data.payoutMethod === 'gbp_transfer' ? '1-2 hours' : '1-3 business days'
+        walletAddress: data.walletAddress
+      })
+
+      if (!quoteResponse.ok) {
+        throw new Error('Failed to get fresh offramp pricing quote')
       }
 
-      setPayoutDetails(mockQuote)
+      const freshQuote = await quoteResponse.json()
+      const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
       
-      // Generate Transak offramp widget link
-      const baseUrl = import.meta.env.MODE === 'production' 
-        ? 'https://global.transak.com' 
-        : 'https://global-stg.transak.com'
-        
-      const params = new URLSearchParams({
-        apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
-        cryptoAmount: data.cryptoAmount,
-        cryptoCurrency: data.cryptoCurrency,
-        fiatCurrency: data.fiatCurrency,
-        payoutMethod: data.payoutMethod,
-        isBuyOrSell: 'SELL',
-        partnerOrderId: mockQuote.id
+      const formattedQuote = {
+        ...freshQuote,
+        cryptoCurrency: cryptoCurrency,
+        network: network
+      }
+
+      // Update the displayed quote with fresh data
+      setPayoutDetails(formattedQuote)
+
+      // Create Transak offramp session using the fresh quote data
+      const sessionResponse = await apiRequest('POST', '/api/merchant/transak/create-offramp-session', {
+        quoteData: {
+          fiatAmount: formattedQuote.fiatAmount,
+          cryptoCurrency: formattedQuote.cryptoCurrency,
+          fiatCurrency: formattedQuote.fiatCurrency,
+          network: formattedQuote.network,
+          paymentMethod: formattedQuote.payoutMethod,
+          partnerOrderId: formattedQuote.partnerOrderId
+        },
+        walletAddress: data.walletAddress,
+        customerEmail: data.customerEmail || '',
+        referrerDomain: window.location.hostname,
+        redirectURL: `${window.location.origin}/transaction-complete`,
+        themeColor: "1f4a8c"
       })
+
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to create Transak offramp session')
+      }
+
+      const sessionData = await sessionResponse.json()
       
-      setPaymentLink(`${baseUrl}?${params.toString()}`)
+      // Check if request was successful
+      if (!sessionData.success) {
+        throw new Error(sessionData.error || 'Offramp session creation failed')
+      }
+      
+      // Extract widget URL from normalized response format
+      const widgetUrl = sessionData.widgetUrl
+      
+      if (!widgetUrl) {
+        console.error('Transak offramp session response:', sessionData)
+        throw new Error('No widget URL received from Transak offramp session')
+      }
+
+      setPaymentLink(widgetUrl)
       
       toast({
-        title: "Transak Payout Quote Created",
+        title: "Offramp Session Created",
         description: "Click the link to complete your crypto offramp via Transak.",
       })
       
     } catch (error) {
+      console.error('Error creating Transak offramp session:', error)
+      
+      // Enhanced error handling
+      let errorMessage = "Failed to create offramp session. Please try again."
+      let errorTitle = "Session Creation Failed"
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Payment provider error')) {
+          errorTitle = "Payment Provider Error"
+          errorMessage = "There was an issue with the payment provider. Please try again later."
+        } else if (error.message.includes('Invalid request data')) {
+          errorTitle = "Invalid Data"
+          errorMessage = "Please check all required fields and try again."
+        } else if (error.message.includes('No widget URL')) {
+          errorTitle = "Session Error"
+          errorMessage = "Offramp session was created but no payment link was received. Please try again."
+        }
+      }
+      
       toast({
-        title: "Payout Creation Failed",
-        description: "Failed to create payout quote. Please try again.",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {
-      setIsCreatingPayout(false)
+      setIsCreatingOfframp(false)
     }
   }
 
@@ -309,8 +605,8 @@ export function OfframpCrypto() {
               </CardHeader>
               <CardContent>
                 <Form {...transakForm}>
-                  <form onSubmit={transakForm.handleSubmit(handleTransakPayout)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                  <form onSubmit={transakForm.handleSubmit(handleTransakOfframp)} className="space-y-4">
+                    <div className="space-y-4">
                       <FormField
                         control={transakForm.control}
                         name="cryptoAmount"
@@ -333,19 +629,39 @@ export function OfframpCrypto() {
 
                       <FormField
                         control={transakForm.control}
-                        name="cryptoCurrency"
+                        name="cryptoNetworkCombined"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Cryptocurrency</FormLabel>
+                            <FormLabel>Cryptocurrency & Network</FormLabel>
                             <FormControl>
-                              <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger data-testid="select-transak-crypto">
-                                  <SelectValue />
+                              <Select 
+                                value={field.value} 
+                                onValueChange={(value) => {
+                                  field.onChange(value)
+                                  // Trigger wallet validation when crypto/network changes
+                                  const currentWallet = transakForm.getValues('walletAddress')
+                                  if (currentWallet) {
+                                    validateWalletAddress(currentWallet, value)
+                                  }
+                                }}
+                              >
+                                <SelectTrigger data-testid="select-transak-crypto-network">
+                                  <SelectValue placeholder="Select cryptocurrency and network" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {supportedCrypto.map((crypto) => (
-                                    <SelectItem key={crypto.value} value={crypto.value}>
-                                      {crypto.label}
+                                  {supportedCryptoNetworks.map((option) => (
+                                    <SelectItem key={option.key} value={option.value}>
+                                      <div className="flex items-center gap-2">
+                                        <CryptoIcon 
+                                          imageUrl={option.imageUrl} 
+                                          crypto={option.crypto} 
+                                          className="w-4 h-4" 
+                                        />
+                                        <span>{option.label}</span>
+                                        <Badge variant="secondary" className="text-xs">
+                                          {option.networkDisplayName}
+                                        </Badge>
+                                      </div>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -358,46 +674,111 @@ export function OfframpCrypto() {
 
                       <FormField
                         control={transakForm.control}
-                        name="fiatCurrency"
+                        name="walletAddress"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Fiat Currency</FormLabel>
+                            <FormLabel>Your Wallet Address</FormLabel>
                             <FormControl>
-                              <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger data-testid="select-transak-fiat">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="USD">USD</SelectItem>
-                                  <SelectItem value="EUR">EUR</SelectItem>
-                                  <SelectItem value="GBP">GBP</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <div className="relative">
+                                <Wallet className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                  placeholder="0x1234...abcd or bc1q..."
+                                  className="pl-10"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(e)
+                                    // Trigger validation on input change
+                                    const cryptoNetworkCombined = transakForm.getValues('cryptoNetworkCombined')
+                                    if (e.target.value && cryptoNetworkCombined) {
+                                      validateWalletAddress(e.target.value, cryptoNetworkCombined)
+                                    }
+                                  }}
+                                  data-testid="input-wallet-address"
+                                />
+                                {walletValidation.isValidating && (
+                                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                                )}
+                                {walletValidation.isValid === true && (
+                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-600" />
+                                )}
+                                {walletValidation.isValid === false && (
+                                  <AlertTriangle className="absolute right-3 top-3 h-4 w-4 text-red-600" />
+                                )}
+                              </div>
                             </FormControl>
+                            {walletValidation.error && (
+                              <p className="text-sm text-red-600">{walletValidation.error}</p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={transakForm.control}
+                          name="fiatCurrency"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fiat Currency</FormLabel>
+                              <FormControl>
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                  <SelectTrigger data-testid="select-transak-fiat">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {supportedFiat.map((fiat) => (
+                                      <SelectItem key={fiat.key} value={fiat.value}>
+                                        {fiat.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={transakForm.control}
+                          name="payoutMethod"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Payout Method</FormLabel>
+                              <FormControl>
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                  <SelectTrigger data-testid="select-transak-payout-method">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {transakPayoutMethods.map((method: any) => (
+                                      <SelectItem key={method.value} value={method.value}>
+                                        {method.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
                       <FormField
                         control={transakForm.control}
-                        name="payoutMethod"
+                        name="customerEmail"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Payout Method</FormLabel>
+                            <FormLabel>Customer Email (Optional)</FormLabel>
                             <FormControl>
-                              <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger data-testid="select-transak-payout-method">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {transakPayoutMethods.map((method: any) => (
-                                    <SelectItem key={method.value} value={method.value}>
-                                      {method.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <Input
+                                placeholder="customer@example.com"
+                                type="email"
+                                {...field}
+                                data-testid="input-customer-email"
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -405,29 +786,76 @@ export function OfframpCrypto() {
                       />
                     </div>
 
+                    {/* Real-time Quote Display */}
+                    {isLoadingQuote && (
+                      <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-center space-x-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Fetching real-time quote...</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {quoteDetails && !isLoadingQuote && (
+                      <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                        <CardHeader>
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <DollarSign className="h-4 w-4" />
+                            Real-time Quote
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Selling:</span>
+                              <span className="font-mono">{quoteDetails.cryptoAmount} {quoteDetails.cryptoCurrency}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Receiving:</span>
+                              <span className="font-mono font-medium text-green-600">{quoteDetails.fiatAmount} {quoteDetails.fiatCurrency}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Rate:</span>
+                              <span className="font-mono">{quoteDetails.conversionRate}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Fee:</span>
+                              <span className="font-mono text-red-600">{quoteDetails.totalFee} {quoteDetails.fiatCurrency}</span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Quote valid for 15 minutes
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     <Button 
                       type="submit" 
-                      disabled={isCreatingPayout}
+                      disabled={isCreatingOfframp || isLoadingQuote || !quoteDetails || walletValidation.isValid !== true}
                       className="w-full"
-                      data-testid="button-create-transak-payout"
+                      data-testid="button-create-transak-offramp"
                     >
-                      {isCreatingPayout && activeProvider === 'transak' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Create Transak Offramp
+                      {isCreatingOfframp && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Create Transak Offramp Session
                     </Button>
                   </form>
                 </Form>
               </CardContent>
             </Card>
 
-            {payoutDetails && payoutDetails.type === 'transak' && paymentLink && (
+            {payoutDetails && paymentLink && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    Transak Offramp Link Ready
+                    Transak Offramp Session Ready
                   </CardTitle>
                   <CardDescription>
-                    Click the link to complete your crypto sale via Transak
+                    Click the link to complete your crypto offramp via Transak
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -442,12 +870,12 @@ export function OfframpCrypto() {
                         <span className="font-mono font-medium text-green-600">{payoutDetails.fiatAmount} {payoutDetails.fiatCurrency}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Transak Fee:</span>
-                        <span className="font-mono text-red-600">{payoutDetails.fees.transakFee} {payoutDetails.fiatCurrency}</span>
+                        <span className="text-muted-foreground">Total Fee:</span>
+                        <span className="font-mono text-red-600">{payoutDetails.totalFee} {payoutDetails.fiatCurrency}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Processing:</span>
-                        <span className="text-xs">{payoutDetails.processingTime}</span>
+                        <span className="text-muted-foreground">Network:</span>
+                        <span className="text-xs">{payoutDetails.network}</span>
                       </div>
                     </div>
                   </div>
@@ -456,14 +884,25 @@ export function OfframpCrypto() {
                     <Button 
                       onClick={() => window.open(paymentLink, '_blank')} 
                       className="w-full"
-                      data-testid="button-open-transak-link"
+                      data-testid="button-open-transak-offramp-link"
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
                       Complete Offramp via Transak
                     </Button>
-                    <Button variant="outline" onClick={resetForms} className="w-full">
-                      Create Another Offramp
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={copyPaymentLink} 
+                        className="flex-1"
+                        data-testid="button-copy-offramp-link"
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Link
+                      </Button>
+                      <Button variant="outline" onClick={resetForms} className="flex-1">
+                        Create Another
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

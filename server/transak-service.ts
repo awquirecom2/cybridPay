@@ -178,6 +178,49 @@ export class PublicTransakService {
     
     return response.json();
   }
+
+  // GET offramp pricing quote using platform-wide credentials from environment for SELL operations
+  static async getOfframpPricingQuote(params: {
+    cryptoAmount: string;
+    cryptoCurrency: string;
+    fiatCurrency: string;
+    network: string;
+    paymentMethod: string;
+  }) {
+    const apiKey = process.env.TRANSAK_API_KEY;
+    const environment = process.env.TRANSAK_ENVIRONMENT || 'staging';
+    
+    if (!apiKey) {
+      throw new Error('TRANSAK_API_KEY environment variable is required');
+    }
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.transak.com/api/v1' 
+      : 'https://api-stg.transak.com/api/v1';
+      
+    const url = `${baseUrl}/pricing/public/quotes?${new URLSearchParams({
+      partnerApiKey: apiKey,
+      fiatCurrency: params.fiatCurrency,
+      cryptoCurrency: params.cryptoCurrency,
+      isBuyOrSell: 'SELL',
+      network: params.network,
+      paymentMethod: params.paymentMethod,
+      cryptoAmount: params.cryptoAmount
+    })}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak offramp pricing API error ${response.status}: ${errorText}`);
+    }
+    
+    return response.json();
+  }
 }
 
 export class TransakService {
@@ -414,6 +457,95 @@ export class TransakService {
       }
       
       throw new Error(`Transak session creation failed ${response.status}: ${errorText}`);
+    }
+
+    const rawResponse = await response.json();
+    return this.parseSessionResponse(rawResponse);
+  }
+
+  // POST /api/v2/auth/session - Create offramp widget session for SELL operations
+  async createOfframpSession(params: CreateSessionParams): Promise<{ widgetUrl: string }> {
+    // Get cached access token (or refresh if needed)
+    let accessToken: string;
+    try {
+      accessToken = await this.getCachedAccessToken();
+    } catch (error) {
+      console.error('[TransakService] Failed to get access token for offramp:', error);
+      throw new Error('Authentication failed: Unable to obtain access token');
+    }
+    
+    // Construct widget parameters for SELL operation according to Transak API
+    const widgetParams = {
+      apiKey: this.apiKey,
+      referrerDomain: params.referrerDomain || "cryptopay.replit.app",
+      productsAvailed: "SELL", // Changed to SELL for offramp
+      ...(params.quoteData.fiatAmount && { fiatAmount: params.quoteData.fiatAmount }),
+      ...(params.quoteData.cryptoAmount && { cryptoAmount: params.quoteData.cryptoAmount }),
+      cryptoCurrencyCode: params.quoteData.cryptoCurrency, // Use cryptoCurrencyCode for consistency with Transak API
+      fiatCurrency: params.quoteData.fiatCurrency,
+      network: params.quoteData.network,
+      walletAddress: params.walletAddress,
+      disableWalletAddressForm: true,
+      hideExchangeScreen: true,
+      hideMenu: true,
+      isFeeCalculationHidden: false,
+      email: params.customerEmail,
+      isAutoFillUserData: true,
+      themeColor: params.themeColor || "1f4a8c",
+      partnerOrderId: params.quoteData.partnerOrderId,
+      redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete",
+      paymentMethod: params.quoteData.paymentMethod
+    };
+
+    // Use environment-based gateway URL
+    const response = await fetch(this.gatewayUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access-token': accessToken
+      },
+      body: JSON.stringify({ widgetParams })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[TransakService] Offramp session creation failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText
+      });
+      
+      // If unauthorized, invalidate cached token and retry once
+      if (response.status === 401 || response.status === 403) {
+        console.warn(`[TransakService] Token authentication failed for offramp (${response.status}), invalidating cache and retrying`);
+        this.invalidateCachedToken();
+        
+        try {
+          // Retry with fresh token
+          const freshToken = await this.getCachedAccessToken();
+          const retryResponse = await fetch(this.gatewayUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'access-token': freshToken
+            },
+            body: JSON.stringify({ widgetParams })
+          });
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            throw new Error(`Transak offramp session creation failed after retry ${retryResponse.status}: ${retryErrorText}`);
+          }
+          
+          // Continue with retry response
+          const rawResponse = await retryResponse.json();
+          return this.parseSessionResponse(rawResponse);
+        } catch (retryError) {
+          throw new Error(`Transak offramp session creation failed after token refresh: ${retryError}`);
+        }
+      }
+      
+      throw new Error(`Transak offramp session creation failed ${response.status}: ${errorText}`);
     }
 
     const rawResponse = await response.json();

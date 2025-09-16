@@ -586,6 +586,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /offramp-pricing-quote - Get pricing quote for SELL operations using platform-wide credentials
+  app.post("/api/merchant/transak/offramp-pricing-quote", requireMerchant, async (req, res) => {
+    try {
+      const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, payoutMethod, walletAddress } = req.body;
+
+      // Validate required fields
+      if (!cryptoAmount || !cryptoNetworkCombined || !fiatCurrency || !payoutMethod) {
+        return res.status(400).json({ 
+          error: "Missing required fields: cryptoAmount, cryptoNetworkCombined, fiatCurrency, payoutMethod" 
+        });
+      }
+
+      // Parse crypto and network from combined value (e.g., "USDC-ethereum")
+      const [cryptoCurrency, network] = cryptoNetworkCombined.split('-');
+      
+      if (!cryptoCurrency || !network) {
+        return res.status(400).json({ 
+          error: "Invalid cryptoNetworkCombined format. Expected format: 'CRYPTO-network'" 
+        });
+      }
+
+      // Debug logging
+      console.error(`[DEBUG] Offramp PaymentMethod attempted: "${payoutMethod}"`);
+      console.error(`[DEBUG] Full offramp pricing request:`, JSON.stringify({
+        cryptoAmount,
+        cryptoCurrency,
+        fiatCurrency,
+        network,
+        payoutMethod,
+        walletAddress
+      }, null, 2));
+
+      // Call Transak pricing API for SELL operations using platform-wide credentials
+      const transakResponse = await PublicTransakService.getOfframpPricingQuote({
+        cryptoAmount,
+        cryptoCurrency,
+        fiatCurrency,
+        network,
+        paymentMethod: payoutMethod
+      });
+
+      // Extract the actual quote data from Transak's nested response structure
+      const quote = transakResponse.response;
+      
+      if (!quote) {
+        throw new Error("Invalid response structure from Transak API");
+      }
+
+      // Format response for frontend with real Transak data
+      const formattedQuote = {
+        id: quote.quoteId,
+        partnerOrderId: `offramp_order_${Date.now()}`,
+        cryptoAmount: quote.cryptoAmount,
+        cryptoCurrency: quote.cryptoCurrency,
+        fiatAmount: quote.fiatAmount,
+        fiatCurrency: quote.fiatCurrency,
+        payoutMethod: quote.paymentMethod,
+        network: quote.network,
+        conversionRate: quote.conversionPrice,
+        marketRate: quote.marketConversionPrice,
+        slippage: quote.slippage,
+        totalFee: quote.totalFee,
+        feeBreakdown: quote.feeBreakdown || [],
+        validUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min from now
+        isBuyOrSell: 'SELL',
+        nonce: quote.nonce
+      };
+
+      res.json(formattedQuote);
+    } catch (error) {
+      console.error("Error fetching offramp pricing quote:", error);
+      res.status(500).json({ error: "Failed to fetch offramp pricing quote" });
+    }
+  });
+
+  // POST /create-offramp-session - Create Transak widget session for offramp processing
+  app.post("/api/merchant/transak/create-offramp-session", requireMerchant, async (req, res) => {
+    try {
+      // Validate request body - reuse the existing schema but modify for SELL operation
+      const validatedData = createTransakSessionSchema.parse(req.body);
+
+      // Override isBuyOrSell to SELL for offramp operations
+      const offrampSessionData = {
+        ...validatedData,
+        quoteData: {
+          ...validatedData.quoteData,
+          isBuyOrSell: 'SELL' as const
+        }
+      };
+
+      // Get Transak service instance for the merchant
+      const transak = await getTransakService(req.user!.id);
+      
+      // Create offramp session using the Transak service
+      const sessionResponse = await transak.createOfframpSession(offrampSessionData);
+
+      // Store the Transak session URL and create a masked payment link
+      const paymentLink = await storage.createPaymentLink({
+        sessionUrl: sessionResponse.widgetUrl,
+        merchantId: req.user!.id
+      });
+
+      // Create the masked URL - use the request's host to create a proper URL
+      const protocol = req.secure ? 'https' : 'http';
+      const host = req.get('host');
+      const maskedUrl = `${protocol}://${host}/pay/${paymentLink.id}`;
+
+      // Return normalized response format with masked URL
+      res.json({
+        success: true,
+        widgetUrl: maskedUrl
+      });
+    } catch (error) {
+      console.error("Error creating Transak offramp session:", error);
+      
+      // Handle validation errors specifically
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: (error as any).issues
+        });
+      }
+      
+      // Handle Transak API errors
+      if (error instanceof Error && error.message.includes('Transak')) {
+        return res.status(502).json({ 
+          error: "Payment provider error", 
+          details: error.message 
+        });
+      }
+      
+      // Generic error fallback
+      res.status(500).json({ error: "Failed to create offramp session" });
+    }
+  });
+
   // Public Transak API endpoints (no authentication required)
   // GET crypto currencies - Public endpoint for Receive Crypto page
   app.get("/api/public/transak/crypto-currencies", async (req, res) => {
