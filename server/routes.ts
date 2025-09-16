@@ -463,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /pricing-quote - Get pricing quote using platform-wide credentials
   app.post("/api/merchant/transak/pricing-quote", requireMerchant, async (req, res) => {
     try {
-      const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, paymentMethod, orderType } = req.body;
+      const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, paymentMethod } = req.body;
 
       // Validate required fields
       if (!cryptoAmount || !cryptoNetworkCombined || !fiatCurrency || !paymentMethod) {
@@ -497,8 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cryptoCurrency,
         fiatCurrency,
         network,
-        paymentMethod,
-        orderType: orderType as 'BUY' | 'SELL' // Pass orderType to service
+        paymentMethod
       });
 
       // Extract the actual quote data from Transak's nested response structure

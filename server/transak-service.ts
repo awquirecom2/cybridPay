@@ -22,7 +22,6 @@ export interface CreateSessionParams {
   };
   walletAddress: string;
   customerEmail: string;
-  orderType?: 'BUY' | 'SELL';
   referrerDomain?: string;
   redirectURL?: string;
   themeColor?: string;
@@ -144,7 +143,6 @@ export class PublicTransakService {
     fiatCurrency: string;
     network: string;
     paymentMethod: string;
-    orderType?: 'BUY' | 'SELL'; // Add orderType parameter, defaulting to BUY for backward compatibility
   }) {
     const apiKey = process.env.TRANSAK_API_KEY;
     const environment = process.env.TRANSAK_ENVIRONMENT || 'staging';
@@ -161,7 +159,7 @@ export class PublicTransakService {
       partnerApiKey: apiKey,
       fiatCurrency: params.fiatCurrency,
       cryptoCurrency: params.cryptoCurrency,
-      isBuyOrSell: params.orderType || 'BUY', // Use orderType parameter, defaulting to BUY
+      isBuyOrSell: 'BUY',
       network: params.network,
       paymentMethod: params.paymentMethod,
       cryptoAmount: params.cryptoAmount
@@ -348,7 +346,7 @@ export class TransakService {
     const widgetParams = {
       apiKey: this.apiKey,
       referrerDomain: params.referrerDomain || "cryptopay.replit.app",
-      productsAvailed: params.orderType || "BUY",
+      productsAvailed: "BUY",
       ...(params.quoteData.fiatAmount && { fiatAmount: params.quoteData.fiatAmount }),
       ...(params.quoteData.cryptoAmount && { cryptoAmount: params.quoteData.cryptoAmount }),
       cryptoCurrencyCode: params.quoteData.cryptoCurrency, // Use cryptoCurrencyCode for consistency with Transak API
