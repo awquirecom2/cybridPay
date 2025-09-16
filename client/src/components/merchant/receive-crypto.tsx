@@ -372,7 +372,7 @@ export function ReceiveCrypto() {
     return () => clearTimeout(debounceTimer)
   }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.paymentMethod, merchantStatus.kybCompleted, merchantStatus.custodianAccountCreated])
 
-  // Function to create payment link with fresh quote to ensure no stale data
+  // Function to create Transak session with fresh quote to ensure no stale data
   const handleCreatePaymentLink = async (data: any) => {
     if (!merchantStatus.kybCompleted) {
       toast({
@@ -408,22 +408,22 @@ export function ReceiveCrypto() {
     }
 
     setIsCreatingPaymentLink(true)
-    console.log('Creating payment link with fresh quote verification')
+    console.log('Creating Transak session with fresh quote verification')
 
     try {
       // Fetch fresh quote with current form values to prevent stale data
-      const response = await apiRequest('POST', '/api/merchant/transak/pricing-quote', {
+      const quoteResponse = await apiRequest('POST', '/api/merchant/transak/pricing-quote', {
         cryptoAmount: data.cryptoAmount,
         cryptoNetworkCombined: data.cryptoNetworkCombined,
         fiatCurrency: data.fiatCurrency,
         paymentMethod: data.paymentMethod
       })
 
-      if (!response.ok) {
+      if (!quoteResponse.ok) {
         throw new Error('Failed to get fresh pricing quote')
       }
 
-      const freshQuote = await response.json()
+      const freshQuote = await quoteResponse.json()
       const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
       
       const formattedQuote = {
@@ -435,37 +435,75 @@ export function ReceiveCrypto() {
       // Update the displayed quote with fresh data
       setQuoteDetails(formattedQuote)
 
-      // Generate payment link with fresh quote data
-      const baseUrl = import.meta.env.PROD 
-        ? 'https://global.transak.com' 
-        : 'https://global-stg.transak.com'
-        
-      const params = new URLSearchParams({
-        apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
-        cryptoAmount: formattedQuote.cryptoAmount,
-        cryptoCurrency: formattedQuote.cryptoCurrency,
-        fiatCurrency: formattedQuote.fiatCurrency,
-        paymentMethod: formattedQuote.paymentMethod,
-        network: formattedQuote.network,
-        partnerOrderId: formattedQuote.partnerOrderId,
-        email: data.customerEmail || '',
+      // Create Transak session using the fresh quote data
+      const sessionResponse = await apiRequest('POST', '/api/merchant/transak/create-session', {
+        quoteData: {
+          fiatAmount: formattedQuote.fiatAmount,
+          cryptoCurrency: formattedQuote.cryptoCurrency,
+          fiatCurrency: formattedQuote.fiatCurrency,
+          network: formattedQuote.network,
+          paymentMethod: formattedQuote.paymentMethod,
+          partnerOrderId: formattedQuote.partnerOrderId
+        },
         walletAddress: data.walletAddress || '',
-        disableWalletAddressForm: (data.walletAddress && walletValidation.isValid) ? 'true' : 'false'
+        customerEmail: data.customerEmail || '',
+        referrerDomain: window.location.hostname,
+        redirectURL: `${window.location.origin}/transaction-complete`,
+        themeColor: "1f4a8c"
       })
+
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to create Transak session')
+      }
+
+      const sessionData = await sessionResponse.json()
       
-      const generatedLink = `${baseUrl}?${params.toString()}`
-      setPaymentLink(generatedLink)
+      // Check if request was successful
+      if (!sessionData.success) {
+        throw new Error(sessionData.error || 'Session creation failed')
+      }
+      
+      // Extract widget URL from normalized response format
+      const widgetUrl = sessionData.widgetUrl
+      
+      if (!widgetUrl) {
+        console.error('Transak session response:', sessionData)
+        throw new Error('No widget URL received from Transak session')
+      }
+
+      setPaymentLink(widgetUrl)
       
       toast({
-        title: "Payment Link Created",
+        title: "Payment Session Created",
         description: "Share this link with your customer to complete the payment.",
       })
       
     } catch (error) {
-      console.error('Error creating payment link:', error)
+      console.error('Error creating Transak session:', error)
+      
+      // Enhanced error handling with specific error messages
+      let errorMessage = "Failed to create payment session. Please try again."
+      let errorTitle = "Session Creation Failed"
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Payment provider error')) {
+          errorTitle = "Payment Provider Error"
+          errorMessage = "There was an issue with the payment provider. Please try again later."
+        } else if (error.message.includes('Invalid request data')) {
+          errorTitle = "Invalid Data"
+          errorMessage = "Please check all required fields and try again."
+        } else if (error.message.includes('No widget URL')) {
+          errorTitle = "Session Error"
+          errorMessage = "Payment session was created but no payment link was received. Please try again."
+        } else if (error.message.includes('Session creation failed')) {
+          errorTitle = "Creation Failed" 
+          errorMessage = error.message
+        }
+      }
+      
       toast({
-        title: "Payment Link Creation Failed",
-        description: "Failed to create payment link. Please try again.",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {

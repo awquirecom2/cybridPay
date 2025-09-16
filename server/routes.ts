@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -525,50 +525,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /create-session - Create Transak widget session for payment processing
   app.post("/api/merchant/transak/create-session", requireMerchant, async (req, res) => {
     try {
-      const { 
-        quoteData, 
-        walletAddress, 
-        customerEmail, 
-        referrerDomain, 
-        redirectURL, 
-        themeColor 
-      } = req.body;
-
-      // Validate required fields
-      if (!quoteData || !walletAddress || !customerEmail) {
-        return res.status(400).json({ 
-          error: "Missing required fields: quoteData, walletAddress, customerEmail" 
-        });
-      }
-
-      // Validate quote data structure
-      if (!quoteData.fiatAmount || !quoteData.cryptoCurrency || !quoteData.fiatCurrency || 
-          !quoteData.network || !quoteData.paymentMethod || !quoteData.partnerOrderId) {
-        return res.status(400).json({ 
-          error: "Invalid quoteData: missing required fields" 
-        });
-      }
+      // Validate request body using Zod schema
+      const validatedData = createTransakSessionSchema.parse(req.body);
 
       // Get Transak service instance for the merchant
       const transak = await getTransakService(req.user!.id);
       
-      // Create session using the Transak service
-      const sessionData = await transak.createSession({
-        quoteData,
-        walletAddress,
-        customerEmail,
-        referrerDomain,
-        redirectURL,
-        themeColor
-      });
+      // Create session using the Transak service (now returns normalized { widgetUrl } response)
+      const sessionResponse = await transak.createSession(validatedData);
 
+      // Return normalized response format
       res.json({
         success: true,
-        sessionData
+        widgetUrl: sessionResponse.widgetUrl
       });
     } catch (error) {
       console.error("Error creating Transak session:", error);
-      res.status(500).json({ error: "Failed to create session" });
+      
+      // Handle validation errors specifically
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: "Invalid request data",
+          details: (error as any).issues
+        });
+      }
+      
+      // Handle Transak API errors
+      if (error instanceof Error && error.message.includes('Transak')) {
+        return res.status(502).json({ 
+          error: "Payment provider error", 
+          details: error.message 
+        });
+      }
+      
+      // Generic error fallback
+      res.status(500).json({ error: "Failed to create payment session" });
     }
   });
 

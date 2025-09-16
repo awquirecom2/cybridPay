@@ -122,6 +122,27 @@ export const transakCredentialsSchema = z.object({
   environment: z.enum(["staging", "production"]).default("staging")
 });
 
+// Transak session creation request schema
+export const createTransakSessionSchema = z.object({
+  quoteData: z.object({
+    fiatAmount: z.number().positive().optional(),
+    cryptoAmount: z.number().positive().optional(),
+    cryptoCurrency: z.string().min(1, "Crypto currency is required"),
+    fiatCurrency: z.string().min(1, "Fiat currency is required"),
+    network: z.string().min(1, "Network is required"),
+    paymentMethod: z.string().min(1, "Payment method is required"),
+    partnerOrderId: z.string().min(1, "Partner order ID is required")
+  }).refine(data => data.fiatAmount || data.cryptoAmount, {
+    message: "Either fiatAmount or cryptoAmount must be provided"
+  }),
+  walletAddress: z.string().min(1, "Wallet address is required"),
+  customerEmail: z.string().email("Valid customer email is required"),
+  referrerDomain: z.string().optional(),
+  redirectURL: z.string().url().optional(),
+  themeColor: z.string().regex(/^[0-9a-fA-F]{6}$/, "Theme color must be a valid hex color (6 characters)").optional()
+});
+
 export type InsertMerchantCredentials = z.infer<typeof insertMerchantCredentialsSchema>;
 export type TransakCredentials = z.infer<typeof transakCredentialsSchema>;
+export type CreateTransakSession = z.infer<typeof createTransakSessionSchema>;
 export type MerchantCredentials = typeof merchantCredentials.$inferSelect;

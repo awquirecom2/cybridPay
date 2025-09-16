@@ -11,7 +11,8 @@ export interface TransakCredentials {
 
 export interface CreateSessionParams {
   quoteData: {
-    fiatAmount: number;
+    fiatAmount?: number;
+    cryptoAmount?: number;
     cryptoCurrency: string;
     fiatCurrency: string;
     network: string;
@@ -29,6 +30,12 @@ export interface CreateSessionParams {
 const TRANSAK_API_URLS = {
   staging: 'https://api-stg.transak.com/api/v2',
   production: 'https://api.transak.com/api/v2'
+};
+
+// Transak gateway URLs for session creation
+const TRANSAK_GATEWAY_URLS = {
+  staging: 'https://api-gateway-stg.transak.com/api/v2/auth/session',
+  production: 'https://api-gateway.transak.com/api/v2/auth/session'
 };
 
 // Encryption utilities for storing credentials securely
@@ -174,13 +181,17 @@ export class PublicTransakService {
 
 export class TransakService {
   private baseUrl: string;
+  private gatewayUrl: string;
   private apiKey: string;
   private apiSecret: string;
+  private environment: 'staging' | 'production';
 
   constructor(credentials: TransakCredentials) {
     this.baseUrl = TRANSAK_API_URLS[credentials.environment];
+    this.gatewayUrl = TRANSAK_GATEWAY_URLS[credentials.environment];
     this.apiKey = credentials.apiKey;
     this.apiSecret = credentials.apiSecret;
+    this.environment = credentials.environment;
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
@@ -254,8 +265,11 @@ export class TransakService {
 
   // POST /partners/api/v2/refresh-token - Generate access token using stored credentials
   async generateAccessToken(): Promise<{ accessToken: string; expiresIn: number }> {
-    const baseUrl = this.baseUrl.replace('/api/v2', ''); // Remove /api/v2 for partners endpoint
-    const url = `${baseUrl}/partners/api/v2/refresh-token`;
+    // Use environment-specific base URL for token generation
+    const tokenBaseUrl = this.environment === 'production' 
+      ? 'https://api.transak.com' 
+      : 'https://api-stg.transak.com';
+    const url = `${tokenBaseUrl}/partners/api/v2/refresh-token`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -282,17 +296,19 @@ export class TransakService {
   }
 
   // POST /api/v2/auth/session - Create widget session for payment processing
-  async createSession(params: CreateSessionParams): Promise<any> {
+  async createSession(params: CreateSessionParams): Promise<{ widgetUrl: string }> {
     // Generate access token first
     const tokenData = await this.generateAccessToken();
     
     // Construct widget parameters according to Transak API
+    // Handle both fiatAmount and cryptoAmount based on what's provided in quote
     const widgetParams = {
       apiKey: this.apiKey,
       referrerDomain: params.referrerDomain || "cryptopay.replit.app",
       productsAvailed: "BUY",
-      fiatAmount: params.quoteData.fiatAmount,
-      cryptoCurrencyCode: params.quoteData.cryptoCurrency,
+      ...(params.quoteData.fiatAmount && { fiatAmount: params.quoteData.fiatAmount }),
+      ...(params.quoteData.cryptoAmount && { cryptoAmount: params.quoteData.cryptoAmount }),
+      cryptoCurrencyCode: params.quoteData.cryptoCurrency, // Use cryptoCurrencyCode for consistency with Transak API
       fiatCurrency: params.quoteData.fiatCurrency,
       network: params.quoteData.network,
       walletAddress: params.walletAddress,
@@ -308,10 +324,8 @@ export class TransakService {
       paymentMethod: params.quoteData.paymentMethod
     };
 
-    // Make API call to create session using staging environment
-    const sessionUrl = 'https://api-gateway-stg.transak.com/api/v2/auth/session';
-    
-    const response = await fetch(sessionUrl, {
+    // Use environment-based gateway URL instead of hard-coded staging
+    const response = await fetch(this.gatewayUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -325,6 +339,20 @@ export class TransakService {
       throw new Error(`Transak session creation failed ${response.status}: ${errorText}`);
     }
 
-    return response.json();
+    const rawResponse = await response.json();
+    
+    // Normalize response format - extract widgetUrl from various possible response structures
+    const widgetUrl = rawResponse.widgetUrl || 
+                      rawResponse.sessionData?.widgetUrl || 
+                      rawResponse.sessionData?.url ||
+                      rawResponse.url;
+    
+    if (!widgetUrl) {
+      console.error('Transak session response:', rawResponse);
+      throw new Error('No widget URL received from Transak session response');
+    }
+
+    // Return normalized response format that frontend expects
+    return { widgetUrl };
   }
 }
