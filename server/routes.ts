@@ -383,22 +383,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to get Transak service for a merchant
+  // Helper function to get Transak service using platform-level credentials
   const getTransakService = async (merchantId: string): Promise<TransakService> => {
-    const credentials = await storage.getMerchantCredentials(merchantId, 'transak');
+    const apiKey = process.env.TRANSAK_API_KEY;
+    const apiSecret = process.env.TRANSAK_API_SECRET;
+    const environment = (process.env.TRANSAK_ENVIRONMENT || 'staging') as 'staging' | 'production';
     
-    if (!credentials || !credentials.isActive) {
-      throw new Error('Transak credentials not configured');
+    if (!apiKey) {
+      throw new Error('Platform Transak credentials not configured: TRANSAK_API_KEY environment variable is required');
     }
 
-    const apiKey = CredentialEncryption.decrypt(credentials.encryptedApiKey);
-    const apiSecret = credentials.encryptedApiSecret ? 
-      CredentialEncryption.decrypt(credentials.encryptedApiSecret) : '';
+    if (!apiSecret) {
+      throw new Error('Platform Transak credentials not configured: TRANSAK_API_SECRET environment variable is required');
+    }
 
     return new TransakService({
       apiKey,
       apiSecret,
-      environment: credentials.environment as 'staging' | 'production'
+      environment
     }, merchantId);
   };
 
