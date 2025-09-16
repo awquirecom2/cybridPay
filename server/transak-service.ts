@@ -195,16 +195,6 @@ export class TransakService {
     this.apiSecret = credentials.apiSecret;
     this.environment = credentials.environment;
     this.merchantId = merchantId || 'default';
-    
-    // DEBUG: Log environment and URLs being used
-    console.log('[TransakService] Constructor initialized:', {
-      environment: this.environment,
-      baseUrl: this.baseUrl,
-      gatewayUrl: this.gatewayUrl,
-      merchantId: this.merchantId,
-      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'NOT_SET',
-      hasApiSecret: !!this.apiSecret
-    });
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
@@ -283,24 +273,10 @@ export class TransakService {
       ? 'https://api.transak.com' 
       : 'https://api-stg.transak.com';
     const url = `${tokenBaseUrl}/partners/api/v2/refresh-token`;
-    
-    // DEBUG: Log token generation request details
-    console.log('[TransakService] generateAccessToken() starting:', {
-      environment: this.environment,
-      tokenBaseUrl,
-      url,
-      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'NOT_SET',
-      hasApiSecret: !!this.apiSecret,
-      apiSecretPrefix: this.apiSecret ? this.apiSecret.substring(0, 8) + '...' : 'NOT_SET'
-    });
 
     const requestBody = {
       apiKey: this.apiKey
     };
-
-    console.log('[TransakService] Making token generation request with body:', {
-      apiKey: this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'NOT_SET'
-    });
     
     const response = await fetch(url, {
       method: 'POST',
@@ -310,17 +286,6 @@ export class TransakService {
         'content-type': 'application/json'
       },
       body: JSON.stringify(requestBody)
-    });
-
-    // DEBUG: Log response details
-    console.log('[TransakService] Token generation response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      headers: {
-        contentType: response.headers.get('content-type'),
-        contentLength: response.headers.get('content-length')
-      }
     });
 
     if (!response.ok) {
@@ -334,16 +299,6 @@ export class TransakService {
     }
 
     const result = await response.json();
-    
-    // DEBUG: Log successful response (mask sensitive data)
-    console.log('[TransakService] Token generation successful:', {
-      hasAccessToken: !!(result.accessToken || result.access_token),
-      tokenPrefix: (result.accessToken || result.access_token) ? 
-        (result.accessToken || result.access_token).substring(0, 10) + '...' : 'NOT_FOUND',
-      expiresIn: result.expiresIn || result.expires_in,
-      responseKeys: Object.keys(result),
-      fullResponseSample: JSON.stringify(result).substring(0, 200) + '...'
-    });
 
     const accessToken = result.data?.accessToken || result.accessToken || result.access_token;
     const expiresIn = result.data?.expiresAt ? 
@@ -354,8 +309,6 @@ export class TransakService {
       console.error('[TransakService] No access token found in response:', result);
       throw new Error('Token generation response missing access token');
     }
-
-    console.log('[TransakService] Returning token with length:', accessToken.length);
 
     return {
       accessToken,
@@ -379,18 +332,10 @@ export class TransakService {
 
   // POST /api/v2/auth/session - Create widget session for payment processing
   async createSession(params: CreateSessionParams): Promise<{ widgetUrl: string }> {
-    // DEBUG: Log session creation start
-    console.log('[TransakService] createSession() starting for merchant:', this.merchantId);
-    
     // Get cached access token (or refresh if needed)
     let accessToken: string;
     try {
-      console.log('[TransakService] Getting access token from cache...');
       accessToken = await this.getCachedAccessToken();
-      console.log('[TransakService] Got access token:', {
-        tokenLength: accessToken ? accessToken.length : 0,
-        tokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : 'NO_TOKEN'
-      });
     } catch (error) {
       console.error('[TransakService] Failed to get access token:', error);
       throw new Error('Authentication failed: Unable to obtain access token');
@@ -420,13 +365,6 @@ export class TransakService {
       paymentMethod: params.quoteData.paymentMethod
     };
 
-    // DEBUG: Log session creation request
-    console.log('[TransakService] Making session creation request:', {
-      gatewayUrl: this.gatewayUrl,
-      tokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : 'NO_TOKEN',
-      widgetParamsKeys: Object.keys(widgetParams)
-    });
-
     // Use environment-based gateway URL instead of hard-coded staging
     const response = await fetch(this.gatewayUrl, {
       method: 'POST',
@@ -435,13 +373,6 @@ export class TransakService {
         'access-token': accessToken
       },
       body: JSON.stringify({ widgetParams })
-    });
-
-    // DEBUG: Log session creation response
-    console.log('[TransakService] Session creation response:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
     });
 
     if (!response.ok) {
@@ -492,7 +423,8 @@ export class TransakService {
   // Helper method to parse session response and extract widget URL
   private parseSessionResponse(rawResponse: any): { widgetUrl: string } {
     // Normalize response format - extract widgetUrl from various possible response structures
-    const widgetUrl = rawResponse.widgetUrl || 
+    const widgetUrl = rawResponse.data?.widgetUrl ||          // Current Transak API format
+                      rawResponse.widgetUrl || 
                       rawResponse.sessionData?.widgetUrl || 
                       rawResponse.sessionData?.url ||
                       rawResponse.url;
@@ -502,7 +434,10 @@ export class TransakService {
       throw new Error('No widget URL received from Transak session response');
     }
 
+    // Decode HTML entities in the URL (&amp; -> &)
+    const decodedWidgetUrl = widgetUrl.replace(/&amp;/g, '&');
+
     // Return normalized response format that frontend expects
-    return { widgetUrl };
+    return { widgetUrl: decodedWidgetUrl };
   }
 }
