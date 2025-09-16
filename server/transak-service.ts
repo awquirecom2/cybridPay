@@ -9,6 +9,22 @@ export interface TransakCredentials {
   environment: 'staging' | 'production';
 }
 
+export interface CreateSessionParams {
+  quoteData: {
+    fiatAmount: number;
+    cryptoCurrency: string;
+    fiatCurrency: string;
+    network: string;
+    paymentMethod: string;
+    partnerOrderId: string;
+  };
+  walletAddress: string;
+  customerEmail: string;
+  referrerDomain?: string;
+  redirectURL?: string;
+  themeColor?: string;
+}
+
 // Transak API base URLs
 const TRANSAK_API_URLS = {
   staging: 'https://api-stg.transak.com/api/v2',
@@ -263,5 +279,52 @@ export class TransakService {
       accessToken: result.accessToken || result.access_token,
       expiresIn: result.expiresIn || result.expires_in || 3600 // Default 1 hour
     };
+  }
+
+  // POST /api/v2/auth/session - Create widget session for payment processing
+  async createSession(params: CreateSessionParams): Promise<any> {
+    // Generate access token first
+    const tokenData = await this.generateAccessToken();
+    
+    // Construct widget parameters according to Transak API
+    const widgetParams = {
+      apiKey: this.apiKey,
+      referrerDomain: params.referrerDomain || "cryptopay.replit.app",
+      productsAvailed: "BUY",
+      fiatAmount: params.quoteData.fiatAmount,
+      cryptoCurrencyCode: params.quoteData.cryptoCurrency,
+      fiatCurrency: params.quoteData.fiatCurrency,
+      network: params.quoteData.network,
+      walletAddress: params.walletAddress,
+      disableWalletAddressForm: true,
+      hideExchangeScreen: true,
+      hideMenu: true,
+      isFeeCalculationHidden: false,
+      email: params.customerEmail,
+      isAutoFillUserData: true,
+      themeColor: params.themeColor || "1f4a8c",
+      partnerOrderId: params.quoteData.partnerOrderId,
+      redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete",
+      paymentMethod: params.quoteData.paymentMethod
+    };
+
+    // Make API call to create session using staging environment
+    const sessionUrl = 'https://api-gateway-stg.transak.com/api/v2/auth/session';
+    
+    const response = await fetch(sessionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access-token': tokenData.accessToken
+      },
+      body: JSON.stringify({ widgetParams })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak session creation failed ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
   }
 }
