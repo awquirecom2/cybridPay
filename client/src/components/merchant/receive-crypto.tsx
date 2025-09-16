@@ -267,13 +267,17 @@ export function ReceiveCrypto() {
       label: name
     }))
     
-    // Return API methods if available, otherwise fallback
+    // Return API methods if available, otherwise fallback with official Transak payment method IDs
     return methodsFromAPI.length > 0 ? methodsFromAPI : [
       { value: "credit_debit_card", label: "Credit/Debit Card" },
-      { value: "bank_transfer", label: "Bank Transfer" },
-      { value: "wire_transfer", label: "Wire Transfer" },
+      { value: "sepa_bank_transfer", label: "SEPA Bank Transfer" },
+      { value: "gbp_bank_transfer", label: "GBP Bank Transfer" },
+      { value: "pm_us_wire_bank_transfer", label: "US Wire Transfer" },
       { value: "apple_pay", label: "Apple Pay" },
-      { value: "google_pay", label: "Google Pay" }
+      { value: "google_pay", label: "Google Pay" },
+      { value: "pm_open_banking", label: "Open Banking" },
+      { value: "inr_bank_transfer", label: "INR Bank Transfer" },
+      { value: "inr_upi", label: "UPI" }
     ]
   })()
 
