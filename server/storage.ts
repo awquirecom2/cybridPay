@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, users, merchants, admins, merchantCredentials } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type PaymentLink, type InsertPaymentLink, users, merchants, admins, merchantCredentials } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -41,6 +41,12 @@ export interface IStorage {
   updateMerchantCredentials(merchantId: string, provider: string, updates: Partial<InsertMerchantCredentials>): Promise<MerchantCredentials | undefined>;
   deleteMerchantCredentials(merchantId: string, provider: string): Promise<boolean>;
   
+  // Payment link methods
+  createPaymentLink(paymentLink: InsertPaymentLink): Promise<PaymentLink>;
+  getPaymentLink(id: string): Promise<PaymentLink | undefined>;
+  deletePaymentLink(id: string): Promise<boolean>;
+  cleanupExpiredPaymentLinks(): Promise<void>;
+  
   sessionStore: session.Store;
 }
 
@@ -48,12 +54,19 @@ const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
+  private paymentLinks: Map<string, PaymentLink> = new Map();
+  private cleanupInterval: NodeJS.Timeout;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
       pool, 
       createTableIfMissing: true 
     });
+    
+    // Run cleanup every 30 minutes
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredPaymentLinks();
+    }, 30 * 60 * 1000);
   }
 
   // User methods
@@ -192,6 +205,58 @@ export class DatabaseStorage implements IStorage {
         eq(merchantCredentials.provider, provider)
       ));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Payment link methods - using in-memory storage as per guidelines
+  async createPaymentLink(paymentLinkData: InsertPaymentLink): Promise<PaymentLink> {
+    const id = randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    const paymentLink: PaymentLink = {
+      id,
+      sessionUrl: paymentLinkData.sessionUrl,
+      merchantId: paymentLinkData.merchantId,
+      createdAt: now,
+      expiresAt
+    };
+    
+    this.paymentLinks.set(id, paymentLink);
+    return paymentLink;
+  }
+
+  async getPaymentLink(id: string): Promise<PaymentLink | undefined> {
+    const paymentLink = this.paymentLinks.get(id);
+    
+    // Check if expired
+    if (paymentLink && paymentLink.expiresAt < new Date()) {
+      this.paymentLinks.delete(id);
+      return undefined;
+    }
+    
+    return paymentLink;
+  }
+
+  async deletePaymentLink(id: string): Promise<boolean> {
+    return this.paymentLinks.delete(id);
+  }
+
+  async cleanupExpiredPaymentLinks(): Promise<void> {
+    const now = new Date();
+    let cleanedCount = 0;
+    
+    // Convert to array to avoid iterator issues
+    const entries = Array.from(this.paymentLinks.entries());
+    for (const [id, paymentLink] of entries) {
+      if (paymentLink.expiresAt < now) {
+        this.paymentLinks.delete(id);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`Cleaned up ${cleanedCount} expired payment links`);
+    }
   }
 }
 

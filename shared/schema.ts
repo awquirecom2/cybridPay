@@ -146,3 +146,17 @@ export type InsertMerchantCredentials = z.infer<typeof insertMerchantCredentials
 export type TransakCredentials = z.infer<typeof transakCredentialsSchema>;
 export type CreateTransakSession = z.infer<typeof createTransakSessionSchema>;
 export type MerchantCredentials = typeof merchantCredentials.$inferSelect;
+
+// Payment Link types for URL masking
+export interface PaymentLink {
+  id: string;
+  sessionUrl: string;
+  merchantId: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface InsertPaymentLink {
+  sessionUrl: string;
+  merchantId: string;
+}

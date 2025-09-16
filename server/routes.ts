@@ -534,10 +534,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create session using the Transak service (now returns normalized { widgetUrl } response)
       const sessionResponse = await transak.createSession(validatedData);
 
-      // Return normalized response format
+      // Store the Transak session URL and create a masked payment link
+      const paymentLink = await storage.createPaymentLink({
+        sessionUrl: sessionResponse.widgetUrl,
+        merchantId: req.user!.id
+      });
+
+      // Create the masked URL - use the request's host to create a proper URL
+      const protocol = req.secure ? 'https' : 'http';
+      const host = req.get('host');
+      const maskedUrl = `${protocol}://${host}/pay/${paymentLink.id}`;
+
+      // Return normalized response format with masked URL
       res.json({
         success: true,
-        widgetUrl: sessionResponse.widgetUrl
+        widgetUrl: maskedUrl
       });
     } catch (error) {
       console.error("Error creating Transak session:", error);
@@ -624,6 +635,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error verifying wallet address:", error);
       res.status(500).json({ error: "Failed to verify wallet address" });
+    }
+  });
+
+  // Payment link redirect endpoint - redirects masked payment URLs to actual Transak sessions
+  app.get("/pay/:linkId", async (req, res) => {
+    try {
+      const { linkId } = req.params;
+      
+      if (!linkId) {
+        return res.status(400).json({ error: "Link ID is required" });
+      }
+      
+      // Retrieve the payment link from storage
+      const paymentLink = await storage.getPaymentLink(linkId);
+      
+      if (!paymentLink) {
+        return res.status(404).json({ 
+          error: "Payment link not found or expired",
+          message: "This payment link is either invalid or has expired. Please request a new payment link."
+        });
+      }
+      
+      // Redirect to the actual Transak session URL
+      res.redirect(302, paymentLink.sessionUrl);
+      
+    } catch (error) {
+      console.error("Error redirecting payment link:", error);
+      res.status(500).json({ error: "Failed to process payment link" });
     }
   });
 
