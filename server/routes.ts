@@ -457,39 +457,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /test-pricing - Test endpoint to see raw Transak API response
-  app.get("/api/test/transak/pricing", async (req, res) => {
-    try {
-      console.log("Testing Transak pricing API with sample parameters...");
-      
-      // Test with sample buy order parameters from the documentation
-      const testParams = {
-        cryptoAmount: "100",
-        cryptoCurrency: "USDC", 
-        fiatCurrency: "USD",
-        network: "ethereum",
-        paymentMethod: "credit_debit_card"
-      };
-      
-      console.log("Test parameters:", testParams);
-      
-      const quote = await PublicTransakService.getPricingQuote(testParams);
-      
-      console.log("Transak API Response:", JSON.stringify(quote, null, 2));
-      
-      res.json({
-        message: "Transak pricing API test successful",
-        testParams,
-        transakResponse: quote
-      });
-    } catch (error) {
-      console.error("Error testing Transak pricing API:", error);
-      res.status(500).json({ 
-        error: "Failed to test Transak pricing API",
-        details: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
 
   // POST /pricing-quote - Get pricing quote using platform-wide credentials
   app.post("/api/merchant/transak/pricing-quote", requireMerchant, async (req, res) => {
@@ -513,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Call Transak pricing API using platform-wide credentials
-      const quote = await PublicTransakService.getPricingQuote({
+      const transakResponse = await PublicTransakService.getPricingQuote({
         cryptoAmount,
         cryptoCurrency,
         fiatCurrency,
@@ -521,7 +488,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethod
       });
 
-      res.json(quote);
+      // Extract the actual quote data from Transak's nested response structure
+      const quote = transakResponse.response;
+      
+      if (!quote) {
+        throw new Error("Invalid response structure from Transak API");
+      }
+
+      // Format response for frontend with real Transak data
+      const formattedQuote = {
+        id: quote.quoteId,
+        partnerOrderId: `order_${Date.now()}`,
+        cryptoAmount: quote.cryptoAmount,
+        cryptoCurrency: quote.cryptoCurrency,
+        fiatAmount: quote.fiatAmount,
+        fiatCurrency: quote.fiatCurrency,
+        paymentMethod: quote.paymentMethod,
+        network: quote.network,
+        conversionRate: quote.conversionPrice,
+        marketRate: quote.marketConversionPrice,
+        slippage: quote.slippage,
+        totalFee: quote.totalFee,
+        feeBreakdown: quote.feeBreakdown || [],
+        validUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min from now
+        isBuyOrSell: quote.isBuyOrSell,
+        nonce: quote.nonce
+      };
+
+      res.json(formattedQuote);
     } catch (error) {
       console.error("Error fetching pricing quote:", error);
       res.status(500).json({ error: "Failed to fetch pricing quote" });

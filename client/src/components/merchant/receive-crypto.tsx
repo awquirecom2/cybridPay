@@ -345,44 +345,36 @@ export function ReceiveCrypto() {
         throw new Error('Failed to get pricing quote from server')
       }
 
+      // Backend already formats the Transak response properly
       const transakQuote = await response.json()
+      console.log('Received formatted quote from backend:', transakQuote)
 
       // Parse crypto and network from combined value for UI display
       const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
       
-      // Transform Transak response to match current UI expectations
-      const transformedQuote = {
-        id: "quote_" + Date.now(),
-        partnerOrderId: "order_" + Date.now(),
-        cryptoAmount: transakQuote.cryptoAmount || data.cryptoAmount,
+      // Use the properly formatted quote from backend with real Transak data
+      const formattedQuote = {
+        ...transakQuote,
+        // Ensure we have the correct display values from form
         cryptoCurrency: cryptoCurrency,
-        fiatAmount: transakQuote.fiatAmount || transakQuote.totalAmount || "0.00", 
-        fiatCurrency: transakQuote.fiatCurrency || data.fiatCurrency,
-        paymentMethod: data.paymentMethod,
-        fees: {
-          transakFee: transakQuote.partnerFee || transakQuote.transakFee || transakQuote.fee || "0.00",
-          networkFee: transakQuote.networkFee || "0.00"
-        },
-        conversionRate: transakQuote.conversionRate || transakQuote.rate || 0,
-        validUntil: transakQuote.validUntil || transakQuote.expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         network: network
       }
 
-      setQuoteDetails(transformedQuote)
+      setQuoteDetails(formattedQuote)
       
       // Generate payment link with Transak widget parameters
-      const baseUrl = process.env.NODE_ENV === 'production' 
+      const baseUrl = import.meta.env.PROD 
         ? 'https://global.transak.com' 
         : 'https://global-stg.transak.com'
         
       const params = new URLSearchParams({
         apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
-        cryptoAmount: data.cryptoAmount,
-        cryptoCurrency: cryptoCurrency,
-        fiatCurrency: data.fiatCurrency,
-        paymentMethod: data.paymentMethod,
-        network: transformedQuote.network,
-        partnerOrderId: transformedQuote.partnerOrderId,
+        cryptoAmount: formattedQuote.cryptoAmount,
+        cryptoCurrency: formattedQuote.cryptoCurrency,
+        fiatCurrency: formattedQuote.fiatCurrency,
+        paymentMethod: formattedQuote.paymentMethod,
+        network: formattedQuote.network,
+        partnerOrderId: formattedQuote.partnerOrderId,
         email: data.customerEmail || '',
         walletAddress: data.walletAddress || '',
         disableWalletAddressForm: (data.walletAddress && walletValidation.isValid) ? 'true' : 'false'
@@ -758,14 +750,37 @@ export function ReceiveCrypto() {
                 </div>
                 
                 <div className="border-t pt-2 space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Transak Fee:</span>
-                    <span className="font-mono">{quoteDetails.fees.transakFee} {quoteDetails.fiatCurrency}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Network Fee:</span>
-                    <span className="font-mono">{quoteDetails.fees.networkFee} {quoteDetails.fiatCurrency}</span>
-                  </div>
+                  {/* Display detailed fee breakdown from real Transak API */}
+                  {quoteDetails.feeBreakdown && quoteDetails.feeBreakdown.length > 0 ? (
+                    quoteDetails.feeBreakdown.map((fee: any, index: number) => (
+                      <div key={index} className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{fee.name}:</span>
+                        <span className="font-mono">{fee.value} {quoteDetails.fiatCurrency}</span>
+                      </div>
+                    ))
+                  ) : (
+                    // Fallback if no detailed breakdown available
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Total Fee:</span>
+                      <span className="font-mono">{quoteDetails.totalFee} {quoteDetails.fiatCurrency}</span>
+                    </div>
+                  )}
+                  
+                  {/* Show market rate and slippage info */}
+                  {quoteDetails.marketRate && quoteDetails.slippage && (
+                    <div className="border-t pt-2 mt-2 space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Market Rate:</span>
+                        <span className="font-mono text-xs">
+                          1 {quoteDetails.cryptoCurrency} = {quoteDetails.marketRate} {quoteDetails.fiatCurrency}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Slippage:</span>
+                        <span className="font-mono">{(quoteDetails.slippage * 100).toFixed(2)}%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-xs text-muted-foreground">
