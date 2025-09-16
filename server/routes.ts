@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       apiKey,
       apiSecret,
       environment: credentials.environment as 'staging' | 'production'
-    });
+    }, merchantId);
   };
 
   // Transak API endpoints

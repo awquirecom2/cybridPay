@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { tokenCache, type TokenFetcher } from './token-cache';
 
 // Transak API integration service
 // Documentation: https://docs.transak.com/
@@ -185,13 +186,15 @@ export class TransakService {
   private apiKey: string;
   private apiSecret: string;
   private environment: 'staging' | 'production';
+  private merchantId: string;
 
-  constructor(credentials: TransakCredentials) {
+  constructor(credentials: TransakCredentials, merchantId?: string) {
     this.baseUrl = TRANSAK_API_URLS[credentials.environment];
     this.gatewayUrl = TRANSAK_GATEWAY_URLS[credentials.environment];
     this.apiKey = credentials.apiKey;
     this.apiSecret = credentials.apiSecret;
     this.environment = credentials.environment;
+    this.merchantId = merchantId || 'default';
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
@@ -295,10 +298,30 @@ export class TransakService {
     };
   }
 
+  // Get cached access token or refresh if needed
+  async getCachedAccessToken(): Promise<string> {
+    const fetcher: TokenFetcher = async () => {
+      return this.generateAccessToken();
+    };
+
+    return tokenCache.getOrRefresh(this.merchantId, 'transak', this.environment, fetcher);
+  }
+
+  // Invalidate cached token (call on 401/403 errors)
+  invalidateCachedToken(): void {
+    tokenCache.invalidate(this.merchantId, 'transak', this.environment);
+  }
+
   // POST /api/v2/auth/session - Create widget session for payment processing
   async createSession(params: CreateSessionParams): Promise<{ widgetUrl: string }> {
-    // Generate access token first
-    const tokenData = await this.generateAccessToken();
+    // Get cached access token (or refresh if needed)
+    let accessToken: string;
+    try {
+      accessToken = await this.getCachedAccessToken();
+    } catch (error) {
+      console.error('Failed to get access token:', error);
+      throw new Error('Authentication failed: Unable to obtain access token');
+    }
     
     // Construct widget parameters according to Transak API
     // Handle both fiatAmount and cryptoAmount based on what's provided in quote
@@ -329,18 +352,53 @@ export class TransakService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'access-token': tokenData.accessToken
+        'access-token': accessToken
       },
       body: JSON.stringify({ widgetParams })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      
+      // If unauthorized, invalidate cached token and retry once
+      if (response.status === 401 || response.status === 403) {
+        console.warn(`Token authentication failed (${response.status}), invalidating cache and retrying`);
+        this.invalidateCachedToken();
+        
+        try {
+          // Retry with fresh token
+          const freshToken = await this.getCachedAccessToken();
+          const retryResponse = await fetch(this.gatewayUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'access-token': freshToken
+            },
+            body: JSON.stringify({ widgetParams })
+          });
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            throw new Error(`Transak session creation failed after retry ${retryResponse.status}: ${retryErrorText}`);
+          }
+          
+          // Continue with retry response
+          const rawResponse = await retryResponse.json();
+          return this.parseSessionResponse(rawResponse);
+        } catch (retryError) {
+          throw new Error(`Transak session creation failed after token refresh: ${retryError}`);
+        }
+      }
+      
       throw new Error(`Transak session creation failed ${response.status}: ${errorText}`);
     }
 
     const rawResponse = await response.json();
-    
+    return this.parseSessionResponse(rawResponse);
+  }
+
+  // Helper method to parse session response and extract widget URL
+  private parseSessionResponse(rawResponse: any): { widgetUrl: string } {
     // Normalize response format - extract widgetUrl from various possible response structures
     const widgetUrl = rawResponse.widgetUrl || 
                       rawResponse.sessionData?.widgetUrl || 
