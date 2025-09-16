@@ -457,6 +457,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /pricing-quote - Get pricing quote using platform-wide credentials
+  app.post("/api/merchant/transak/pricing-quote", requireMerchant, async (req, res) => {
+    try {
+      const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, paymentMethod } = req.body;
+
+      // Validate required fields
+      if (!cryptoAmount || !cryptoNetworkCombined || !fiatCurrency || !paymentMethod) {
+        return res.status(400).json({ 
+          error: "Missing required fields: cryptoAmount, cryptoNetworkCombined, fiatCurrency, paymentMethod" 
+        });
+      }
+
+      // Parse crypto and network from combined value (e.g., "USDC-ethereum")
+      const [cryptoCurrency, network] = cryptoNetworkCombined.split('-');
+      
+      if (!cryptoCurrency || !network) {
+        return res.status(400).json({ 
+          error: "Invalid cryptoNetworkCombined format. Expected format: 'CRYPTO-network'" 
+        });
+      }
+
+      // Call Transak pricing API using platform-wide credentials
+      const quote = await PublicTransakService.getPricingQuote({
+        cryptoAmount,
+        cryptoCurrency,
+        fiatCurrency,
+        network,
+        paymentMethod
+      });
+
+      res.json(quote);
+    } catch (error) {
+      console.error("Error fetching pricing quote:", error);
+      res.status(500).json({ error: "Failed to fetch pricing quote" });
+    }
+  });
+
   // Public Transak API endpoints (no authentication required)
   // GET crypto currencies - Public endpoint for Receive Crypto page
   app.get("/api/public/transak/crypto-currencies", async (req, res) => {

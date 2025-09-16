@@ -10,6 +10,7 @@ import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useQuery } from "@tanstack/react-query"
+import { apiRequest } from "@/lib/queryClient"
 
 // Crypto Icon Component with real Transak images
 const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: string, crypto: string, className?: string }) => {
@@ -332,35 +333,42 @@ export function ReceiveCrypto() {
     console.log('Creating Transak quote with data:', data)
 
     try {
-      // TODO: Implement real Transak API call to create quote
-      // const response = await fetch('/api/transak/create-quote', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data)
-      // })
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Mock quote response based on Transak API structure
-      const mockQuote = {
-        id: "quote_" + Date.now(),
-        partnerOrderId: "order_" + Date.now(), 
+      // Call real Transak pricing API using platform-wide credentials
+      const response = await apiRequest('POST', '/api/merchant/transak/pricing-quote', {
         cryptoAmount: data.cryptoAmount,
-        cryptoCurrency: data.cryptoCurrency,
-        fiatAmount: (parseFloat(data.cryptoAmount) * (data.cryptoCurrency === 'USDC' ? 1 : data.cryptoCurrency === 'ETH' ? 2500 : 45000)).toFixed(2),
+        cryptoNetworkCombined: data.cryptoNetworkCombined,
         fiatCurrency: data.fiatCurrency,
-        paymentMethod: data.paymentMethod,
-        fees: {
-          transakFee: (parseFloat(data.cryptoAmount) * 0.025).toFixed(2),
-          networkFee: data.cryptoCurrency === 'ETH' ? "15.00" : "2.50"
-        },
-        conversionRate: data.cryptoCurrency === 'USDC' ? 1 : data.cryptoCurrency === 'ETH' ? 2500 : 45000,
-        validUntil: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes
-        network: data.cryptoCurrency === 'BTC' ? 'bitcoin' : 'ethereum'
+        paymentMethod: data.paymentMethod
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get pricing quote from server')
       }
 
-      setQuoteDetails(mockQuote)
+      const transakQuote = await response.json()
+
+      // Parse crypto and network from combined value for UI display
+      const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
+      
+      // Transform Transak response to match current UI expectations
+      const transformedQuote = {
+        id: "quote_" + Date.now(),
+        partnerOrderId: "order_" + Date.now(),
+        cryptoAmount: transakQuote.cryptoAmount || data.cryptoAmount,
+        cryptoCurrency: cryptoCurrency,
+        fiatAmount: transakQuote.fiatAmount || transakQuote.totalAmount || "0.00", 
+        fiatCurrency: transakQuote.fiatCurrency || data.fiatCurrency,
+        paymentMethod: data.paymentMethod,
+        fees: {
+          transakFee: transakQuote.partnerFee || transakQuote.transakFee || transakQuote.fee || "0.00",
+          networkFee: transakQuote.networkFee || "0.00"
+        },
+        conversionRate: transakQuote.conversionRate || transakQuote.rate || 0,
+        validUntil: transakQuote.validUntil || transakQuote.expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        network: network
+      }
+
+      setQuoteDetails(transformedQuote)
       
       // Generate payment link with Transak widget parameters
       const baseUrl = process.env.NODE_ENV === 'production' 
@@ -370,11 +378,11 @@ export function ReceiveCrypto() {
       const params = new URLSearchParams({
         apiKey: import.meta.env.VITE_TRANSAK_API_KEY || 'transak_staging_key',
         cryptoAmount: data.cryptoAmount,
-        cryptoCurrency: data.cryptoCurrency,
+        cryptoCurrency: cryptoCurrency,
         fiatCurrency: data.fiatCurrency,
         paymentMethod: data.paymentMethod,
-        network: mockQuote.network,
-        partnerOrderId: mockQuote.partnerOrderId,
+        network: transformedQuote.network,
+        partnerOrderId: transformedQuote.partnerOrderId,
         email: data.customerEmail || '',
         walletAddress: data.walletAddress || '',
         disableWalletAddressForm: (data.walletAddress && walletValidation.isValid) ? 'true' : 'false'

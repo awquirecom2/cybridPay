@@ -111,6 +111,49 @@ export class PublicTransakService {
     const url = `https://api-stg.transak.com/cryptocoverage/api/v1/public/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${walletAddress}`;
     return this.makePublicRequest(url);
   }
+
+  // GET pricing quote using platform-wide credentials from environment
+  static async getPricingQuote(params: {
+    cryptoAmount: string;
+    cryptoCurrency: string;
+    fiatCurrency: string;
+    network: string;
+    paymentMethod: string;
+  }) {
+    const apiKey = process.env.TRANSAK_API_KEY;
+    const environment = process.env.TRANSAK_ENVIRONMENT || 'staging';
+    
+    if (!apiKey) {
+      throw new Error('TRANSAK_API_KEY environment variable is required');
+    }
+
+    const baseUrl = environment === 'production' 
+      ? 'https://api.transak.com/api/v1' 
+      : 'https://api-stg.transak.com/api/v1';
+      
+    const url = `${baseUrl}/pricing/public/quotes?${new URLSearchParams({
+      partnerApiKey: apiKey,
+      fiatCurrency: params.fiatCurrency,
+      cryptoCurrency: params.cryptoCurrency,
+      isBuyOrSell: 'BUY',
+      network: params.network,
+      paymentMethod: params.paymentMethod,
+      cryptoAmount: params.cryptoAmount
+    })}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Transak pricing API error ${response.status}: ${errorText}`);
+    }
+    
+    return response.json();
+  }
 }
 
 export class TransakService {
