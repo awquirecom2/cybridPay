@@ -522,6 +522,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /create-session - Create Transak widget session for payment processing
+  app.post("/api/merchant/transak/create-session", requireMerchant, async (req, res) => {
+    try {
+      const { 
+        quoteData, 
+        walletAddress, 
+        customerEmail, 
+        referrerDomain, 
+        redirectURL, 
+        themeColor 
+      } = req.body;
+
+      // Validate required fields
+      if (!quoteData || !walletAddress || !customerEmail) {
+        return res.status(400).json({ 
+          error: "Missing required fields: quoteData, walletAddress, customerEmail" 
+        });
+      }
+
+      // Validate quote data structure
+      if (!quoteData.fiatAmount || !quoteData.cryptoCurrency || !quoteData.fiatCurrency || 
+          !quoteData.network || !quoteData.paymentMethod || !quoteData.partnerOrderId) {
+        return res.status(400).json({ 
+          error: "Invalid quoteData: missing required fields" 
+        });
+      }
+
+      // Get Transak service instance for the merchant
+      const transak = await getTransakService(req.user!.id);
+      
+      // Create session using the Transak service
+      const sessionData = await transak.createSession({
+        quoteData,
+        walletAddress,
+        customerEmail,
+        referrerDomain,
+        redirectURL,
+        themeColor
+      });
+
+      res.json({
+        success: true,
+        sessionData
+      });
+    } catch (error) {
+      console.error("Error creating Transak session:", error);
+      res.status(500).json({ error: "Failed to create session" });
+    }
+  });
+
   // Public Transak API endpoints (no authentication required)
   // GET crypto currencies - Public endpoint for Receive Crypto page
   app.get("/api/public/transak/crypto-currencies", async (req, res) => {
