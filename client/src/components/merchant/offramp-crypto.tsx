@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building, Copy, Wallet, DollarSign, Clock } from "lucide-react"
+import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building, Copy, Wallet, DollarSign, Clock, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -232,90 +232,101 @@ export function OfframpCrypto() {
       USD: [
         { 
           value: "credit_debit_card", 
-          label: "💳 Debit Card (Visa)", 
+          label: "Visa Debit Card", 
+          shortLabel: "Visa Debit",
           processingTime: "Real-time", 
-          description: "Instant payout to your Visa debit card (117 countries)",
-          icon: "💳",
+          description: "Instant payout to your Visa debit card",
+          coverage: "117 countries",
           note: "Only debit cards supported"
         },
         { 
           value: "mastercard_debit", 
-          label: "💳 Debit Card (Mastercard)", 
+          label: "Mastercard Debit Card", 
+          shortLabel: "Mastercard Debit",
           processingTime: "Real-time", 
-          description: "Instant payout to Mastercard debit card (30 countries)",
-          icon: "💳",
+          description: "Instant payout to Mastercard debit card",
+          coverage: "EEA & UK",
           note: "Available in EEA & UK"
         },
         { 
           value: "ach_bank_transfer", 
-          label: "🏦 ACH Bank Transfer", 
+          label: "ACH Bank Transfer", 
+          shortLabel: "ACH Transfer",
           processingTime: "1-2 business days", 
           description: "Direct transfer to your US bank account",
-          icon: "🏦"
+          coverage: "US banks"
         },
         { 
           value: "wire_transfer", 
-          label: "💸 Wire Transfer", 
+          label: "Wire Transfer", 
+          shortLabel: "Wire Transfer",
           processingTime: "Same business day", 
           description: "Fast wire transfer to your bank",
-          icon: "💸"
+          coverage: "US banks"
         }
       ],
       EUR: [
         { 
           value: "sepa_bank_transfer", 
-          label: "🏦 SEPA Bank Transfer", 
+          label: "SEPA Bank Transfer", 
+          shortLabel: "SEPA Transfer",
           processingTime: "1-2 business days", 
-          description: "Transfer to European bank account (40 EEA countries)",
-          icon: "🏦"
+          description: "Transfer to European bank account",
+          coverage: "40 EEA countries"
         },
         { 
           value: "credit_debit_card", 
-          label: "💳 Debit Card (Visa)", 
+          label: "Visa Debit Card", 
+          shortLabel: "Visa Debit",
           processingTime: "Real-time", 
           description: "Instant payout to your Visa debit card",
-          icon: "💳"
+          coverage: "Europe"
         },
         { 
           value: "mastercard_debit", 
-          label: "💳 Debit Card (Mastercard)", 
+          label: "Mastercard Debit Card", 
+          shortLabel: "Mastercard Debit",
           processingTime: "Real-time", 
-          description: "Available in EEA countries & UK",
-          icon: "💳"
+          description: "Instant payout to Mastercard debit card",
+          coverage: "EEA & UK"
         }
       ],
       GBP: [
         { 
           value: "faster_payments", 
-          label: "⚡ Faster Payments", 
+          label: "Faster Payments", 
+          shortLabel: "Faster Payments",
           processingTime: "Real-time", 
           description: "Instant transfer to UK bank accounts",
-          icon: "⚡"
+          coverage: "UK banks"
         },
         { 
           value: "credit_debit_card", 
-          label: "💳 Debit Card (Visa)", 
+          label: "Visa Debit Card", 
+          shortLabel: "Visa Debit",
           processingTime: "Real-time", 
           description: "Instant payout to your Visa debit card",
-          icon: "💳"
+          coverage: "UK"
         }
       ],
       CAD: [
         { 
           value: "bank_transfer", 
-          label: "🏦 Bank Transfer", 
+          label: "Bank Transfer", 
+          shortLabel: "Bank Transfer",
           processingTime: "1-2 business days", 
           description: "Transfer to your Canadian bank account",
-          icon: "🏦"
+          coverage: "Canadian banks"
         }
       ],
       AUD: [
         { 
           value: "bank_transfer", 
-          label: "🏦 Bank Transfer", 
+          label: "Bank Transfer", 
+          shortLabel: "Bank Transfer",
           processingTime: "1-2 business days", 
           description: "Transfer to your Australian bank account",
-          icon: "🏦"
+          coverage: "Australian banks"
         }
       ]
     };
@@ -893,17 +904,7 @@ export function OfframpCrypto() {
                                   <SelectContent>
                                     {transakPayoutMethods.map((method: any) => (
                                       <SelectItem key={method.value} value={method.value}>
-                                        <div className="flex flex-col">
-                                          <span className="font-medium">{method.label}</span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {method.processingTime} • {method.description}
-                                          </span>
-                                          {method.note && (
-                                            <span className="text-xs text-amber-600 dark:text-amber-400">
-                                              {method.note}
-                                            </span>
-                                          )}
-                                        </div>
+                                        {method.shortLabel || method.label}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -913,6 +914,43 @@ export function OfframpCrypto() {
                             </FormItem>
                           )}
                         />
+
+                        {/* Payout Method Details */}
+                        {(() => {
+                          const selectedPayoutMethod = transakForm.watch('payoutMethod');
+                          const selectedMethod = transakPayoutMethods.find(method => method.value === selectedPayoutMethod);
+                          
+                          if (!selectedMethod) return null;
+                          
+                          return (
+                            <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                                  <span className="font-medium text-sm">{selectedMethod.label}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {selectedMethod.processingTime}
+                                  </Badge>
+                                  {selectedMethod.coverage && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {selectedMethod.coverage}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {selectedMethod.description}
+                              </p>
+                              {selectedMethod.note && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                  {selectedMethod.note}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <FormField
