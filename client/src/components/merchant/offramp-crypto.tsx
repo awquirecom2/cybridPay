@@ -228,81 +228,142 @@ export function OfframpCrypto() {
   const transakPayoutMethods = (() => {
     const selectedFiat = transakForm.watch('fiatCurrency') || 'USD';
     
-    // Use only validated payment methods that work with Transak API
-    // Based on testing: only 'credit_debit_card' works reliably
+    // Fallback payment methods based on official Transak documentation
+    // Reference: https://docs.transak.com/docs/transak-off-ramp  
     const payoutMethodsByFiat: { [key: string]: any[] } = {
       USD: [
         { 
           value: "credit_debit_card", 
-          label: "Debit Card Payment", 
+          label: "Debit Card Payout", 
           shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your debit card",
-          coverage: "Global",
+          description: "Instant payout to your debit card (Visa/Mastercard)",
+          coverage: "117 countries (Visa), 30 countries (Mastercard)",
           note: "Only debit cards supported, not credit cards"
         }
       ],
       EUR: [
         { 
+          value: "sepa_bank_transfer", 
+          label: "SEPA Bank Transfer", 
+          shortLabel: "SEPA Transfer",
+          processingTime: "1-2 business days", 
+          description: "Transfer to European bank account",
+          coverage: "40 EEA countries"
+        },
+        { 
           value: "credit_debit_card", 
-          label: "Debit Card Payment", 
+          label: "Debit Card Payout", 
           shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your debit card",
-          coverage: "Europe"
+          description: "Instant payout to your debit card (Visa/Mastercard)",
+          coverage: "Europe",
+          note: "Only debit cards supported, not credit cards"
         }
       ],
       GBP: [
         { 
+          value: "faster_payments", 
+          label: "Faster Payments", 
+          shortLabel: "Faster Payments",
+          processingTime: "Real-time", 
+          description: "Instant transfer to UK bank accounts",
+          coverage: "UK only"
+        },
+        { 
           value: "credit_debit_card", 
-          label: "Debit Card Payment", 
+          label: "Debit Card Payout", 
           shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your debit card",
-          coverage: "UK"
+          description: "Instant payout to your debit card (Visa/Mastercard)",
+          coverage: "UK",
+          note: "Only debit cards supported, not credit cards"
         }
       ],
       CAD: [
         { 
           value: "credit_debit_card", 
-          label: "Debit Card Payment", 
+          label: "Debit Card Payout", 
           shortLabel: "Debit Card",
           processingTime: "Real-time", 
           description: "Instant payout to your debit card",
-          coverage: "Canada"
+          coverage: "Canada",
+          note: "Only debit cards supported, not credit cards"
         }
       ],
       AUD: [
         { 
           value: "credit_debit_card", 
-          label: "Debit Card Payment", 
+          label: "Debit Card Payout", 
           shortLabel: "Debit Card",
           processingTime: "Real-time", 
           description: "Instant payout to your debit card",
-          coverage: "Australia"
+          coverage: "Australia",
+          note: "Only debit cards supported, not credit cards"
         }
       ]
     };
 
-    // Try to get methods from API first
+    // Try to get methods from Transak API first  
     if (fiatCurrenciesData && (fiatCurrenciesData as any)?.response) {
       const currencies = (fiatCurrenciesData as any).response;
       const selectedCurrency = currencies.find((curr: any) => curr.symbol === selectedFiat);
       
+      console.log(`Looking for currency: ${selectedFiat}, found:`, selectedCurrency);
+      
       if (selectedCurrency && selectedCurrency.supportedPaymentMethods) {
-        const apiMethods = selectedCurrency.supportedPaymentMethods
-          .filter((method: any) => method.isPayOutAllowed === true)
-          .map((method: any) => ({
-            value: method.id,
-            label: method.name || method.id.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-            processingTime: method.processingTime || "Processing time varies",
-            description: method.description || "Bank payout method",
-            minAmount: method.minAmountForPayOut,
-            maxAmount: method.maxAmountForPayOut,
-            icon: method.icon || "💰"
-          }));
+        // Filter methods that support payout (selling crypto)
+        const payoutMethods = selectedCurrency.supportedPaymentMethods.filter((method: any) => 
+          method.isPayOutAllowed === true
+        );
         
-        if (apiMethods.length > 0) {
+        console.log(`Payout methods for ${selectedFiat}:`, payoutMethods);
+        
+        if (payoutMethods.length > 0) {
+          const apiMethods = payoutMethods.map((method: any) => {
+            // Map Transak method IDs to user-friendly labels
+            const methodLabels: { [key: string]: { label: string, shortLabel: string, description: string, processingTime: string } } = {
+              'credit_debit_card': {
+                label: 'Debit Card Payout',
+                shortLabel: 'Debit Card', 
+                description: 'Instant payout to your debit card (Visa/Mastercard)',
+                processingTime: 'Real-time'
+              },
+              'sepa_bank_transfer': {
+                label: 'SEPA Bank Transfer',
+                shortLabel: 'SEPA Transfer',
+                description: 'Transfer to European bank account',
+                processingTime: '1-2 business days'
+              },
+              'faster_payments': {
+                label: 'Faster Payments',
+                shortLabel: 'Faster Payments', 
+                description: 'Instant transfer to UK bank accounts',
+                processingTime: 'Real-time'
+              }
+            };
+
+            const methodInfo = methodLabels[method.id] || {
+              label: method.name || method.id.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              shortLabel: method.name || method.id.replace(/_/g, ' '),
+              description: 'Bank payout method',
+              processingTime: 'Processing time varies'
+            };
+
+            return {
+              value: method.id,
+              label: methodInfo.label,
+              shortLabel: methodInfo.shortLabel,
+              processingTime: methodInfo.processingTime,
+              description: methodInfo.description,
+              minAmount: method.minAmountForPayOut,
+              maxAmount: method.maxAmountForPayOut,
+              coverage: selectedCurrency.name || selectedFiat,
+              note: method.id === 'credit_debit_card' ? 'Only debit cards supported, not credit cards' : undefined
+            };
+          });
+          
+          console.log(`Mapped API methods for ${selectedFiat}:`, apiMethods);
           return apiMethods;
         }
       }
@@ -724,8 +785,8 @@ export function OfframpCrypto() {
                         Multiple payout methods available based on your currency selection:
                       </p>
                       <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
-                        <div>• <strong>Debit Card Payouts:</strong> Real-time payouts to your debit card</div>
-                        <div>• <strong>Global Coverage:</strong> Available in most countries and currencies</div>
+                        <div>• <strong>Debit Card Payouts:</strong> Visa (117 countries), Mastercard (30 countries EEA/UK)</div>
+                        <div>• <strong>Bank Transfers:</strong> SEPA (EUR, 40 EEA countries), Faster Payments (GBP, UK)</div>
                         <div>• <strong>Note:</strong> Only debit cards supported - credit cards not available for payouts</div>
                       </div>
                     </div>
