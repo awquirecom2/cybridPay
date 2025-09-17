@@ -74,6 +74,33 @@ export function OfframpCrypto() {
     error: string | null;
   }>({ isValid: null, isValidating: false, error: null })
 
+  // Simple crypto options for Cybrid (fallback)
+  const supportedCrypto = [
+    { value: "USDC", label: "USDC - USD Coin" },
+    { value: "USDT", label: "USDT - Tether" },
+    { value: "ETH", label: "ETH - Ethereum" },
+    { value: "BTC", label: "BTC - Bitcoin" }
+  ]
+
+  // Copy payment link to clipboard
+  const copyPaymentLink = async () => {
+    if (paymentLink) {
+      try {
+        await navigator.clipboard.writeText(paymentLink)
+        toast({
+          title: "Link Copied",
+          description: "Payment link has been copied to clipboard.",
+        })
+      } catch (error) {
+        toast({
+          title: "Copy Failed",
+          description: "Failed to copy link to clipboard.",
+          variant: "destructive"
+        })
+      }
+    }
+  }
+
   // Fetch real crypto currencies from Transak API
   const { data: cryptoCurrenciesData, isLoading: isLoadingCrypto, error: cryptoError } = useQuery({
     queryKey: ['/api/public/transak/crypto-currencies'],
@@ -185,9 +212,9 @@ export function OfframpCrypto() {
 
   // Transform fiat currencies data for dropdown
   const supportedFiat = (fiatCurrenciesData as any)?.response?.map((fiat: { symbol: string, name: string }, index: number) => ({
+    key: `${fiat.symbol}-${index}`,
     value: fiat.symbol,
-    label: `${fiat.symbol} - ${fiat.name}`,
-    key: `${fiat.symbol}-${index}`
+    label: `${fiat.symbol} - ${fiat.name}`
   })).filter((fiat: { value: string, label: string, key: string }, index: number, self: any[]) => 
     index === self.findIndex((f: any) => f.value === fiat.value)
   ) || [
@@ -463,7 +490,7 @@ export function OfframpCrypto() {
   }
 
   const handleCybridPayout = async (data: any) => {
-    setIsCreatingPayout(true)
+    setIsCreatingOfframp(true)
     console.log('Creating Cybrid payout:', data)
 
     try {
@@ -501,7 +528,7 @@ export function OfframpCrypto() {
         variant: "destructive"
       })
     } finally {
-      setIsCreatingPayout(false)
+      setIsCreatingOfframp(false)
     }
   }
 
@@ -727,7 +754,7 @@ export function OfframpCrypto() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {supportedFiat.map((fiat) => (
+                                    {supportedFiat.map((fiat: any) => (
                                       <SelectItem key={fiat.key} value={fiat.value}>
                                         {fiat.label}
                                       </SelectItem>
@@ -959,7 +986,7 @@ export function OfframpCrypto() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {supportedCrypto.map((crypto) => (
+                                  {supportedCrypto.map((crypto: any) => (
                                     <SelectItem key={crypto.value} value={crypto.value}>
                                       {crypto.label}
                                     </SelectItem>
@@ -1025,11 +1052,11 @@ export function OfframpCrypto() {
 
                     <Button 
                       type="submit" 
-                      disabled={isCreatingPayout}
+                      disabled={isCreatingOfframp}
                       className="w-full"
                       data-testid="button-create-cybrid-payout"
                     >
-                      {isCreatingPayout && activeProvider === 'cybrid' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      {isCreatingOfframp && activeProvider === 'cybrid' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Initiate Cybrid Payout
                     </Button>
                   </form>
