@@ -444,8 +444,8 @@ export function OfframpCrypto() {
         throw new Error(sessionData.error || 'Offramp session creation failed')
       }
       
-      // Extract widget URL from normalized response format
-      const widgetUrl = sessionData.widgetUrl
+      // Extract URLs from response format - prefer direct unmasked URL if available
+      const widgetUrl = sessionData.directTransakUrl || sessionData.widgetUrl
       
       if (!widgetUrl) {
         console.error('Transak offramp session response:', sessionData)
@@ -882,7 +882,7 @@ export function OfframpCrypto() {
                     Transak Offramp Session Ready
                   </CardTitle>
                   <CardDescription>
-                    Click the link to complete your crypto offramp via Transak
+                    Click the direct Transak link below to complete your crypto offramp (unmasked URL)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -908,6 +908,18 @@ export function OfframpCrypto() {
                   </div>
 
                   <div className="space-y-2">
+                    {/* Direct Transak URL Display */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Direct Transak Session URL (Unmasked)</label>
+                      <input
+                        type="text"
+                        value={paymentLink}
+                        readOnly
+                        className="w-full px-2 py-1 text-xs border rounded font-mono bg-muted/30 text-muted-foreground"
+                        data-testid="input-direct-transak-url"
+                      />
+                    </div>
+                    
                     <Button 
                       onClick={() => window.open(paymentLink, '_blank')} 
                       className="w-full"

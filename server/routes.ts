@@ -795,10 +795,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const host = req.get('host');
       const maskedUrl = `${protocol}://${host}/pay/${paymentLink.id}`;
 
-      // Return normalized response format with masked URL
+      // Return both masked URL and direct Transak URL for flexibility
       res.json({
         success: true,
-        widgetUrl: maskedUrl
+        widgetUrl: maskedUrl, // Masked payment link for security
+        directTransakUrl: sessionResponse.widgetUrl // Direct unmasked Transak URL
       });
     } catch (error) {
       console.error("Error creating Transak offramp session:", error);
