@@ -193,6 +193,23 @@ export class PublicTransakService {
       throw new Error('TRANSAK_API_KEY environment variable is required');
     }
 
+    // Map frontend payout method selections to exact Transak API paymentMethod values
+    const mapPaymentMethod = (frontendMethod: string): string => {
+      switch (frontendMethod) {
+        case 'sepa_bank_transfer':
+        case 'faster_payments':
+          return 'bank_transfer';
+        case 'credit_debit_card':
+          return 'credit_debit_card';
+        default:
+          console.warn(`[TransakService] Unknown payout method in pricing: ${frontendMethod}, defaulting to credit_debit_card`);
+          return 'credit_debit_card';
+      }
+    };
+
+    const transakPaymentMethod = mapPaymentMethod(params.paymentMethod);
+    console.log(`[TransakService] Mapping pricing payout method: ${params.paymentMethod} → ${transakPaymentMethod}`);
+
     const baseUrl = environment === 'production' 
       ? 'https://api.transak.com/api/v1' 
       : 'https://api-stg.transak.com/api/v1';
@@ -203,7 +220,7 @@ export class PublicTransakService {
       cryptoCurrency: params.cryptoCurrency,
       isBuyOrSell: 'SELL',
       network: params.network,
-      paymentMethod: params.paymentMethod,
+      paymentMethod: transakPaymentMethod,
       cryptoAmount: params.cryptoAmount
     })}`;
     
@@ -472,6 +489,23 @@ export class TransakService {
       throw new Error('Authentication failed: Unable to obtain access token');
     }
     
+    // Map frontend payout method selections to exact Transak API paymentMethod values
+    const mapPaymentMethod = (frontendMethod: string): string => {
+      switch (frontendMethod) {
+        case 'sepa_bank_transfer':
+        case 'faster_payments':
+          return 'bank_transfer';
+        case 'credit_debit_card':
+          return 'credit_debit_card';
+        default:
+          console.warn(`[TransakService] Unknown payout method: ${frontendMethod}, defaulting to credit_debit_card`);
+          return 'credit_debit_card';
+      }
+    };
+
+    const transakPaymentMethod = mapPaymentMethod(params.quoteData.paymentMethod);
+    console.log(`[TransakService] Mapping payout method: ${params.quoteData.paymentMethod} → ${transakPaymentMethod}`);
+    
     // Construct widget parameters exactly matching your provided structure - NO additional params
     const widgetParams = {
       apiKey: this.apiKey,
@@ -489,7 +523,8 @@ export class TransakService {
       email: params.customerEmail,
       isAutoFillUserData: true,
       themeColor: "1f4a8c",
-      redirectURL: "https://ruupay.com/transaction-complete"
+      redirectURL: "https://ruupay.com/transaction-complete",
+      paymentMethod: transakPaymentMethod
     };
 
     console.log('[TransakService] Creating session with widgetParams:', JSON.stringify(widgetParams, null, 2));
