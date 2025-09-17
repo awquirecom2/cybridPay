@@ -474,14 +474,13 @@ export class TransakService {
       throw new Error('Authentication failed: Unable to obtain access token');
     }
     
-    // Construct widget parameters for SELL operation according to Transak API
+    // Construct widget parameters for SELL operation according to your sample curl structure
     const widgetParams = {
       apiKey: this.apiKey,
-      referrerDomain: params.referrerDomain || "cryptopay.replit.app",
-      productsAvailed: "SELL", // Changed to SELL for offramp
-      ...(params.quoteData.fiatAmount && { fiatAmount: params.quoteData.fiatAmount }),
-      ...(params.quoteData.cryptoAmount && { cryptoAmount: params.quoteData.cryptoAmount }),
-      cryptoCurrencyCode: params.quoteData.cryptoCurrency, // Use cryptoCurrencyCode for consistency with Transak API
+      referrerDomain: params.referrerDomain || "cryptopay.replit.app", 
+      productsAvailed: "SELL",
+      cryptoAmount: params.quoteData.cryptoAmount,
+      cryptoCurrencyCode: params.quoteData.cryptoCurrency,
       fiatCurrency: params.quoteData.fiatCurrency,
       network: params.quoteData.network,
       walletAddress: params.walletAddress,
@@ -493,8 +492,8 @@ export class TransakService {
       isAutoFillUserData: true,
       themeColor: params.themeColor || "1f4a8c",
       partnerOrderId: params.quoteData.partnerOrderId,
-      redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete",
-      paymentMethod: params.quoteData.paymentMethod
+      partnerCustomerId: params.customerEmail ? `cryptopay_customer_${Buffer.from(params.customerEmail).toString('base64').slice(0, 8)}` : `cryptopay_customer_${Date.now()}`,
+      redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete"
     };
 
     // Use environment-based gateway URL
