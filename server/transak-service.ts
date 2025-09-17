@@ -18,7 +18,6 @@ export interface CreateSessionParams {
     fiatCurrency: string;
     network: string;
     paymentMethod: string;
-    partnerOrderId: string;
   };
   walletAddress: string;
   customerEmail: string;
@@ -403,7 +402,6 @@ export class TransakService {
       email: params.customerEmail,
       isAutoFillUserData: true,
       themeColor: params.themeColor || "1f4a8c",
-      partnerOrderId: params.quoteData.partnerOrderId,
       redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete",
       paymentMethod: params.quoteData.paymentMethod
     };
@@ -474,10 +472,10 @@ export class TransakService {
       throw new Error('Authentication failed: Unable to obtain access token');
     }
     
-    // Construct widget parameters exactly matching your curl structure
+    // Construct widget parameters exactly matching your provided structure - NO additional params
     const widgetParams = {
       apiKey: this.apiKey,
-      referrerDomain: params.referrerDomain || "google.com",
+      referrerDomain: "google.com",
       productsAvailed: "SELL",
       cryptoAmount: params.quoteData.cryptoAmount,
       cryptoCurrencyCode: params.quoteData.cryptoCurrency,
@@ -490,10 +488,8 @@ export class TransakService {
       isFeeCalculationHidden: false,
       email: params.customerEmail,
       isAutoFillUserData: true,
-      themeColor: params.themeColor || "1f4a8c",
-      partnerOrderId: params.quoteData.partnerOrderId,
-      partnerCustomerId: params.customerEmail ? `cryptopay_customer_${Buffer.from(params.customerEmail).toString('base64').slice(0, 8)}` : `cryptopay_customer_${Date.now()}`,
-      redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete"
+      themeColor: "1f4a8c",
+      redirectURL: "https://ruupay.com/transaction-complete"
     };
 
     console.log('[TransakService] Creating session with widgetParams:', JSON.stringify(widgetParams, null, 2));

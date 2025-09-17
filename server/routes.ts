@@ -637,7 +637,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Format response for frontend with real Transak data
       const formattedQuote = {
         id: quote.quoteId,
-        partnerOrderId: `offramp_order_${Date.now()}`,
         cryptoAmount: quote.cryptoAmount,
         cryptoCurrency: quote.cryptoCurrency,
         fiatAmount: quote.fiatAmount,
@@ -678,7 +677,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cryptoCurrency: "USDC",
           fiatCurrency: "USD",
           network: "ethereum",
-          partnerOrderId: `cryptopay_test_${Date.now()}`,
           paymentMethod: "credit_debit_card",
           isBuyOrSell: 'SELL' as const
         }
