@@ -661,6 +661,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /test-offramp-session - Test endpoint to create a SELL session with sample data
+  app.post("/api/merchant/transak/test-offramp-session", requireMerchant, async (req, res) => {
+    try {
+      console.log('[DEBUG] Creating test offramp session...');
+      
+      // Create test session data matching your curl structure
+      const testSessionData = {
+        walletAddress: "0x1234567890123456789012345678901234567890",
+        customerEmail: "test@cryptopay.com",
+        referrerDomain: "google.com",
+        themeColor: "1f4a8c",
+        redirectURL: "https://cryptopay.replit.app/transaction-complete",
+        quoteData: {
+          cryptoAmount: 150,
+          cryptoCurrency: "USDC",
+          fiatCurrency: "USD",
+          network: "ethereum",
+          partnerOrderId: `cryptopay_test_${Date.now()}`,
+          paymentMethod: "credit_debit_card",
+          isBuyOrSell: 'SELL' as const
+        }
+      };
+
+      // Get Transak service instance for the merchant
+      const transak = await getTransakService(req.user!.id);
+      
+      // Create test offramp session
+      const sessionResponse = await transak.createOfframpSession(testSessionData);
+
+      console.log('[DEBUG] Test session created successfully:', sessionResponse);
+
+      // Return the session URL directly for testing
+      res.json({
+        success: true,
+        widgetUrl: sessionResponse.widgetUrl,
+        testData: testSessionData
+      });
+    } catch (error) {
+      console.error("[DEBUG] Error creating test offramp session:", error);
+      res.status(500).json({ 
+        error: "Failed to create test offramp session", 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // POST /create-offramp-session - Create Transak widget session for offramp processing
   app.post("/api/merchant/transak/create-offramp-session", requireMerchant, async (req, res) => {
     try {

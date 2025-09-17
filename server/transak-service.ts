@@ -474,10 +474,10 @@ export class TransakService {
       throw new Error('Authentication failed: Unable to obtain access token');
     }
     
-    // Construct widget parameters for SELL operation according to your sample curl structure
+    // Construct widget parameters exactly matching your curl structure
     const widgetParams = {
       apiKey: this.apiKey,
-      referrerDomain: params.referrerDomain || "cryptopay.replit.app", 
+      referrerDomain: params.referrerDomain || "google.com",
       productsAvailed: "SELL",
       cryptoAmount: params.quoteData.cryptoAmount,
       cryptoCurrencyCode: params.quoteData.cryptoCurrency,
@@ -496,14 +496,22 @@ export class TransakService {
       redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete"
     };
 
-    // Use environment-based gateway URL
+    console.log('[TransakService] Creating session with widgetParams:', JSON.stringify(widgetParams, null, 2));
+
+    // Use environment-based gateway URL (matching your curl endpoint)
+    console.log(`[TransakService] Making request to: ${this.gatewayUrl}`);
+    console.log(`[TransakService] Access token: ${accessToken.slice(0, 20)}...`);
+    
+    const requestBody = { widgetParams };
+    console.log('[TransakService] Request body:', JSON.stringify(requestBody, null, 2));
+    
     const response = await fetch(this.gatewayUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'access-token': accessToken
       },
-      body: JSON.stringify({ widgetParams })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
