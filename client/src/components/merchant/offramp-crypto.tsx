@@ -124,6 +124,7 @@ export function OfframpCrypto() {
     }
   })
 
+
   const cybridForm = useForm({
     defaultValues: {
       cryptoAmount: "",
@@ -227,106 +228,58 @@ export function OfframpCrypto() {
   const transakPayoutMethods = (() => {
     const selectedFiat = transakForm.watch('fiatCurrency') || 'USD';
     
-    // Define payout methods by currency based on Transak documentation
+    // Use only validated payment methods that work with Transak API
+    // Based on testing: only 'credit_debit_card' works reliably
     const payoutMethodsByFiat: { [key: string]: any[] } = {
       USD: [
         { 
           value: "credit_debit_card", 
-          label: "Visa Debit Card", 
-          shortLabel: "Visa Debit",
+          label: "Debit Card Payment", 
+          shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your Visa debit card",
-          coverage: "117 countries",
-          note: "Only debit cards supported"
-        },
-        { 
-          value: "mastercard_debit", 
-          label: "Mastercard Debit Card", 
-          shortLabel: "Mastercard Debit",
-          processingTime: "Real-time", 
-          description: "Instant payout to Mastercard debit card",
-          coverage: "EEA & UK",
-          note: "Available in EEA & UK"
-        },
-        { 
-          value: "ach_bank_transfer", 
-          label: "ACH Bank Transfer", 
-          shortLabel: "ACH Transfer",
-          processingTime: "1-2 business days", 
-          description: "Direct transfer to your US bank account",
-          coverage: "US banks"
-        },
-        { 
-          value: "wire_transfer", 
-          label: "Wire Transfer", 
-          shortLabel: "Wire Transfer",
-          processingTime: "Same business day", 
-          description: "Fast wire transfer to your bank",
-          coverage: "US banks"
+          description: "Instant payout to your debit card",
+          coverage: "Global",
+          note: "Only debit cards supported, not credit cards"
         }
       ],
       EUR: [
         { 
-          value: "sepa_bank_transfer", 
-          label: "SEPA Bank Transfer", 
-          shortLabel: "SEPA Transfer",
-          processingTime: "1-2 business days", 
-          description: "Transfer to European bank account",
-          coverage: "40 EEA countries"
-        },
-        { 
           value: "credit_debit_card", 
-          label: "Visa Debit Card", 
-          shortLabel: "Visa Debit",
+          label: "Debit Card Payment", 
+          shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your Visa debit card",
+          description: "Instant payout to your debit card",
           coverage: "Europe"
-        },
-        { 
-          value: "mastercard_debit", 
-          label: "Mastercard Debit Card", 
-          shortLabel: "Mastercard Debit",
-          processingTime: "Real-time", 
-          description: "Instant payout to Mastercard debit card",
-          coverage: "EEA & UK"
         }
       ],
       GBP: [
         { 
-          value: "faster_payments", 
-          label: "Faster Payments", 
-          shortLabel: "Faster Payments",
-          processingTime: "Real-time", 
-          description: "Instant transfer to UK bank accounts",
-          coverage: "UK banks"
-        },
-        { 
           value: "credit_debit_card", 
-          label: "Visa Debit Card", 
-          shortLabel: "Visa Debit",
+          label: "Debit Card Payment", 
+          shortLabel: "Debit Card",
           processingTime: "Real-time", 
-          description: "Instant payout to your Visa debit card",
+          description: "Instant payout to your debit card",
           coverage: "UK"
         }
       ],
       CAD: [
         { 
-          value: "bank_transfer", 
-          label: "Bank Transfer", 
-          shortLabel: "Bank Transfer",
-          processingTime: "1-2 business days", 
-          description: "Transfer to your Canadian bank account",
-          coverage: "Canadian banks"
+          value: "credit_debit_card", 
+          label: "Debit Card Payment", 
+          shortLabel: "Debit Card",
+          processingTime: "Real-time", 
+          description: "Instant payout to your debit card",
+          coverage: "Canada"
         }
       ],
       AUD: [
         { 
-          value: "bank_transfer", 
-          label: "Bank Transfer", 
-          shortLabel: "Bank Transfer",
-          processingTime: "1-2 business days", 
-          description: "Transfer to your Australian bank account",
-          coverage: "Australian banks"
+          value: "credit_debit_card", 
+          label: "Debit Card Payment", 
+          shortLabel: "Debit Card",
+          processingTime: "Real-time", 
+          description: "Instant payout to your debit card",
+          coverage: "Australia"
         }
       ]
     };
@@ -358,6 +311,31 @@ export function OfframpCrypto() {
     // Get methods for selected currency, fallback to USD methods
     return payoutMethodsByFiat[selectedFiat] || payoutMethodsByFiat.USD;
   })()
+
+  // Auto-reset payout method if currently selected method becomes invalid
+  useEffect(() => {
+    const currentPayoutMethod = transakForm.getValues('payoutMethod');
+    const availableMethods = transakPayoutMethods.map((method: any) => method.value);
+    
+    if (currentPayoutMethod && !availableMethods.includes(currentPayoutMethod)) {
+      // Reset to the first available method if current selection is invalid
+      if (availableMethods.length > 0) {
+        transakForm.setValue('payoutMethod', availableMethods[0]);
+        console.log(`Reset payout method from ${currentPayoutMethod} to ${availableMethods[0]}`);
+      }
+    }
+  }, [transakPayoutMethods, transakForm])
+
+  // Also reset when currency changes to ensure compatibility
+  useEffect(() => {
+    const currentFiat = transakForm.watch('fiatCurrency');
+    const availableMethods = transakPayoutMethods.map((method: any) => method.value);
+    
+    // Always reset to first available method when currency changes
+    if (availableMethods.length > 0) {
+      transakForm.setValue('payoutMethod', availableMethods[0]);
+    }
+  }, [transakForm.watch('fiatCurrency'), transakForm])
 
   // Wallet validation function using combined crypto-network selection
   const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
@@ -746,8 +724,8 @@ export function OfframpCrypto() {
                         Multiple payout methods available based on your currency selection:
                       </p>
                       <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
-                        <div>• <strong>Debit Cards:</strong> Real-time payouts (Visa: 117 countries, Mastercard: EEA/UK)</div>
-                        <div>• <strong>Bank Transfers:</strong> SEPA (EUR), Faster Payments (GBP), ACH/Wire (USD)</div>
+                        <div>• <strong>Debit Card Payouts:</strong> Real-time payouts to your debit card</div>
+                        <div>• <strong>Global Coverage:</strong> Available in most countries and currencies</div>
                         <div>• <strong>Note:</strong> Only debit cards supported - credit cards not available for payouts</div>
                       </div>
                     </div>
@@ -918,7 +896,7 @@ export function OfframpCrypto() {
                         {/* Payout Method Details */}
                         {(() => {
                           const selectedPayoutMethod = transakForm.watch('payoutMethod');
-                          const selectedMethod = transakPayoutMethods.find(method => method.value === selectedPayoutMethod);
+                          const selectedMethod = transakPayoutMethods.find((method: any) => method.value === selectedPayoutMethod);
                           
                           if (!selectedMethod) return null;
                           
