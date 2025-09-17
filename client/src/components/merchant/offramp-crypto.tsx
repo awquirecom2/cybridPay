@@ -118,7 +118,7 @@ export function OfframpCrypto() {
       cryptoAmount: "",
       cryptoNetworkCombined: "USDC-ethereum", // Combined format: crypto-network
       fiatCurrency: "USD",
-      payoutMethod: "credit_debit_card", // Use the actual API method ID
+      payoutMethod: "credit_debit_card", // Default to Visa debit card (most widely supported)
       walletAddress: "",
       customerEmail: ""
     }
@@ -223,35 +223,129 @@ export function OfframpCrypto() {
     { value: "GBP", label: "GBP - British Pound", key: "fallback-gbp" }
   ]
 
-  // Get USD payment methods from Transak API that support payouts
+  // Enhanced payout methods based on Transak documentation and selected fiat currency
   const transakPayoutMethods = (() => {
+    const selectedFiat = transakForm.watch('fiatCurrency') || 'USD';
+    
+    // Define payout methods by currency based on Transak documentation
+    const payoutMethodsByFiat: { [key: string]: any[] } = {
+      USD: [
+        { 
+          value: "credit_debit_card", 
+          label: "💳 Debit Card (Visa)", 
+          processingTime: "Real-time", 
+          description: "Instant payout to your Visa debit card (117 countries)",
+          icon: "💳",
+          note: "Only debit cards supported"
+        },
+        { 
+          value: "mastercard_debit", 
+          label: "💳 Debit Card (Mastercard)", 
+          processingTime: "Real-time", 
+          description: "Instant payout to Mastercard debit card (30 countries)",
+          icon: "💳",
+          note: "Available in EEA & UK"
+        },
+        { 
+          value: "ach_bank_transfer", 
+          label: "🏦 ACH Bank Transfer", 
+          processingTime: "1-2 business days", 
+          description: "Direct transfer to your US bank account",
+          icon: "🏦"
+        },
+        { 
+          value: "wire_transfer", 
+          label: "💸 Wire Transfer", 
+          processingTime: "Same business day", 
+          description: "Fast wire transfer to your bank",
+          icon: "💸"
+        }
+      ],
+      EUR: [
+        { 
+          value: "sepa_bank_transfer", 
+          label: "🏦 SEPA Bank Transfer", 
+          processingTime: "1-2 business days", 
+          description: "Transfer to European bank account (40 EEA countries)",
+          icon: "🏦"
+        },
+        { 
+          value: "credit_debit_card", 
+          label: "💳 Debit Card (Visa)", 
+          processingTime: "Real-time", 
+          description: "Instant payout to your Visa debit card",
+          icon: "💳"
+        },
+        { 
+          value: "mastercard_debit", 
+          label: "💳 Debit Card (Mastercard)", 
+          processingTime: "Real-time", 
+          description: "Available in EEA countries & UK",
+          icon: "💳"
+        }
+      ],
+      GBP: [
+        { 
+          value: "faster_payments", 
+          label: "⚡ Faster Payments", 
+          processingTime: "Real-time", 
+          description: "Instant transfer to UK bank accounts",
+          icon: "⚡"
+        },
+        { 
+          value: "credit_debit_card", 
+          label: "💳 Debit Card (Visa)", 
+          processingTime: "Real-time", 
+          description: "Instant payout to your Visa debit card",
+          icon: "💳"
+        }
+      ],
+      CAD: [
+        { 
+          value: "bank_transfer", 
+          label: "🏦 Bank Transfer", 
+          processingTime: "1-2 business days", 
+          description: "Transfer to your Canadian bank account",
+          icon: "🏦"
+        }
+      ],
+      AUD: [
+        { 
+          value: "bank_transfer", 
+          label: "🏦 Bank Transfer", 
+          processingTime: "1-2 business days", 
+          description: "Transfer to your Australian bank account",
+          icon: "🏦"
+        }
+      ]
+    };
+
+    // Try to get methods from API first
     if (fiatCurrenciesData && (fiatCurrenciesData as any)?.response) {
       const currencies = (fiatCurrenciesData as any).response;
+      const selectedCurrency = currencies.find((curr: any) => curr.symbol === selectedFiat);
       
-      // Find USD currency
-      const usdCurrency = currencies.find((curr: any) => curr.symbol === 'USD');
-      
-      if (usdCurrency && usdCurrency.supportedPaymentMethods) {
-        // Filter payment methods that support payout (isPayOutAllowed: true)
-        return usdCurrency.supportedPaymentMethods
+      if (selectedCurrency && selectedCurrency.supportedPaymentMethods) {
+        const apiMethods = selectedCurrency.supportedPaymentMethods
           .filter((method: any) => method.isPayOutAllowed === true)
           .map((method: any) => ({
             value: method.id,
             label: method.name || method.id.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-            processingTime: method.processingTime,
+            processingTime: method.processingTime || "Processing time varies",
+            description: method.description || "Bank payout method",
             minAmount: method.minAmountForPayOut,
             maxAmount: method.maxAmountForPayOut,
-            icon: method.icon
+            icon: method.icon || "💰"
           }));
+        
+        if (apiMethods.length > 0) {
+          return apiMethods;
+        }
       }
     }
-    
-    // Fallback to hardcoded methods if API data unavailable
-    return [
-      { value: "credit_debit_card", label: "Card Payment", processingTime: "1-3 minutes" },
-      { value: "bank_transfer", label: "Bank Transfer", processingTime: "1-2 hours" },
-      { value: "wire_transfer", label: "Wire Transfer", processingTime: "1-2 business days" }
-    ];
+
+    // Get methods for selected currency, fallback to USD methods
+    return payoutMethodsByFiat[selectedFiat] || payoutMethodsByFiat.USD;
   })()
 
   // Wallet validation function using combined crypto-network selection
@@ -630,7 +724,25 @@ export function OfframpCrypto() {
                   Sell crypto directly to fiat via Transak's offramp service
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Enhanced Payout Options Info */}
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="text-blue-600 dark:text-blue-400 text-sm">ℹ️</div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">Enhanced Payout Options</h4>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Multiple payout methods available based on your currency selection:
+                      </p>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                        <div>• <strong>Debit Cards:</strong> Real-time payouts (Visa: 117 countries, Mastercard: EEA/UK)</div>
+                        <div>• <strong>Bank Transfers:</strong> SEPA (EUR), Faster Payments (GBP), ACH/Wire (USD)</div>
+                        <div>• <strong>Note:</strong> Only debit cards supported - credit cards not available for payouts</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 <Form {...transakForm}>
                   <form onSubmit={transakForm.handleSubmit(handleTransakOfframp)} className="space-y-4">
                     <div className="space-y-4">
@@ -781,7 +893,17 @@ export function OfframpCrypto() {
                                   <SelectContent>
                                     {transakPayoutMethods.map((method: any) => (
                                       <SelectItem key={method.value} value={method.value}>
-                                        {method.label}
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{method.label}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {method.processingTime} • {method.description}
+                                          </span>
+                                          {method.note && (
+                                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                                              {method.note}
+                                            </span>
+                                          )}
+                                        </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
