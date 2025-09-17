@@ -401,12 +401,13 @@ export class TransakService {
     }
     
     // Construct widget parameters according to Transak API
-    // Use fiatAmount from pricing quote instead of cryptoAmount for session creation
+    // Handle both fiatAmount and cryptoAmount based on what's provided in quote
     const widgetParams = {
       apiKey: this.apiKey,
       referrerDomain: params.referrerDomain || "cryptopay.replit.app",
       productsAvailed: "BUY",
-      fiatAmount: params.quoteData.fiatAmount, // Always use fiatAmount from pricing response
+      ...(params.quoteData.fiatAmount && { fiatAmount: params.quoteData.fiatAmount }),
+      ...(params.quoteData.cryptoAmount && { cryptoAmount: params.quoteData.cryptoAmount }),
       cryptoCurrencyCode: params.quoteData.cryptoCurrency, // Use cryptoCurrencyCode for consistency with Transak API
       fiatCurrency: params.quoteData.fiatCurrency,
       network: params.quoteData.network,
@@ -421,8 +422,6 @@ export class TransakService {
       redirectURL: params.redirectURL || "https://cryptopay.replit.app/transaction-complete",
       paymentMethod: params.quoteData.paymentMethod
     };
-
-    console.log(`[TransakService] Using fiatAmount for session: ${params.quoteData.fiatAmount} ${params.quoteData.fiatCurrency}`);
 
     // Use environment-based gateway URL instead of hard-coded staging
     const response = await fetch(this.gatewayUrl, {
