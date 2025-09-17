@@ -130,8 +130,7 @@ export const createTransakSessionSchema = z.object({
     cryptoCurrency: z.string().min(1, "Crypto currency is required"),
     fiatCurrency: z.string().min(1, "Fiat currency is required"),
     network: z.string().min(1, "Network is required"),
-    paymentMethod: z.string().min(1, "Payment method is required"),
-    partnerOrderId: z.string().min(1, "Partner order ID is required")
+    paymentMethod: z.string().min(1, "Payment method is required")
   }).refine(data => data.fiatAmount || data.cryptoAmount, {
     message: "Either fiatAmount or cryptoAmount must be provided"
   }),
