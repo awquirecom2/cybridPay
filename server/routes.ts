@@ -766,8 +766,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /create-offramp-session - Create Transak widget session for offramp processing
   app.post("/api/merchant/transak/create-offramp-session", requireMerchant, async (req, res) => {
     try {
+      console.log('[DEBUG] Raw request body for offramp session:', JSON.stringify(req.body, null, 2));
       // Validate request body - reuse the existing schema but modify for SELL operation
       const validatedData = createTransakSessionSchema.parse(req.body);
+      console.log('[DEBUG] Validated data:', JSON.stringify(validatedData, null, 2));
 
       // Override isBuyOrSell to SELL for offramp operations
       const offrampSessionData = {

@@ -419,12 +419,12 @@ export function OfframpCrypto() {
       // Create Transak offramp session using the fresh quote data
       const sessionResponse = await apiRequest('POST', '/api/merchant/transak/create-offramp-session', {
         quoteData: {
-          fiatAmount: formattedQuote.fiatAmount,
+          cryptoAmount: formattedQuote.cryptoAmount, // Fixed: send cryptoAmount instead of fiatAmount
           cryptoCurrency: formattedQuote.cryptoCurrency,
           fiatCurrency: formattedQuote.fiatCurrency,
           network: formattedQuote.network,
           paymentMethod: formattedQuote.payoutMethod,
-          partnerOrderId: formattedQuote.partnerOrderId
+          isBuyOrSell: 'SELL'
         },
         walletAddress: data.walletAddress,
         customerEmail: data.customerEmail || '',
