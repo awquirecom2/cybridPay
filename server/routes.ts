@@ -660,6 +660,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /demo-session - Public demo endpoint to create a Transak session with dummy data
+  app.post("/api/public/transak/demo-session", async (req, res) => {
+    try {
+      console.log('[DEBUG] Creating demo Transak session with dummy data...');
+      
+      // Use platform-wide Transak credentials for demo
+      const apiKey = process.env.TRANSAK_API_KEY;
+      const apiSecret = process.env.TRANSAK_API_SECRET;
+      
+      if (!apiKey || !apiSecret) {
+        return res.status(500).json({ error: "Transak credentials not configured" });
+      }
+
+      // Create demo session data with dummy parameters
+      const demoSessionData = {
+        walletAddress: "0x742d35Cc9Cf6aB6a8B8f8E8D0e97e3f7b6a5c4d3",
+        customerEmail: "test@example.com",
+        referrerDomain: "google.com",
+        themeColor: "1f4a8c",
+        redirectURL: "https://cryptopay.replit.app/transaction-complete",
+        quoteData: {
+          cryptoAmount: 100,
+          cryptoCurrency: "USDC",
+          fiatCurrency: "USD",
+          network: "ethereum",
+          paymentMethod: "credit_debit_card",
+          isBuyOrSell: 'SELL' as const
+        }
+      };
+
+      // Create Transak service instance with platform credentials
+      const transak = new TransakService({
+        apiKey,
+        apiSecret,
+        environment: 'staging'
+      }, 'demo');
+      
+      // Create demo offramp session
+      const sessionResponse = await transak.createOfframpSession(demoSessionData);
+
+      console.log('[DEBUG] Demo session created successfully:', sessionResponse);
+
+      // Return the session URL directly
+      res.json({
+        success: true,
+        sessionUrl: sessionResponse.widgetUrl,
+        dummyData: demoSessionData,
+        message: "Demo Transak session created with dummy parameters"
+      });
+    } catch (error) {
+      console.error("[DEBUG] Error creating demo Transak session:", error);
+      res.status(500).json({ 
+        error: "Failed to create demo Transak session", 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // POST /test-offramp-session - Test endpoint to create a SELL session with sample data
   app.post("/api/merchant/transak/test-offramp-session", requireMerchant, async (req, res) => {
     try {
