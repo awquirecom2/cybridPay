@@ -42,12 +42,11 @@ export const merchants = pgTable("merchants", {
   integrations: text("integrations").array().default([]),
   // Cybrid customer mapping fields
   cybridCustomerGuid: text("cybrid_customer_guid"), // Maps to Cybrid customer GUID
-  cybridVerificationGuid: text("cybrid_verification_guid"), // Tracks KYC verification
+  cybridVerificationGuid: text("cybrid_verification_status"), // Tracks KYC verification status
   cybridIntegrationStatus: text("cybrid_integration_status").default("pending"), // pending, active, error
   cybridLastError: text("cybrid_last_error"), // Store last error message
   cybridLastAttemptAt: timestamp("cybrid_last_attempt_at"), // Last integration attempt
   cybridLastSyncedAt: timestamp("cybrid_last_synced_at"), // Last successful sync
-  cybridEnvironment: text("cybrid_environment").default("staging"), // staging, production
   depositAddressesCreated: boolean("deposit_addresses_created").default(false),
   dateOnboarded: timestamp("date_onboarded").default(sql`NOW()`),
   createdAt: timestamp("created_at").default(sql`NOW()`),
