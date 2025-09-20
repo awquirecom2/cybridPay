@@ -1,0 +1,19 @@
+ PM [express] GET /api/admin/merchants 304 in 260ms :: [{"id":"f56ea1ad-fc80-4b6a-8d28-bc9b87…
+Creating Cybrid customer for merchant 2573a5d5-de0a-4739-a1e1-d960c6fcfcb9
+Failed to create Cybrid customer for merchant 2573a5d5-de0a-4739-a1e1-d960c6fcfcb9: Error: Cybrid API error 400: {"status":400,"error_message":"name is invalid, name[full] is missing, name[full] is invalid","message_code":"invalid_parameter"}
+    at Function.makeRequest (/home/runner/workspace/server/cybrid-service.ts:134:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Function.createBusinessCustomer (/home/runner/workspace/server/cybrid-service.ts:155:24)
+    at async Function.ensureCustomer (/home/runner/workspace/server/cybrid-service.ts:427:14)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:313:30)
+Failed to ensure Cybrid customer for merchant 2573a5d5-de0a-4739-a1e1-d960c6fcfcb9: Error: Cybrid API error 400: {"status":400,"error_message":"name is invalid, name[full] is missing, name[full] is invalid","message_code":"invalid_parameter"}
+    at Function.makeRequest (/home/runner/workspace/server/cybrid-service.ts:134:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Function.createBusinessCustomer (/home/runner/workspace/server/cybrid-service.ts:155:24)
+    at async Function.ensureCustomer (/home/runner/workspace/server/cybrid-service.ts:427:14)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:313:30)
+Error creating Cybrid customer: Error: Cybrid API error 400: {"status":400,"error_message":"name is invalid, name[full] is missing, name[full] is invalid","message_code":"invalid_parameter"}
+    at Function.makeRequest (/home/runner/workspace/server/cybrid-service.ts:134:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Function.createBusinessCustomer (/home/runner/workspace/server/cybrid-service.ts:155:24)
+    at async Function.ensureCustomer (/home/runner/workspace/server/cybrid-service.ts:427:14)
