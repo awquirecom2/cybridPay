@@ -88,7 +88,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read customers:read customers:write accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write'
+          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write'
         })
       });
 
@@ -199,7 +199,15 @@ export class CybridService {
   static async getCustomerByExternalId(externalId: string): Promise<CybridCustomer | null> {
     try {
       const customers = await this.makeRequest(`/api/customers?external_customer_id=${externalId}`) as { objects: CybridCustomer[] };
-      return customers.objects.length > 0 ? customers.objects[0] : null;
+      
+      // CRITICAL FIX: Cybrid API returns all customers when external ID doesn't exist
+      // We must verify the returned customer actually has the external ID we searched for
+      if (customers.objects.length > 0) {
+        const customer = customers.objects.find(c => c.external_customer_id === externalId);
+        return customer || null;
+      }
+      
+      return null;
     } catch (error) {
       console.error(`Failed to fetch Cybrid customer for external ID ${externalId}:`, error);
       return null;
