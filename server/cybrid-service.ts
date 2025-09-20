@@ -407,6 +407,16 @@ export class CybridService {
     email: string;
   }): Promise<CybridCustomer> {
     try {
+      // SECONDARY GUARD: Verify merchant is approved before creating customer
+      const merchant = await storage.getMerchant(merchantData.merchantId);
+      if (!merchant) {
+        throw new Error(`Merchant ${merchantData.merchantId} not found`);
+      }
+      
+      if (merchant.status !== 'approved') {
+        throw new Error(`Cannot create Cybrid customer for non-approved merchant. Status: ${merchant.status}`);
+      }
+
       // First check if customer already exists by external ID
       const existingCustomer = await this.getCustomerByExternalId(merchantData.merchantId);
       

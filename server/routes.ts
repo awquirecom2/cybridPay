@@ -215,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kybStatus: "pending"
       });
 
-      // Prepare response object
+      // Prepare response object - no immediate Cybrid customer creation
       const response = {
         merchant: sanitizeMerchant(merchant),
         credentials: {
@@ -223,39 +223,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           password: credentials.password // Plain text password for admin to share
         },
         cybrid: {
-          status: 'pending',
-          customerGuid: null as string | null,
-          error: null as string | null
+          status: 'pending_approval', // Will be created when merchant is approved
+          customerGuid: null,
+          error: null
         }
       };
 
-      // Automatically create Cybrid customer (don't fail merchant creation if this fails)
-      try {
-        console.log(`Creating Cybrid customer for merchant: ${merchant.name} (${merchant.id})`);
-        
-        const cybridCustomer = await CybridService.ensureCustomer({
-          merchantId: merchant.id,
-          name: merchantData.name,
-          email: merchantData.email
-        });
-
-        response.cybrid = {
-          status: 'active',
-          customerGuid: cybridCustomer.guid,
-          error: null
-        };
-
-        console.log(`✅ Cybrid customer created successfully: ${cybridCustomer.guid}`);
-
-      } catch (cybridError) {
-        console.error(`❌ Failed to create Cybrid customer for merchant ${merchant.id}:`, cybridError);
-        
-        response.cybrid = {
-          status: 'error',
-          customerGuid: null,
-          error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
-        };
-      }
+      console.log(`✅ Merchant created successfully: ${merchant.name} (${merchant.id}). Cybrid customer will be created upon approval.`);
 
       // Always return success - merchant creation succeeded
       res.status(201).json(response);
@@ -271,12 +245,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updates = req.body;
       
+      // Get current merchant state before update
+      const currentMerchant = await storage.getMerchant(id);
+      if (!currentMerchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+      
       const merchant = await storage.updateMerchant(id, updates);
       if (!merchant) {
         return res.status(404).json({ error: "Merchant not found" });
       }
+
+      // DELAYED TRIGGER: Create Cybrid customer when status changes to "approved"
+      const isBeingApproved = currentMerchant.status !== 'approved' && updates.status === 'approved';
+      let cybridResult = null;
+
+      if (isBeingApproved) {
+        try {
+          console.log(`🎯 Merchant approved! Creating delayed Cybrid customer for: ${merchant.name} (${merchant.id})`);
+          
+          const cybridCustomer = await CybridService.ensureCustomer({
+            merchantId: merchant.id,
+            name: merchant.name,
+            email: merchant.email
+          });
+
+          cybridResult = {
+            success: true,
+            customerGuid: cybridCustomer.guid,
+            message: `Cybrid customer created successfully: ${cybridCustomer.guid}`
+          };
+
+          console.log(`✅ Delayed Cybrid customer creation successful for merchant ${merchant.id}`);
+
+        } catch (cybridError) {
+          console.error(`❌ Delayed Cybrid customer creation failed for merchant ${merchant.id}:`, cybridError);
+          
+          cybridResult = {
+            success: false,
+            customerGuid: null,
+            error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
+          };
+        }
+      }
+
+      // Include Cybrid result in response if customer creation was triggered
+      const response: any = { 
+        merchant: sanitizeMerchant(merchant)
+      };
+
+      if (cybridResult) {
+        response.cybrid = cybridResult;
+      }
       
-      res.json(sanitizeMerchant(merchant));
+      res.json(response);
     } catch (error) {
       console.error("Error updating merchant:", error);
       res.status(400).json({ error: "Failed to update merchant" });
@@ -307,6 +329,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!merchant) {
         return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // APPROVAL GATE: Only create Cybrid customers for approved merchants
+      if (merchant.status !== 'approved') {
+        return res.status(400).json({ 
+          error: "Cannot create Cybrid customer for non-approved merchant",
+          merchantStatus: merchant.status,
+          message: "Merchant must be approved before creating Cybrid customer"
+        });
+      }
+
+      // Skip if customer already exists
+      if (merchant.cybridCustomerGuid) {
+        return res.json({
+          success: true,
+          message: "Cybrid customer already exists",
+          customer: {
+            guid: merchant.cybridCustomerGuid,
+            alreadyExists: true
+          }
+        });
       }
 
       // Create or ensure Cybrid customer exists
