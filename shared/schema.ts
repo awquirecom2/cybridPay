@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, boolean, serial, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -199,3 +199,14 @@ export const cybridDepositAddressSchema = z.object({
   asset: z.string().min(1, "Asset is required"),
   network: z.string().optional()
 });
+
+// Webhook events table for idempotency tracking
+export const webhookEvents = pgTable("webhook_events", {
+  id: serial("id").primaryKey(),
+  eventId: varchar("event_id").notNull().unique(),
+  eventType: varchar("event_type").notNull(),
+  payload: json("payload"),
+  processedAt: timestamp("processed_at").default(sql`NOW()`)
+});
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;

@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type MerchantDepositAddress, type InsertMerchantDepositAddress, type PaymentLink, type InsertPaymentLink, users, merchants, admins, merchantCredentials, merchantDepositAddresses } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type MerchantDepositAddress, type InsertMerchantDepositAddress, type PaymentLink, type InsertPaymentLink, type WebhookEvent, users, merchants, admins, merchantCredentials, merchantDepositAddresses, webhookEvents } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -47,6 +47,10 @@ export interface IStorage {
   // Merchant deposit address methods  
   getMerchantDepositAddresses(merchantId: string): Promise<MerchantDepositAddress[]>;
   createMerchantDepositAddress(address: InsertMerchantDepositAddress): Promise<MerchantDepositAddress>;
+
+  // Webhook event methods for idempotency
+  getWebhookEvent(eventId: string): Promise<any | undefined>;
+  createWebhookEvent(event: { eventId: string; eventType: string; payload: any }): Promise<any>;
   
   // Payment link methods
   createPaymentLink(paymentLink: InsertPaymentLink): Promise<PaymentLink>;
@@ -281,6 +285,23 @@ export class DatabaseStorage implements IStorage {
 
   async createMerchantDepositAddress(address: InsertMerchantDepositAddress): Promise<MerchantDepositAddress> {
     const result = await db.insert(merchantDepositAddresses).values(address).returning();
+    return result[0];
+  }
+
+  // Webhook event methods for idempotency
+  async getWebhookEvent(eventId: string): Promise<WebhookEvent | undefined> {
+    const result = await db.select().from(webhookEvents)
+      .where(eq(webhookEvents.eventId, eventId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createWebhookEvent(event: { eventId: string; eventType: string; payload: any }): Promise<WebhookEvent> {
+    const result = await db.insert(webhookEvents).values({
+      eventId: event.eventId,
+      eventType: event.eventType,
+      payload: event.payload
+    }).returning();
     return result[0];
   }
 }

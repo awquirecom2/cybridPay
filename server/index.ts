@@ -3,6 +3,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Register webhook routes BEFORE JSON parsing to capture raw body
+app.use('/api/webhooks/cybrid', express.raw({ type: '*/*', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

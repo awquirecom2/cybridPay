@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
@@ -379,6 +380,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to fetch deposit addresses" });
     }
   });
+
+  // Cybrid webhook endpoint for receiving verification status updates  
+  app.post("/api/webhooks/cybrid", async (req: any, res) => {
+    try {
+      const signature = req.headers['x-cybrid-signature'] as string;
+      const timestamp = req.headers['x-cybrid-timestamp'] as string;
+      const body = req.rawBody || req.body;
+
+      // Verify required webhook headers
+      if (!signature || !timestamp) {
+        console.warn('Cybrid webhook missing required headers');
+        return res.status(400).json({ error: 'Missing required webhook headers' });
+      }
+
+      // Verify webhook signature with HMAC (includes timestamp to prevent replay)
+      const webhookSecret = process.env.CYBRID_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error('CYBRID_WEBHOOK_SECRET not configured');
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+      }
+
+      const crypto = require('crypto');
+      // Include timestamp in signature calculation to prevent replay attacks
+      const signedData = `${timestamp}.${body}`;
+      const expectedSignature = crypto.createHmac('sha256', webhookSecret)
+        .update(signedData)
+        .digest('hex');
+      
+      // Validate signature format and remove prefix
+      if (!signature.startsWith('sha256=')) {
+        console.warn('Invalid Cybrid webhook signature format');
+        return res.status(401).json({ error: 'Invalid signature format' });
+      }
+      
+      const receivedSignature = signature.replace('sha256=', '');
+      
+      // Validate signature lengths before comparison
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+      const receivedBuffer = Buffer.from(receivedSignature, 'hex');
+      
+      if (expectedBuffer.length !== receivedBuffer.length) {
+        console.warn('Cybrid webhook signature length mismatch');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+      
+      if (!crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+        console.warn('Cybrid webhook signature verification failed');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      // Check timestamp to prevent replay attacks (5 minute window)
+      const webhookTimestamp = parseInt(timestamp, 10);
+      if (isNaN(webhookTimestamp)) {
+        console.warn('Invalid Cybrid webhook timestamp format');
+        return res.status(400).json({ error: 'Invalid timestamp format' });
+      }
+      
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (Math.abs(currentTime - webhookTimestamp) > 300) {
+        console.warn('Cybrid webhook timestamp too old or too far in future');
+        return res.status(400).json({ error: 'Invalid timestamp' });
+      }
+
+      // Parse the webhook payload
+      let payload;
+      try {
+        payload = JSON.parse(body.toString());
+      } catch (error) {
+        console.error('Failed to parse Cybrid webhook payload:', error);
+        return res.status(400).json({ error: 'Invalid JSON payload' });
+      }
+
+      console.log(`Received Cybrid webhook: ${payload.type} for ${payload.object?.guid}`);
+
+      // Check for event ID to prevent duplicate processing (use payload data only, not headers)
+      const eventId = payload.id || payload.event_id || crypto.createHash('sha256').update(body).digest('hex').slice(0, 16);
+      
+      // Check if we've already processed this event
+      const existingEvent = await storage.getWebhookEvent(eventId);
+      if (existingEvent) {
+        console.log(`Webhook event ${eventId} already processed, returning success`);
+        return res.status(200).json({ received: true, type: payload.type, status: 'duplicate' });
+      }
+
+      // Store webhook event for idempotency
+      await storage.createWebhookEvent({
+        eventId: eventId,
+        eventType: payload.type,
+        payload: payload
+      });
+
+      // Handle different webhook event types
+      switch (payload.type) {
+        case 'identity_verification.completed':
+        case 'identity_verification.passed':
+          await handleIdentityVerificationCompleted(payload.object);
+          break;
+        case 'identity_verification.failed':
+        case 'identity_verification.rejected':
+          await handleIdentityVerificationFailed(payload.object);
+          break;
+        case 'customer.storing':
+          await handleCustomerStoring(payload.object);
+          break;
+        default:
+          console.log(`Unhandled Cybrid webhook event type: ${payload.type}`);
+      }
+
+      // Return success response to Cybrid
+      res.status(200).json({ received: true, type: payload.type });
+
+    } catch (error) {
+      console.error('Error processing Cybrid webhook:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  });
+
+  // Webhook handler functions for Cybrid events
+  async function handleIdentityVerificationCompleted(verificationData: any) {
+    try {
+      const customerGuid = verificationData.customer_guid;
+      const verificationGuid = verificationData.guid;
+      const outcome = verificationData.outcome;
+
+      console.log(`Identity verification completed: ${verificationGuid} with outcome: ${outcome}`);
+
+      // Find merchant by Cybrid customer GUID
+      const merchant = await storage.getMerchantByCybridGuid(customerGuid);
+      if (!merchant) {
+        console.error(`No merchant found for Cybrid customer GUID: ${customerGuid}`);
+        return;
+      }
+
+      // Update merchant verification status based on outcome
+      let kybStatus = 'pending';
+      let cybridIntegrationStatus = 'active';
+      
+      if (outcome === 'passed') {
+        kybStatus = 'approved';
+        
+        // Automatically create deposit addresses when verification is complete
+        try {
+          await CybridService.createDepositAddresses(customerGuid);
+          console.log(`Deposit addresses created for verified merchant ${merchant.id}`);
+        } catch (addressError) {
+          console.error(`Failed to create deposit addresses for merchant ${merchant.id}:`, addressError);
+        }
+        
+      } else if (outcome === 'failed') {
+        kybStatus = 'rejected';
+        cybridIntegrationStatus = 'error';
+      }
+
+      // Update merchant record with verification results
+      await storage.updateMerchant(merchant.id, {
+        kybStatus: kybStatus,
+        cybridIntegrationStatus: cybridIntegrationStatus,
+        cybridVerificationStatus: outcome,
+        cybridVerificationGuid: verificationGuid,
+        cybridLastSyncedAt: new Date()
+      });
+
+      console.log(`Updated merchant ${merchant.id} with verification status: ${kybStatus}`);
+
+    } catch (error) {
+      console.error('Error handling identity verification completed:', error);
+    }
+  }
+
+  async function handleIdentityVerificationFailed(verificationData: any) {
+    try {
+      const customerGuid = verificationData.customer_guid;
+      const verificationGuid = verificationData.guid;
+
+      console.log(`Identity verification failed: ${verificationGuid}`);
+
+      // Find merchant by Cybrid customer GUID
+      const merchant = await storage.getMerchantByCybridGuid(customerGuid);
+      if (!merchant) {
+        console.error(`No merchant found for Cybrid customer GUID: ${customerGuid}`);
+        return;
+      }
+
+      // Update merchant record with failure status
+      await storage.updateMerchant(merchant.id, {
+        kybStatus: 'rejected',
+        cybridIntegrationStatus: 'error',
+        cybridVerificationStatus: 'failed',
+        cybridVerificationGuid: verificationGuid,
+        cybridLastError: verificationData.failure_reason || 'Verification failed',
+        cybridLastSyncedAt: new Date()
+      });
+
+      console.log(`Updated merchant ${merchant.id} with failed verification status`);
+
+    } catch (error) {
+      console.error('Error handling identity verification failed:', error);
+    }
+  }
+
+  async function handleCustomerStoring(customerData: any) {
+    try {
+      const customerGuid = customerData.guid;
+      
+      console.log(`Customer storing state reached: ${customerGuid}`);
+
+      // Find merchant by Cybrid customer GUID
+      const merchant = await storage.getMerchantByCybridGuid(customerGuid);
+      if (!merchant) {
+        console.error(`No merchant found for Cybrid customer GUID: ${customerGuid}`);
+        return;
+      }
+
+      // Update merchant integration status to active when customer reaches storing state
+      await storage.updateMerchant(merchant.id, {
+        cybridIntegrationStatus: 'active',
+        cybridLastSyncedAt: new Date()
+      });
+
+      console.log(`Updated merchant ${merchant.id} integration status to active`);
+
+    } catch (error) {
+      console.error('Error handling customer storing:', error);
+    }
+  }
 
   // Merchant portal routes (require merchant authentication)
   app.get("/api/merchant/dashboard", requireMerchant, async (req, res) => {
