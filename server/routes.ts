@@ -381,6 +381,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cybrid customer token endpoint for merchant KYC widget authentication
+  app.get("/api/cybrid/token", requireMerchant, async (req, res) => {
+    try {
+      const merchant = req.user as any;
+      
+      // Ensure merchant has a Cybrid customer GUID
+      if (!merchant.cybridCustomerGuid) {
+        return res.status(400).json({ 
+          error: "Merchant account not linked to verification system. Please contact support." 
+        });
+      }
+
+      // Create customer-scoped JWT token (NOT platform token - security fix!)
+      const customerToken = await CybridService.createCustomerToken(merchant.cybridCustomerGuid);
+      
+      res.json({
+        accessToken: customerToken.token,
+        expiresIn: customerToken.expiresIn
+      });
+    } catch (error) {
+      console.error("Failed to generate Cybrid customer token for merchant:", error);
+      res.status(500).json({ 
+        error: "Failed to authenticate with verification system" 
+      });
+    }
+  });
+
   // Cybrid webhook endpoint for receiving verification status updates  
   app.post("/api/webhooks/cybrid", async (req: any, res) => {
     try {

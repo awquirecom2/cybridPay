@@ -10,11 +10,13 @@ import { Progress } from "@/components/ui/progress"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { CybridKycWidget } from "./cybrid-kyc-widget"
 
 export function KybOnboarding() {
   const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({})
+  const [kycVerificationStatus, setKycVerificationStatus] = useState<'pending' | 'completed' | 'failed'>('pending')
   
   const form = useForm({
     defaultValues: {
@@ -56,9 +58,23 @@ export function KybOnboarding() {
   }
 
   const handleStepSubmit = () => {
+    // Step 3 validation: Require KYC completion before proceeding
+    if (currentStep === 3 && kycVerificationStatus !== 'completed') {
+      toast({
+        title: "Identity Verification Required",
+        description: "Please complete identity verification before proceeding.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1)
       console.log(`Step ${currentStep} completed, moving to step ${currentStep + 1}`)
+      toast({
+        title: "Step Completed",
+        description: `Step ${currentStep} completed successfully.`
+      });
     } else {
       console.log('KYB submission completed')
       toast({
@@ -72,6 +88,13 @@ export function KybOnboarding() {
     if (stepId < currentStep) return "completed"
     if (stepId === currentStep) return "current"
     return "pending"
+  }
+
+  const canProceedFromStep = (stepNumber: number) => {
+    if (stepNumber === 3) {
+      return kycVerificationStatus === 'completed';
+    }
+    return true;
   }
 
   const renderBusinessInfo = () => (
@@ -265,62 +288,126 @@ export function KybOnboarding() {
     </Card>
   )
 
+  const handleKycComplete = (status: string) => {
+    console.log('KYC verification completed with status:', status);
+    if (status === 'passed' || status === 'approved') {
+      setKycVerificationStatus('completed');
+      toast({
+        title: "Identity Verification Complete",
+        description: "Your identity has been successfully verified.",
+      });
+    } else {
+      setKycVerificationStatus('failed');
+      toast({
+        title: "Identity Verification Failed", 
+        description: "Please contact support if you need assistance.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleKycError = (error: string) => {
+    console.error('KYC verification error:', error);
+    setKycVerificationStatus('failed');
+    toast({
+      title: "Verification Error",
+      description: error,
+      variant: "destructive"
+    });
+  };
+
   const renderDirectorInfo = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Director Information</CardTitle>
-        <CardDescription>
-          Details of the primary business director or authorized representative
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="directorName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Smith" {...field} data-testid="input-director-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Director Information</CardTitle>
+          <CardDescription>
+            Provide basic details and complete identity verification for the business director
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <FormField
+                control={form.control}
+                name="directorName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Smith" {...field} data-testid="input-director-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="directorEmail"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email Address *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="john@company.com" type="email" {...field} data-testid="input-director-email" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="directorEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Address *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="john@company.com" type="email" {...field} data-testid="input-director-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="directorPhone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-director-phone" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </Form>
-      </CardContent>
-    </Card>
+              <FormField
+                control={form.control}
+                name="directorPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+1 (555) 123-4567" {...field} data-testid="input-director-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <CybridKycWidget
+        onVerificationComplete={handleKycComplete}
+        onError={handleKycError}
+        data-testid="cybrid-kyc-widget"
+      />
+
+      {kycVerificationStatus === 'completed' && (
+        <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">Identity Verification Complete</span>
+            </div>
+            <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+              Your identity has been successfully verified and meets regulatory requirements.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {kycVerificationStatus === 'failed' && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">Identity Verification Failed</span>
+            </div>
+            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+              Please contact support for assistance with identity verification.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 
   const renderReview = () => (

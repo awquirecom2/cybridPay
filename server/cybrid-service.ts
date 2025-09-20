@@ -197,6 +197,34 @@ export class CybridService {
     return this.makeRequest(`/api/customers/${customerGuid}`) as Promise<CybridCustomer>;
   }
 
+  // Create customer-scoped JWT token for Banking UI widget
+  static async createCustomerToken(customerGuid: string): Promise<{ token: string; expiresIn: number }> {
+    try {
+      console.log(`Creating customer token for customer: ${customerGuid}`);
+
+      const tokenPayload = {
+        customer_guid: customerGuid,
+        scopes: ['kyc_identity_verifications:execute', 'kyc_identity_verifications:read']
+      };
+
+      const tokenResponse = await this.makeRequest('/api/customer_tokens', {
+        method: 'POST',
+        body: JSON.stringify(tokenPayload)
+      }) as { token: string; expires_at: string };
+
+      console.log('Customer token created successfully');
+
+      return {
+        token: tokenResponse.token,
+        expiresIn: 3600 // Default to 1 hour, adjust based on actual response
+      };
+
+    } catch (error) {
+      console.error('Failed to create customer token:', error);
+      throw new Error(`Failed to create customer session token: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   // Create identity verification session for KYC
   static async createIdentityVerification(customerGuid: string): Promise<CybridIdentityVerification> {
     try {
