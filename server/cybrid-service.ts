@@ -45,11 +45,18 @@ export interface CybridAddress {
   created_at: string;
 }
 
-// Cybrid API base URLs
+// Cybrid Banking API base URLs
 const CYBRID_API_URLS = {
   sandbox: 'https://bank.sandbox.cybrid.app',
   staging: 'https://bank.sandbox.cybrid.app',
   production: 'https://bank.cybrid.app'
+};
+
+// Cybrid Identity API base URLs (for customer tokens)
+const CYBRID_IDENTITY_URLS = {
+  sandbox: 'https://id.sandbox.cybrid.app',
+  staging: 'https://id.sandbox.cybrid.app',
+  production: 'https://id.cybrid.app'
 };
 
 // Cybrid OAuth URLs (separate from API)
@@ -115,6 +122,33 @@ export class CybridService {
   private static async makeRequest(endpoint: string, options: RequestInit = {}) {
     const token = await this.getAccessToken();
     const url = `${this.BASE_URL}${endpoint}`;
+    
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Cybrid API error ${response.status}: ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  // Make request to Cybrid Identity API (for customer tokens)
+  private static async makeIdentityRequest(endpoint: string, options: RequestInit = {}) {
+    const token = await this.getAccessToken();
+    const identityBaseUrl = CYBRID_IDENTITY_URLS[this.ENVIRONMENT as keyof typeof CYBRID_IDENTITY_URLS];
+    const url = `${identityBaseUrl}${endpoint}`;
     
     const defaultHeaders = {
       'Content-Type': 'application/json',
@@ -267,7 +301,7 @@ export class CybridService {
       };
 
 
-      const tokenResponse = await this.makeRequest('/api/customer_tokens', {
+      const tokenResponse = await this.makeIdentityRequest('/api/customer_tokens', {
         method: 'POST',
         body: JSON.stringify(tokenPayload)
       }) as { token: string; expires_at: string };
