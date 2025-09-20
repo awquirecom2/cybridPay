@@ -47,12 +47,14 @@ export interface CybridAddress {
 
 // Cybrid API base URLs
 const CYBRID_API_URLS = {
+  sandbox: 'https://bank.sandbox.cybrid.app',
   staging: 'https://bank.sandbox.cybrid.app',
   production: 'https://bank.cybrid.app'
 };
 
 // Cybrid OAuth URLs (separate from API)
 const CYBRID_AUTH_URLS = {
+  sandbox: 'https://id.sandbox.cybrid.app/oauth/token',
   staging: 'https://id.sandbox.cybrid.app/oauth/token',
   production: 'https://id.cybrid.app/oauth/token'
 };
@@ -86,7 +88,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read banks:write customers:read customers:write accounts:read accounts:write prices:read quotes:read quotes:write trades:read trades:write transfers:read transfers:write external_bank_accounts:read external_bank_accounts:write workflows:read workflows:write identity_verifications:read identity_verifications:write'
+          scope: 'banks:read customers:read customers:write accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write'
         })
       });
 
