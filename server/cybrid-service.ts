@@ -183,6 +183,18 @@ export class CybridService {
     }
   }
 
+  // Get all customers
+  static async getAllCustomers(): Promise<CybridCustomer[]> {
+    try {
+      const response = await this.makeRequest('/api/customers') as { objects: CybridCustomer[], total: number };
+      console.log(`Fetched ${response.objects.length} customers from Cybrid`);
+      return response.objects;
+    } catch (error) {
+      console.error('Failed to fetch all Cybrid customers:', error);
+      throw error;
+    }
+  }
+
   // Get customer by external ID (our merchant ID)
   static async getCustomerByExternalId(externalId: string): Promise<CybridCustomer | null> {
     try {
