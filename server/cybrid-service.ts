@@ -304,7 +304,7 @@ export class CybridService {
       const tokenResponse = await this.makeIdentityRequest('/api/customer_tokens', {
         method: 'POST',
         body: JSON.stringify(tokenPayload)
-      }) as { token: string; expires_at: string };
+      }) as any;
 
       console.log('Customer token created successfully');
       console.log('[DEBUG] Token response from Cybrid:', JSON.stringify(tokenResponse, null, 2));
