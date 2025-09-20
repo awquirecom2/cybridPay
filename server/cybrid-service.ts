@@ -307,6 +307,12 @@ export class CybridService {
       }) as { token: string; expires_at: string };
 
       console.log('Customer token created successfully');
+      console.log('[DEBUG] Token response from Cybrid:', JSON.stringify(tokenResponse, null, 2));
+
+      if (!tokenResponse.token) {
+        console.error('[ERROR] No token in Cybrid response!');
+        throw new Error('Cybrid returned empty token');
+      }
 
       return {
         token: tokenResponse.token,
