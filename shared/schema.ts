@@ -40,6 +40,15 @@ export const merchants = pgTable("merchants", {
   notes: text("notes"),
   volume: text("volume").default("$0"),
   integrations: text("integrations").array().default([]),
+  // Cybrid customer mapping fields
+  cybridCustomerGuid: text("cybrid_customer_guid"), // Maps to Cybrid customer GUID
+  cybridVerificationGuid: text("cybrid_verification_guid"), // Tracks KYC verification
+  cybridIntegrationStatus: text("cybrid_integration_status").default("pending"), // pending, active, error
+  cybridLastError: text("cybrid_last_error"), // Store last error message
+  cybridLastAttemptAt: timestamp("cybrid_last_attempt_at"), // Last integration attempt
+  cybridLastSyncedAt: timestamp("cybrid_last_synced_at"), // Last successful sync
+  cybridEnvironment: text("cybrid_environment").default("staging"), // staging, production
+  depositAddressesCreated: boolean("deposit_addresses_created").default(false),
   dateOnboarded: timestamp("date_onboarded").default(sql`NOW()`),
   createdAt: timestamp("created_at").default(sql`NOW()`),
   updatedAt: timestamp("updated_at").default(sql`NOW()`)
@@ -159,3 +168,34 @@ export interface InsertPaymentLink {
   sessionUrl: string;
   merchantId: string;
 }
+
+// Merchant deposit addresses table for storing crypto deposit addresses
+export const merchantDepositAddresses = pgTable("merchant_deposit_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantId: varchar("merchant_id").notNull().references(() => merchants.id, { onDelete: "cascade" }),
+  cybridCustomerGuid: text("cybrid_customer_guid").notNull(), // Link to Cybrid customer
+  cybridAccountGuid: text("cybrid_account_guid"), // Cybrid trading account GUID
+  asset: text("asset").notNull(), // BTC, ETH, USDC, USDT (aligned with Cybrid terminology)
+  network: text("network").notNull(), // bitcoin, ethereum
+  address: text("address").notNull(), // Deposit address
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`NOW()`)
+});
+
+export const insertMerchantDepositAddressSchema = createInsertSchema(merchantDepositAddresses).omit({
+  id: true,
+  createdAt: true
+});
+
+export type InsertMerchantDepositAddress = z.infer<typeof insertMerchantDepositAddressSchema>;
+export type MerchantDepositAddress = typeof merchantDepositAddresses.$inferSelect;
+
+// Validation schemas for Cybrid admin routes
+export const cybridCustomerParamsSchema = z.object({
+  id: z.string().min(1, "Merchant ID is required")
+});
+
+export const cybridDepositAddressSchema = z.object({
+  asset: z.string().min(1, "Asset is required"),
+  network: z.string().optional()
+});

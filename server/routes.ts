@@ -4,8 +4,9 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
+import { CybridService } from "./cybrid-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Utility functions to sanitize data (remove passwords)
@@ -204,14 +205,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         kybStatus: "pending"
       });
 
-      // Return sanitized merchant info along with generated credentials
-      res.status(201).json({
+      // Prepare response object
+      const response = {
         merchant: sanitizeMerchant(merchant),
         credentials: {
           username: credentials.username,
           password: credentials.password // Plain text password for admin to share
+        },
+        cybrid: {
+          status: 'pending',
+          customerGuid: null as string | null,
+          error: null as string | null
         }
-      });
+      };
+
+      // Automatically create Cybrid customer (don't fail merchant creation if this fails)
+      try {
+        console.log(`Creating Cybrid customer for merchant: ${merchant.name} (${merchant.id})`);
+        
+        const cybridCustomer = await CybridService.ensureCustomer({
+          merchantId: merchant.id,
+          name: merchantData.name,
+          email: merchantData.email
+        });
+
+        response.cybrid = {
+          status: 'active',
+          customerGuid: cybridCustomer.guid,
+          error: null
+        };
+
+        console.log(`✅ Cybrid customer created successfully: ${cybridCustomer.guid}`);
+
+      } catch (cybridError) {
+        console.error(`❌ Failed to create Cybrid customer for merchant ${merchant.id}:`, cybridError);
+        
+        response.cybrid = {
+          status: 'error',
+          customerGuid: null,
+          error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
+        };
+      }
+
+      // Always return success - merchant creation succeeded
+      res.status(201).json(response);
+      
     } catch (error) {
       console.error("Error creating merchant:", error);
       res.status(400).json({ error: "Failed to create merchant" });
@@ -248,6 +286,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting merchant:", error);
       res.status(500).json({ error: "Failed to delete merchant" });
+    }
+  });
+
+  // Cybrid customer management routes for admins
+  app.post("/api/admin/merchants/:id/cybrid-customer", requireAdmin, async (req, res) => {
+    try {
+      const { id } = cybridCustomerParamsSchema.parse(req.params);
+      const merchant = await storage.getMerchant(id);
+      
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Create or ensure Cybrid customer exists
+      const cybridCustomer = await CybridService.ensureCustomer({
+        merchantId: merchant.id,
+        name: merchant.name,
+        email: merchant.email
+      });
+
+      res.json({
+        success: true,
+        customer: {
+          guid: cybridCustomer.guid,
+          name: cybridCustomer.name,
+          state: cybridCustomer.state,
+          type: cybridCustomer.type
+        }
+      });
+
+    } catch (error) {
+      console.error("Error creating Cybrid customer:", error);
+      res.status(500).json({ error: "Failed to create Cybrid customer" });
+    }
+  });
+
+  app.get("/api/admin/merchants/:id/cybrid-status", requireAdmin, async (req, res) => {
+    try {
+      const { id } = cybridCustomerParamsSchema.parse(req.params);
+      const merchant = await storage.getMerchant(id);
+      
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      if (!merchant.cybridCustomerGuid) {
+        return res.json({
+          hasCustomer: false,
+          cybridCustomerGuid: null,
+          integrationStatus: merchant.cybridIntegrationStatus || 'none'
+        });
+      }
+
+      // Get current Cybrid customer data
+      try {
+        const customer = await CybridService.getCustomer(merchant.cybridCustomerGuid);
+        
+        res.json({
+          hasCustomer: true,
+          cybridCustomerGuid: merchant.cybridCustomerGuid,
+          integrationStatus: merchant.cybridIntegrationStatus,
+          customer: {
+            guid: customer.guid,
+            name: customer.name,
+            state: customer.state,
+            type: customer.type
+          }
+        });
+      } catch (cybridError) {
+        res.json({
+          hasCustomer: true,
+          cybridCustomerGuid: merchant.cybridCustomerGuid,
+          integrationStatus: 'error',
+          error: 'Failed to fetch Cybrid customer data'
+        });
+      }
+
+    } catch (error) {
+      console.error("Error fetching Cybrid status:", error);
+      res.status(500).json({ error: "Failed to fetch Cybrid status" });
+    }
+  });
+
+  app.get("/api/admin/merchants/:id/deposit-addresses", requireAdmin, async (req, res) => {
+    try {
+      const { id } = cybridCustomerParamsSchema.parse(req.params);
+      const addresses = await storage.getMerchantDepositAddresses(id);
+      res.json(addresses);
+    } catch (error) {
+      console.error("Error fetching deposit addresses:", error);
+      res.status(500).json({ error: "Failed to fetch deposit addresses" });
     }
   });
 

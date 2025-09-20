@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type PaymentLink, type InsertPaymentLink, users, merchants, admins, merchantCredentials } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type MerchantDepositAddress, type InsertMerchantDepositAddress, type PaymentLink, type InsertPaymentLink, users, merchants, admins, merchantCredentials, merchantDepositAddresses } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
@@ -40,6 +40,13 @@ export interface IStorage {
   createMerchantCredentials(credentials: InsertMerchantCredentials): Promise<MerchantCredentials>;
   updateMerchantCredentials(merchantId: string, provider: string, updates: Partial<InsertMerchantCredentials>): Promise<MerchantCredentials | undefined>;
   deleteMerchantCredentials(merchantId: string, provider: string): Promise<boolean>;
+
+  // Cybrid-specific merchant methods
+  getMerchantByCybridGuid(cybridCustomerGuid: string): Promise<Merchant | undefined>;
+
+  // Merchant deposit address methods  
+  getMerchantDepositAddresses(merchantId: string): Promise<MerchantDepositAddress[]>;
+  createMerchantDepositAddress(address: InsertMerchantDepositAddress): Promise<MerchantDepositAddress>;
   
   // Payment link methods
   createPaymentLink(paymentLink: InsertPaymentLink): Promise<PaymentLink>;
@@ -257,6 +264,24 @@ export class DatabaseStorage implements IStorage {
     if (cleanedCount > 0) {
       console.log(`Cleaned up ${cleanedCount} expired payment links`);
     }
+  }
+
+  // Cybrid-specific merchant methods
+  async getMerchantByCybridGuid(cybridCustomerGuid: string): Promise<Merchant | undefined> {
+    const result = await db.select().from(merchants)
+      .where(eq(merchants.cybridCustomerGuid, cybridCustomerGuid));
+    return result[0];
+  }
+
+  // Merchant deposit address methods
+  async getMerchantDepositAddresses(merchantId: string): Promise<MerchantDepositAddress[]> {
+    return await db.select().from(merchantDepositAddresses)
+      .where(eq(merchantDepositAddresses.merchantId, merchantId));
+  }
+
+  async createMerchantDepositAddress(address: InsertMerchantDepositAddress): Promise<MerchantDepositAddress> {
+    const result = await db.insert(merchantDepositAddresses).values(address).returning();
+    return result[0];
   }
 }
 
