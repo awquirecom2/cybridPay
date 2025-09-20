@@ -307,15 +307,14 @@ export class CybridService {
       }) as any;
 
       console.log('Customer token created successfully');
-      console.log('[DEBUG] Token response from Cybrid:', JSON.stringify(tokenResponse, null, 2));
 
-      if (!tokenResponse.token) {
-        console.error('[ERROR] No token in Cybrid response!');
+      if (!tokenResponse.access_token) {
+        console.error('[ERROR] No access_token in Cybrid response!');
         throw new Error('Cybrid returned empty token');
       }
 
       return {
-        token: tokenResponse.token,
+        token: tokenResponse.access_token,
         expiresIn: 3600 // Default to 1 hour, adjust based on actual response
       };
 
