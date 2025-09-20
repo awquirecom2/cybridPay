@@ -4,7 +4,7 @@ import { Express } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { requireMerchant } from "./auth-core";
+import { requireMerchant, requireMerchantAuthenticated } from "./auth-core";
 
 const scryptAsync = promisify(scrypt);
 
@@ -38,8 +38,10 @@ export function setupMerchantAuth(app: Express) {
       if (!merchant || !(await comparePasswords(password, merchant.password))) {
         return done(null, false, { message: "Invalid credentials" });
       }
-      if (merchant.status !== "approved") {
-        return done(null, false, { message: "Account not approved" });
+      // Allow pending merchants to log in for onboarding purposes
+      // Only block rejected or deactivated merchants
+      if (merchant.status === 'rejected' || merchant.status === 'deactivated') {
+        return done(null, false, { message: "Account access denied" });
       }
       return done(null, merchant);
     }),
@@ -71,7 +73,7 @@ export function setupMerchantAuth(app: Express) {
     });
   });
 
-  app.get("/api/merchant/profile", requireMerchant, (req, res) => {
+  app.get("/api/merchant/profile", requireMerchantAuthenticated, (req, res) => {
     res.json(sanitizeMerchant(req.user));
   });
 

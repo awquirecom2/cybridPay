@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initAuthCore, requireAdmin, requireMerchant } from "./auth-core";
+import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
@@ -381,8 +381,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cybrid customer token endpoint for merchant KYC widget authentication
-  app.get("/api/cybrid/token", requireMerchant, async (req, res) => {
+  // Cybrid customer token endpoint for merchant KYC widget authentication  
+  app.get("/api/cybrid/token", requireMerchantAuthenticated, async (req, res) => {
     try {
       const merchant = req.user as any;
       

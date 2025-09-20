@@ -103,6 +103,21 @@ export function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
+// Light middleware for onboarding - allows pending merchants
+export function requireMerchantAuthenticated(req: any, res: any, next: any) {
+  if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'merchant') {
+    return res.status(401).json({ error: "Merchant authentication required" });
+  }
+  
+  // Block only rejected/deactivated merchants, allow pending for onboarding
+  if (req.user.status === 'rejected' || req.user.status === 'deactivated') {
+    return res.status(403).json({ error: "Merchant account access denied" });
+  }
+  
+  next();
+}
+
+// Strict middleware for post-approval features - requires approved status
 export function requireMerchant(req: any, res: any, next: any) {
   if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'merchant') {
     return res.status(401).json({ error: "Merchant authentication required" });
