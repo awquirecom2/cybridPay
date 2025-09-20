@@ -60,6 +60,12 @@ export function CybridKycWidget({
     if (!cybridRef.current || !effectiveCustomerId || !cybridToken) return;
 
     try {
+      console.log('🔧 Initializing Cybrid widget with:', {
+        customerId: effectiveCustomerId,
+        tokenPresent: !!(cybridToken as any)?.accessToken,
+        tokenLength: (cybridToken as any)?.accessToken?.length || 0
+      });
+
       // Clear existing content
       cybridRef.current.innerHTML = '';
 
@@ -67,19 +73,23 @@ export function CybridKycWidget({
       const cybridApp = document.createElement('cybrid-app');
 
       // Configure the widget for KYC verification
-      (cybridApp as any).config = {
+      const config = {
         refreshInterval: 10000,
         routing: false,
         locale: 'en-US',
         theme: 'LIGHT',
         customer: effectiveCustomerId,
         fiat: 'USD',
-        features: ['kyc_identity_verifications'],
+        features: ['identity_verifications'],
         environment: 'sandbox' // Match backend environment mapping
       };
 
+      console.log('🔧 Widget config:', config);
+      (cybridApp as any).config = config;
+
       // Set authentication token
       (cybridApp as any).token = (cybridToken as any)?.accessToken;
+      console.log('🔧 Token set on widget');
 
       // Listen for verification events
       cybridApp.addEventListener('verification-complete', (event: any) => {
