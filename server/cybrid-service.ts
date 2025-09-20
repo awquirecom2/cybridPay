@@ -157,6 +157,7 @@ export class CybridService {
       }) as CybridCustomer;
 
       console.log(`Cybrid customer created successfully: ${customer.guid}`);
+      console.log(`[DEBUG] Full customer response:`, JSON.stringify(customer, null, 2));
 
       // Update merchant record with Cybrid customer GUID
       await storage.updateMerchant(merchantData.merchantId, {
@@ -227,6 +228,9 @@ export class CybridService {
         customer_guid: customerGuid,
         scopes: ['kyc_identity_verifications:execute', 'kyc_identity_verifications:read']
       };
+
+      console.log(`[DEBUG] Token creation URL: /api/customer_tokens`);
+      console.log(`[DEBUG] Token payload:`, JSON.stringify(tokenPayload, null, 2));
 
       const tokenResponse = await this.makeRequest('/api/customer_tokens', {
         method: 'POST',
