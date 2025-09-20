@@ -1,0 +1,49 @@
+curl --request POST \
+     --url https://id.sandbox.cybrid.app/api/customer_tokens \
+     --header 'accept: application/json' \
+     --header 'authorization: Bearer eyJraWQiOiJTcWZRWXNjelFQbENOSDhxOXZuR1E2WWcwQk1ENm5UZkZMLWhxeER6eFdFIiwiYWxnIjoiUlM1MTIifQ.eyJpc3MiOiJodHRwczovL2lkLnNhbmRib3guY3licmlkLmFwcCIsImF1ZCI6WyJodHRwczovL2Jhbmsuc2FuZGJveC5jeWJyaWQuYXBwIiwiaHR0cDovL3NhbmRib3gtYXBpLWludGVncmF0aW9uLXRyYW5zZmVyczozMDA3IiwiaHR0cDovL3NhbmRib3gtYXBpLWludGVybmFsLWlkZW50aXR5OjMwMDQiLCJodHRwOi8vc2FuZGJveC1hcGktaW50ZXJuYWwtYWNjb3VudHM6MzAwMyIsImh0dHA6Ly9zYW5kYm94LWFwaS1pbnRlcm5hbC1rZXk6MzAwNSIsImh0dHBzOi8vaWQuc2FuZGJveC5jeWJyaWQuYXBwIl0sInN1YiI6ImJmNzRkMjI0ZmIyMDdlNjNiNzZjNjFiNWY2OTJkOWMzIiwic3ViX3R5cGUiOiJiYW5rIiwic2NvcGUiOlsiZGVwb3NpdF9iYW5rX2FjY291bnRzOnJlYWQiLCJpZGVudGl0eV92ZXJpZmljYXRpb25zOmV4ZWN1dGUiLCJpZGVudGl0eV92ZXJpZmljYXRpb25zOnJlYWQiLCJpZGVudGl0eV92ZXJpZmljYXRpb25zOndyaXRlIiwiZGVwb3NpdF9hZGRyZXNzZXM6ZXhlY3V0ZSIsImRlcG9zaXRfYWRkcmVzc2VzOnJlYWQiLCJhY2NvdW50czpyZWFkIiwiYmFua3M6cmVhZCIsImJhbmtzOndyaXRlIiwiY3VzdG9tZXJzOnJlYWQiLCJjdXN0b21lcnM6d3JpdGUiLCJjdXN0b21lcnM6ZXhlY3V0ZSIsImFjY291bnRzOmV4ZWN1dGUiXSwiaWF0IjoxNzU4Mzk4Mjk1LCJleHAiOjE3NTg0MjcwOTUsImp0aSI6IjY0OGE4NDNiLTI5NDMtNGMyYS1iZjU3LTI5ZDRlNDc5YmU2ZSIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJwcm9wZXJ0aWVzIjp7Im9yZ2FuaXphdGlvbl9ndWlkIjoiYmZlNWVlY2IyMjBiN2ViM2RhNjYzN2VlNjQyNjA5NTYiLCJ0eXBlIjoic2FuZGJveCJ9fQ.U61iX00d2wBPOPwL6_Cqh3OaZMBTpAtl0229l-n69ekcsqEq1qEqmJGgIrXhNole5P2o4Y904y2nZuw44txifJUFRKp5BjLVl2TrSro25mxFDJ2IkF3gXHh-Pf6D3r5QfarIHucwI4L5hf_dxceTD3ShTTbnFzyYPI3M1aNkFUOniXry2L4TwMPvJj1q-2VCH_6YPYjZzimu1AC2TehxHFmfeSIJpLfYvluNBhBymoZmAH84hKcnG2j8oEscVWFb1dPuccyNbdRENWBPvGh06UMUtpD4VtSsr2BTKZATb9m4yiAn2m1Vz-vyQteUaDHnK31LndFtYYqP3gf636rXbTU2HuzZh5pCEfGs5JNl2LVOpyC-Hh0IuxglaYlZp09wgyBlj_9DhcBAhilkvQTG25O0RzMfkwGyqV7ohPOW_TZ1fLORCbmYNjN4lCepohQp6JHtuhkdS1ajB_nWbR2KTjI_fapE0vqIHW84z2AfrmxdZA7ZIMnVW2QgopiXtzKyPlnLhcuV-zPtVM_yCbQUsSntK6SEcMtFn-jXOJ01Sy_loX3AE8peR4GnQnFtr5Q5X3qFd_yPlJl-1P0ylH4-_NMjviOSPdgBPCNYqirLOenwTD67gVAUc5EqWBMtiv-DGc1i8Hn_R9_RX5qD84KvFYMxsgKI9oRtbMEMQ7rLxHI' \
+     --header 'content-type: application/json' \
+     --data '
+{
+  "scopes": [
+    "counterparties:read",
+    "counterparties:pii:read",
+    "counterparties:write",
+    "counterparties:execute",
+    "customers:read",
+    "customers:pii:read",
+    "customers:write",
+    "accounts:read",
+    "accounts:execute",
+    "prices:read",
+    "quotes:read",
+    "quotes:execute",
+    "trades:read",
+    "trades:execute",
+    "transfers:read",
+    "transfers:write",
+    "transfers:execute",
+    "external_bank_accounts:read",
+    "external_bank_accounts:pii:read",
+    "external_bank_accounts:write",
+    "external_bank_accounts:execute",
+    "external_wallets:read",
+    "external_wallets:execute",
+    "workflows:read",
+    "workflows:execute",
+    "deposit_addresses:read",
+    "deposit_addresses:execute",
+    "deposit_bank_accounts:read",
+    "deposit_bank_accounts:execute",
+    "invoices:read",
+    "invoices:write",
+    "invoices:execute",
+    "identity_verifications:read",
+    "identity_verifications:pii:read",
+    "identity_verifications:write",
+    "identity_verifications:execute",
+    "persona_sessions:execute"
+  ],
+  "customer_guid": "87c8d55d501cf6de17bb0f780d893efe"
+}
+'

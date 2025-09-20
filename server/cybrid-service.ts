@@ -157,7 +157,6 @@ export class CybridService {
       }) as CybridCustomer;
 
       console.log(`Cybrid customer created successfully: ${customer.guid}`);
-      console.log(`[DEBUG] Full customer response:`, JSON.stringify(customer, null, 2));
 
       // Update merchant record with Cybrid customer GUID
       await storage.updateMerchant(merchantData.merchantId, {
@@ -226,11 +225,47 @@ export class CybridService {
 
       const tokenPayload = {
         customer_guid: customerGuid,
-        scopes: ['kyc_identity_verifications:execute', 'kyc_identity_verifications:read']
+        scopes: [
+          "counterparties:read",
+          "counterparties:pii:read", 
+          "counterparties:write",
+          "counterparties:execute",
+          "customers:read",
+          "customers:pii:read",
+          "customers:write",
+          "accounts:read",
+          "accounts:execute",
+          "prices:read",
+          "quotes:read", 
+          "quotes:execute",
+          "trades:read",
+          "trades:execute",
+          "transfers:read",
+          "transfers:write",
+          "transfers:execute",
+          "external_bank_accounts:read",
+          "external_bank_accounts:pii:read",
+          "external_bank_accounts:write", 
+          "external_bank_accounts:execute",
+          "external_wallets:read",
+          "external_wallets:execute",
+          "workflows:read",
+          "workflows:execute",
+          "deposit_addresses:read",
+          "deposit_addresses:execute",
+          "deposit_bank_accounts:read",
+          "deposit_bank_accounts:execute",
+          "invoices:read",
+          "invoices:write",
+          "invoices:execute",
+          "identity_verifications:read",
+          "identity_verifications:pii:read",
+          "identity_verifications:write",
+          "identity_verifications:execute",
+          "persona_sessions:execute"
+        ]
       };
 
-      console.log(`[DEBUG] Token creation URL: /api/customer_tokens`);
-      console.log(`[DEBUG] Token payload:`, JSON.stringify(tokenPayload, null, 2));
 
       const tokenResponse = await this.makeRequest('/api/customer_tokens', {
         method: 'POST',
