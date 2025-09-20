@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,13 +14,55 @@ import { useToast } from "@/hooks/use-toast"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { apiRequest, queryClient } from "@/lib/queryClient"
 
+// Types for merchant data
+interface MerchantData {
+  id: string;
+  name: string;
+  email: string;
+  businessType: string;
+  website: string;
+  phone?: string;
+  address?: string;
+  description?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'deactivated';
+  kybStatus: 'pending' | 'approved' | 'rejected' | 'in_review';
+  customFeeEnabled: boolean;
+  customFeePercentage: string;
+  customFlatFee: string;
+  payoutMethod: string;
+  bankAccountNumber?: string;
+  bankRoutingNumber?: string;
+  notes?: string;
+  integrations: string[];
+  volume: string;
+  dateOnboarded: string;
+  cybridCustomerGuid?: string;
+  cybridIntegrationStatus?: 'none' | 'pending' | 'active' | 'error';
+  cybridLastError?: string;
+}
+
+interface CybridStatusData {
+  hasCustomer: boolean;
+  cybridCustomerGuid: string | null;
+  integrationStatus: string;
+  customer?: {
+    guid: string;
+    name: string;
+    state: string;
+    type: string;
+  };
+  error?: string;
+}
+
 export function MerchantManagement() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [selectedMerchant, setSelectedMerchant] = useState<any>(null)
+  const [showCybridDialog, setShowCybridDialog] = useState(false)
+  const [selectedMerchant, setSelectedMerchant] = useState<MerchantData | null>(null)
+  const [cybridStatus, setCybridStatus] = useState<CybridStatusData | null>(null)
   const [newMerchant, setNewMerchant] = useState({
     name: "",
     email: "",
@@ -47,7 +89,7 @@ export function MerchantManagement() {
 
   // State for showing generated credentials
   const [showCredentials, setShowCredentials] = useState(false)
-  const [generatedCredentials, setGeneratedCredentials] = useState(null)
+  const [generatedCredentials, setGeneratedCredentials] = useState<{username: string; password: string} | null>(null)
 
   // Fetch merchants from API
   const { data: merchants = [], isLoading: merchantsLoading, refetch: refetchMerchants } = useQuery({
@@ -55,7 +97,7 @@ export function MerchantManagement() {
     queryFn: async () => {
       const response = await fetch('/api/admin/merchants')
       if (!response.ok) throw new Error('Failed to fetch merchants')
-      return response.json()
+      return response.json() as Promise<MerchantData[]>
     }
   })
 
@@ -110,6 +152,48 @@ export function MerchantManagement() {
     }
   })
 
+  // Cybrid customer creation mutation
+  const createCybridCustomerMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/cybrid-customer`)
+      return await response.json()
+    },
+    onSuccess: () => {
+      refetchMerchants()
+      toast({
+        title: "Cybrid Customer Created",
+        description: "Cybrid customer account created successfully.",
+      })
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create Cybrid customer.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  // Cybrid status fetch mutation
+  const fetchCybridStatusMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await fetch(`/api/admin/merchants/${merchantId}/cybrid-status`)
+      if (!response.ok) throw new Error('Failed to fetch Cybrid status')
+      return await response.json() as CybridStatusData
+    },
+    onSuccess: (data) => {
+      setCybridStatus(data)
+      setShowCybridDialog(true)
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to fetch Cybrid status.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -144,7 +228,33 @@ export function MerchantManagement() {
     )
   }
 
-  const filteredMerchants = merchants.filter(merchant => {
+  const getCybridStatusBadge = (status: string | undefined) => {
+    if (!status || status === 'none') {
+      return (
+        <Badge variant="outline" className="text-xs">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Not Setup
+        </Badge>
+      )
+    }
+
+    const variants = {
+      active: { variant: "default" as const, icon: CheckCircle, text: "Active" },
+      pending: { variant: "secondary" as const, icon: Clock, text: "Pending" },
+      error: { variant: "destructive" as const, icon: XCircle, text: "Error" }
+    }
+    const config = variants[status as keyof typeof variants] || variants.pending
+    const Icon = config.icon
+    
+    return (
+      <Badge variant={config.variant} className="text-xs flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {config.text}
+      </Badge>
+    )
+  }
+
+  const filteredMerchants = merchants.filter((merchant: MerchantData) => {
     const matchesSearch = merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          merchant.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || merchant.status === statusFilter
@@ -152,7 +262,7 @@ export function MerchantManagement() {
   })
 
   const handleMerchantAction = (action: string, merchantId: string) => {
-    const merchant = merchants.find(m => m.id === merchantId)
+    const merchant = merchants.find((m: MerchantData) => m.id === merchantId)
     if (!merchant) return
 
     if (action === 'edit') {
@@ -175,6 +285,18 @@ export function MerchantManagement() {
         notes: merchant.notes || ""
       })
       setShowEditDialog(true)
+      return
+    }
+
+    // Cybrid management actions
+    if (action === 'cybrid-status') {
+      setSelectedMerchant(merchant)
+      fetchCybridStatusMutation.mutate(merchantId)
+      return
+    }
+
+    if (action === 'cybrid-create') {
+      createCybridCustomerMutation.mutate(merchantId)
       return
     }
 
@@ -635,6 +757,104 @@ export function MerchantManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Cybrid Status Dialog */}
+      <Dialog open={showCybridDialog} onOpenChange={setShowCybridDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Cybrid Integration Status
+            </DialogTitle>
+            <DialogDescription>
+              {selectedMerchant ? `Cybrid integration details for ${selectedMerchant.name}` : 'Cybrid integration details'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {cybridStatus && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Integration Status</Label>
+                  <div className="mt-1">
+                    {getCybridStatusBadge(cybridStatus.integrationStatus)}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Customer Exists</Label>
+                  <div className="mt-1">
+                    <Badge variant={cybridStatus.hasCustomer ? "default" : "outline"}>
+                      {cybridStatus.hasCustomer ? "Yes" : "No"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {cybridStatus.cybridCustomerGuid && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Customer GUID</Label>
+                  <div className="mt-1 p-2 bg-muted rounded border font-mono text-xs break-all">
+                    {cybridStatus.cybridCustomerGuid}
+                  </div>
+                </div>
+              )}
+
+              {cybridStatus.customer && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-muted-foreground">Customer Details</Label>
+                  <div className="p-3 bg-muted rounded-lg space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Name:</span>
+                      <span className="font-medium">{cybridStatus.customer.name}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">State:</span>
+                      <span className="font-medium capitalize">{cybridStatus.customer.state}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Type:</span>
+                      <span className="font-medium capitalize">{cybridStatus.customer.type}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {cybridStatus.error && (
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-destructive">Error Details</p>
+                      <p className="text-sm text-destructive/80 mt-1">{cybridStatus.error}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCybridDialog(false)}>
+              Close
+            </Button>
+            {selectedMerchant && (!cybridStatus?.hasCustomer || cybridStatus?.integrationStatus === 'error') && (
+              <Button 
+                onClick={() => {
+                  if (selectedMerchant) {
+                    setShowCybridDialog(false)
+                    createCybridCustomerMutation.mutate(selectedMerchant.id)
+                  }
+                }}
+                disabled={createCybridCustomerMutation.isPending}
+                data-testid="button-create-cybrid-customer"
+              >
+                {createCybridCustomerMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+                {cybridStatus?.hasCustomer ? 'Retry Setup' : 'Create Customer'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -713,7 +933,7 @@ export function MerchantManagement() {
                   <TableHead>Merchant</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>KYB</TableHead>
-                  <TableHead>Integrations</TableHead>
+                  <TableHead>Cybrid</TableHead>
                   <TableHead>Volume</TableHead>
                   <TableHead>Onboarded</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -735,13 +955,7 @@ export function MerchantManagement() {
                       {getKybBadge(merchant.kybStatus)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {merchant.integrations.map((integration) => (
-                          <Badge key={integration} variant="outline" className="text-xs">
-                            {integration}
-                          </Badge>
-                        ))}
-                      </div>
+                      {getCybridStatusBadge(merchant.cybridIntegrationStatus)}
                     </TableCell>
                     <TableCell className="font-mono">{merchant.volume}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -787,6 +1001,18 @@ export function MerchantManagement() {
                             <DropdownMenuItem onClick={() => handleMerchantAction('reactivate', merchant.id)}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Reactivate
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {/* Cybrid Management Actions */}
+                          <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-status', merchant.id)}>
+                            <Wallet className="h-4 w-4 mr-2" />
+                            View Cybrid Status
+                          </DropdownMenuItem>
+                          {(!merchant.cybridCustomerGuid || merchant.cybridIntegrationStatus === 'error') && (
+                            <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-create', merchant.id)}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              {merchant.cybridCustomerGuid ? 'Retry Cybrid Setup' : 'Create Cybrid Customer'}
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
