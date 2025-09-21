@@ -329,8 +329,8 @@ export class CybridService {
       console.log(`Creating manual KYC verification for customer: ${customerGuid}`);
       
       const verificationPayload = {
-        type: 'kyc',
-        method: 'id_and_selfie',
+        type: 'kyb',
+        method: 'business_registration',
         customer_guid: customerGuid
       };
 
