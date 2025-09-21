@@ -363,6 +363,35 @@ export class CybridService {
     throw new Error(`Failed to get persona inquiry ID after ${maxAttempts} attempts`);
   }
 
+  // Find existing identity verification for customer
+  static async findExistingVerification(customerGuid: string): Promise<CybridIdentityVerification | null> {
+    try {
+      console.log(`Looking for existing identity verification for customer: ${customerGuid}`);
+      
+      const verifications = await this.makeRequest(`/api/identity_verifications?customer_guid=${customerGuid}`, {
+        method: 'GET'
+      }) as { objects: CybridIdentityVerification[] };
+
+      console.log(`Found ${verifications.objects.length} existing verifications`);
+      console.log('EXISTING VERIFICATIONS RESPONSE:', JSON.stringify(verifications, null, 2));
+
+      // Find the most recent incomplete verification
+      const pendingVerification = verifications.objects.find(v => 
+        v.state !== 'completed' && v.type === 'kyc' && v.method === 'document_submission'
+      );
+
+      if (pendingVerification) {
+        console.log(`Found existing pending verification: ${pendingVerification.guid}`);
+        return pendingVerification;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to find existing verification:', error);
+      return null;
+    }
+  }
+
   // Create manual KYC identity verification (for Persona flow)
   static async createManualKycVerification(customerGuid: string): Promise<{
     verificationGuid: string;
@@ -373,20 +402,40 @@ export class CybridService {
     try {
       console.log(`Creating manual KYC verification for customer: ${customerGuid}`);
       
-      // Step 1: Create identity verification
-      const verificationPayload = {
-        type: 'kyc',
-        method: 'document_submission',
-        customer_guid: customerGuid
-      };
+      let verification: CybridIdentityVerification;
 
-      const verification = await this.makeRequest('/api/identity_verifications', {
-        method: 'POST',
-        body: JSON.stringify(verificationPayload)
-      }) as CybridIdentityVerification;
+      try {
+        // Step 1: Try to create new identity verification
+        const verificationPayload = {
+          type: 'kyc',
+          method: 'document_submission',
+          customer_guid: customerGuid
+        };
 
-      console.log(`Identity verification created: ${verification.guid}`);
-      console.log('FULL CYBRID RESPONSE:', JSON.stringify(verification, null, 2));
+        verification = await this.makeRequest('/api/identity_verifications', {
+          method: 'POST',
+          body: JSON.stringify(verificationPayload)
+        }) as CybridIdentityVerification;
+
+        console.log(`Identity verification created: ${verification.guid}`);
+        console.log('FULL CYBRID CREATE RESPONSE:', JSON.stringify(verification, null, 2));
+
+      } catch (createError: any) {
+        if (createError.message.includes('409') && createError.message.includes('already exists')) {
+          console.log('Identity verification already exists, finding existing one...');
+          
+          const existingVerification = await this.findExistingVerification(customerGuid);
+          
+          if (!existingVerification) {
+            throw new Error('No existing verification found despite conflict error');
+          }
+          
+          verification = existingVerification;
+          console.log(`Using existing verification: ${verification.guid}`);
+        } else {
+          throw createError;
+        }
+      }
 
       // Step 2: Poll until we get persona_inquiry_id (when state becomes "waiting")
       const personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
@@ -402,6 +451,7 @@ export class CybridService {
       }) as any;
 
       console.log(`Persona session created:`, personaSession);
+      console.log('FULL PERSONA SESSION RESPONSE:', JSON.stringify(personaSession, null, 2));
 
       return {
         verificationGuid: verification.guid,
