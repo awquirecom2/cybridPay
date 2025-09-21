@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Shield, ExternalLink, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Loader2, Shield, ExternalLink, CheckCircle, XCircle, Clock, AlertTriangle, Copy } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -123,6 +123,17 @@ export function ManualKycVerification({
     }
   };
 
+  const handleCopyUrl = async () => {
+    if (verificationData?.personaUrl) {
+      try {
+        await navigator.clipboard.writeText(verificationData.personaUrl);
+        // Could add a toast notification here
+      } catch (error) {
+        console.error('Failed to copy URL:', error);
+      }
+    }
+  };
+
   if (statusLoading) {
     return (
       <Card className={className}>
@@ -206,24 +217,47 @@ export function ManualKycVerification({
           </div>
         )}
 
-        {verificationData?.redirectUrl && currentStatus === 'in_review' && (
+        {verificationData?.personaUrl && (
           <div className="space-y-4">
             <Alert>
               <ExternalLink className="h-4 w-4" />
               <AlertDescription>
-                Your verification link is ready. Click the button below to complete your identity verification.
+                Your verification link is ready. Copy the URL below or click to open it directly.
               </AlertDescription>
             </Alert>
             
-            <Button 
-              onClick={handleOpenVerification}
-              variant="outline"
-              className="w-full"
-              data-testid="button-open-verification"
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Complete Verification
-            </Button>
+            <div className="space-y-3">
+              <div className="p-3 bg-muted rounded-md">
+                <label className="text-sm font-medium mb-2 block">Verification URL:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={verificationData.personaUrl}
+                    readOnly
+                    className="flex-1 px-2 py-1 text-sm bg-background border rounded text-muted-foreground font-mono"
+                    data-testid="input-verification-url"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyUrl}
+                    data-testid="button-copy-url"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <Button 
+                onClick={handleOpenVerification}
+                variant="outline"
+                className="w-full"
+                data-testid="button-open-verification"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Verification in New Tab
+              </Button>
+            </div>
           </div>
         )}
 
