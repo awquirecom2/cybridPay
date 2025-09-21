@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -90,6 +90,11 @@ export function MerchantManagement() {
   // State for showing generated credentials
   const [showCredentials, setShowCredentials] = useState(false)
   const [generatedCredentials, setGeneratedCredentials] = useState<{username: string; password: string} | null>(null)
+  
+  // State for reset credentials
+  const [showResetCredentials, setShowResetCredentials] = useState(false)
+  const [resetCredentials, setResetCredentials] = useState<{username: string; password: string} | null>(null)
+  const [resetMerchantName, setResetMerchantName] = useState("")
 
   // Fetch merchants from API
   const { data: merchants = [], isLoading: merchantsLoading, refetch: refetchMerchants } = useQuery({
@@ -189,6 +194,32 @@ export function MerchantManagement() {
       toast({
         title: "Error",
         description: "Failed to fetch Cybrid status.",
+        variant: "destructive",
+      })
+    }
+  })
+
+  // Reset merchant credentials mutation
+  const resetCredentialsMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/reset-credentials`)
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      setResetCredentials(data.credentials)
+      setResetMerchantName(data.merchantName)
+      setShowResetCredentials(true)
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Credentials Reset",
+        description: "New login credentials have been generated successfully.",
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: "Failed to reset credentials. Please try again.",
         variant: "destructive",
       })
     }
@@ -297,6 +328,11 @@ export function MerchantManagement() {
 
     if (action === 'cybrid-create') {
       createCybridCustomerMutation.mutate(merchantId)
+      return
+    }
+
+    if (action === 'reset-credentials') {
+      resetCredentialsMutation.mutate(merchantId)
       return
     }
 
@@ -757,6 +793,92 @@ export function MerchantManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Reset Credentials Display Dialog */}
+      <Dialog open={showResetCredentials} onOpenChange={setShowResetCredentials}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Credentials Reset Complete
+            </DialogTitle>
+            <DialogDescription>
+              New login credentials have been generated for {resetMerchantName}. Please securely share these with the merchant.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 border rounded-lg bg-muted/50">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Username</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={resetCredentials?.username || ''}
+                      readOnly
+                      className="font-mono"
+                      data-testid="text-reset-username"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetCredentials?.username || '')
+                        toast({ title: "Copied", description: "Username copied to clipboard" })
+                      }}
+                      data-testid="button-copy-reset-username"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Password</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={resetCredentials?.password || ''}
+                      readOnly
+                      className="font-mono"
+                      data-testid="text-reset-password"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(resetCredentials?.password || '')
+                        toast({ title: "Copied", description: "Password copied to clipboard" })
+                      }}
+                      data-testid="button-copy-reset-password"
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-amber-800">
+                <p className="font-medium">Important Security Notice</p>
+                <p className="text-xs mt-1">
+                  These credentials should be shared securely with the merchant and they should change their password upon first login.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                setShowResetCredentials(false)
+                setResetCredentials(null)
+                setResetMerchantName("")
+              }}
+              data-testid="button-close-reset-credentials"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Cybrid Status Dialog */}
       <Dialog open={showCybridDialog} onOpenChange={setShowCybridDialog}>
         <DialogContent className="sm:max-w-lg">
@@ -1003,6 +1125,15 @@ export function MerchantManagement() {
                               Reactivate
                             </DropdownMenuItem>
                           )}
+                          
+                          {/* Credential Management */}
+                          <DropdownMenuItem 
+                            onClick={() => handleMerchantAction('reset-credentials', merchant.id)}
+                            className="text-amber-600 focus:text-amber-600"
+                          >
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Reset Credentials
+                          </DropdownMenuItem>
                           
                           {/* Cybrid Management Actions */}
                           <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-status', merchant.id)}>

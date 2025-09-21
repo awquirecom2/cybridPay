@@ -305,6 +305,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset merchant credentials endpoint
+  app.post("/api/admin/merchants/:id/reset-credentials", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get the merchant to verify it exists and get the name
+      const merchant = await storage.getMerchant(id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Generate new credentials
+      const newCredentials = generateMerchantCredentials();
+      const hashedPassword = await hashPassword(newCredentials.password);
+
+      // Update merchant with new credentials
+      const updatedMerchant = await storage.updateMerchant(id, {
+        username: newCredentials.username,
+        password: hashedPassword
+      });
+
+      if (!updatedMerchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      console.log(`🔑 Credentials reset for merchant: ${merchant.name} (${merchant.id})`);
+
+      // Return the new credentials (plaintext for admin to share)
+      res.json({
+        success: true,
+        merchantName: merchant.name,
+        credentials: {
+          username: newCredentials.username,
+          password: newCredentials.password // Plain text password for admin to share
+        }
+      });
+
+    } catch (error) {
+      console.error("Error resetting merchant credentials:", error);
+      res.status(400).json({ error: "Failed to reset credentials" });
+    }
+  });
+
   app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -616,7 +659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateMerchant(merchant.id, {
         kybStatus: kybStatus,
         cybridIntegrationStatus: cybridIntegrationStatus,
-        cybridVerificationStatus: outcome,
         cybridVerificationGuid: verificationGuid,
         cybridLastSyncedAt: new Date()
       });
@@ -646,7 +688,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateMerchant(merchant.id, {
         kybStatus: 'rejected',
         cybridIntegrationStatus: 'error',
-        cybridVerificationStatus: 'failed',
         cybridVerificationGuid: verificationGuid,
         cybridLastError: verificationData.failure_reason || 'Verification failed',
         cybridLastSyncedAt: new Date()
