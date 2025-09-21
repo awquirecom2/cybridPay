@@ -346,6 +346,7 @@ export class CybridService {
       }) as CybridIdentityVerification;
 
       console.log(`Identity verification created: ${verification.guid}`);
+      console.log('FULL CYBRID RESPONSE:', JSON.stringify(verification, null, 2));
 
       // Step 2: Create persona session
       const personaPayload = {
