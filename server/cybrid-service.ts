@@ -20,6 +20,7 @@ export interface CybridIdentityVerification {
   state: string;
   outcome: string;
   created_at: string;
+  persona_inquiry_id?: string; // Available when state is "waiting"
 }
 
 export interface CybridAccount {
@@ -323,6 +324,45 @@ export class CybridService {
     }
   }
 
+  // Helper method to poll identity verification until it reaches "waiting" status
+  static async pollForPersonaInquiryId(verificationGuid: string, maxAttempts: number = 30): Promise<string> {
+    console.log(`Polling for persona inquiry ID for verification: ${verificationGuid}`);
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const verification = await this.makeRequest(`/api/identity_verifications/${verificationGuid}`, {
+          method: 'GET'
+        }) as CybridIdentityVerification;
+        
+        console.log(`Poll attempt ${attempt}: state="${verification.state}", persona_inquiry_id="${verification.persona_inquiry_id}"`);
+        
+        if (verification.state === 'waiting' && verification.persona_inquiry_id) {
+          console.log(`Found persona inquiry ID: ${verification.persona_inquiry_id}`);
+          return verification.persona_inquiry_id;
+        }
+        
+        if (verification.state === 'completed') {
+          console.log(`Verification completed with outcome: ${verification.outcome}`);
+          throw new Error(`Identity verification completed with outcome: ${verification.outcome}`);
+        }
+        
+        // Wait 2 seconds before next attempt
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+      } catch (error) {
+        console.error(`Poll attempt ${attempt} failed:`, error);
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+    
+    throw new Error(`Failed to get persona inquiry ID after ${maxAttempts} attempts`);
+  }
+
   // Create manual KYC identity verification (for Persona flow)
   static async createManualKycVerification(customerGuid: string): Promise<{
     verificationGuid: string;
@@ -348,9 +388,12 @@ export class CybridService {
       console.log(`Identity verification created: ${verification.guid}`);
       console.log('FULL CYBRID RESPONSE:', JSON.stringify(verification, null, 2));
 
-      // Step 2: Create persona session
+      // Step 2: Poll until we get persona_inquiry_id (when state becomes "waiting")
+      const personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
+
+      // Step 3: Create persona session using the inquiry ID
       const personaPayload = {
-        identity_verification_guid: verification.guid
+        persona_inquiry_id: personaInquiryId
       };
 
       const personaSession = await this.makeRequest('/api/persona_sessions', {
@@ -362,7 +405,7 @@ export class CybridService {
 
       return {
         verificationGuid: verification.guid,
-        inquiryId: personaSession.inquiry_id,
+        inquiryId: personaSession.inquiry_id || personaInquiryId,
         redirectUrl: personaSession.redirect_url,
         clientToken: personaSession.client_token
       };
