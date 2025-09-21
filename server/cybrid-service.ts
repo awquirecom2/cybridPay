@@ -453,11 +453,11 @@ export class CybridService {
         personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
       }
 
-      // Step 2: Create persona session using the inquiry ID
-      console.log(`Creating persona session with inquiry ID: ${personaInquiryId}`);
+      // Step 2: Create persona session using the identity verification GUID
+      console.log(`Creating persona session with verification GUID: ${verification.guid}`);
       
       const personaPayload = {
-        persona_inquiry_id: personaInquiryId
+        identity_verification_guid: verification.guid
       };
 
       const personaSession = await this.makeRequest('/api/persona_sessions', {
