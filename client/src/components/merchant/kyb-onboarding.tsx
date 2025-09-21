@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Upload, FileText, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,9 +20,13 @@ export function KybOnboarding() {
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({})
   
   // Get real-time KYC status from API using list endpoint
-  const { data: kycStatus, isLoading: kycLoading, refetch: refetchKycStatus } = useQuery({
+  const { data: kycStatus, isLoading: kycLoading, error: kycError, refetch: refetchKycStatus } = useQuery({
     queryKey: ['/api/cybrid/kyc-status'],
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchInterval: (data) => {
+      // Stop polling when status is completed or failed (final states)
+      const status = (data as any)?.status;
+      return (status === 'approved' || status === 'rejected') ? false : 5000;
+    },
     refetchIntervalInBackground: true,
     staleTime: 1000 // Consider data stale after 1 second
   })
@@ -32,6 +36,17 @@ export function KybOnboarding() {
   const kycVerificationStatus = apiStatus === 'approved' ? 'completed' :
                                 apiStatus === 'rejected' ? 'failed' :
                                 'pending'
+  
+  // Handle API errors with useEffect to avoid infinite re-renders
+  useEffect(() => {
+    if (kycError && !kycLoading) {
+      toast({
+        title: "Status Check Failed",
+        description: "Unable to check verification status. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [kycError, kycLoading, toast]);
   
   const form = useForm({
     defaultValues: {
@@ -401,12 +416,7 @@ export function KybOnboarding() {
         </CardContent>
       </Card>
 
-      <ManualKycVerification
-        onVerificationComplete={handleKycComplete}
-        data-testid="manual-kyc-verification"
-      />
-
-      {kycVerificationStatus === 'completed' && (
+      {kycVerificationStatus === 'completed' ? (
         <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
@@ -418,20 +428,27 @@ export function KybOnboarding() {
             </p>
           </CardContent>
         </Card>
-      )}
+      ) : (
+        <>
+          <ManualKycVerification
+            onVerificationComplete={handleKycComplete}
+            data-testid="manual-kyc-verification"
+          />
 
-      {kycVerificationStatus === 'failed' && (
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Identity Verification Failed</span>
-            </div>
-            <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-              Please contact support for assistance with identity verification.
-            </p>
-          </CardContent>
-        </Card>
+          {kycVerificationStatus === 'failed' && (
+            <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">Identity Verification Failed</span>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  Please contact support for assistance with identity verification.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   )
