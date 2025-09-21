@@ -574,6 +574,14 @@ export class CybridService {
       const latestVerification = verifications
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
+      console.log(`Latest verification for customer ${customerGuid}:`, {
+        guid: latestVerification.guid,
+        state: latestVerification.state,
+        outcome: latestVerification.outcome,
+        persona_inquiry_id: latestVerification.persona_inquiry_id,
+        created_at: latestVerification.created_at
+      });
+
       // Map Cybrid states to our KYC status
       let status: 'pending' | 'approved' | 'rejected' | 'in_review' = 'pending';
       
