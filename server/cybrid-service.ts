@@ -95,7 +95,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write'
+          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write identity_verifications:execute'
         })
       });
 

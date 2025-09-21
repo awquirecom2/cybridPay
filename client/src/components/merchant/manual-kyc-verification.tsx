@@ -41,7 +41,10 @@ export function ManualKycVerification({
 
   // Start manual KYC mutation
   const startKycMutation = useMutation({
-    mutationFn: () => apiRequest('/api/cybrid/start-manual-kyc', 'POST'),
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/cybrid/start-manual-kyc');
+      return response.json();
+    },
     onSuccess: (data: any) => {
       console.log('Manual KYC started successfully:', data);
       setVerificationUrl(data.verificationUrl);
