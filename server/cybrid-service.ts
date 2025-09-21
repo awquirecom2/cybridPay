@@ -464,7 +464,7 @@ export class CybridService {
         inquiryId: personaInquiryId,
         personaUrl: personaVerificationUrl,
         redirectUrl: personaVerificationUrl, // Use persona URL as redirect
-        clientToken: null
+        clientToken: undefined
       };
 
     } catch (error) {
