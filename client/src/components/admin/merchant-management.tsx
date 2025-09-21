@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -225,6 +225,29 @@ export function MerchantManagement() {
     }
   })
 
+  // Bulk sync KYC status mutation
+  const bulkSyncKycMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/merchants/sync-kyc')
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "KYC Sync Completed",
+        description: data.message || "KYC statuses have been updated from Cybrid",
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Error",
+        description: "Failed to sync KYC statuses. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -430,14 +453,28 @@ export function MerchantManagement() {
             Manage merchant accounts, KYB status, and integrations
           </p>
         </div>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-merchant">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Merchant
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => bulkSyncKycMutation.mutate()}
+            disabled={bulkSyncKycMutation.isPending}
+            data-testid="button-sync-kyc"
+          >
+            {bulkSyncKycMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4 mr-2" />
+            )}
+            Sync KYC Status
+          </Button>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-merchant">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Merchant
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="h-5 w-5" />
@@ -507,6 +544,7 @@ export function MerchantManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Edit Merchant Dialog */}

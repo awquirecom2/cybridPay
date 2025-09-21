@@ -348,6 +348,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk sync KYC status for all merchants
+  app.post("/api/admin/merchants/sync-kyc", requireAdmin, async (req, res) => {
+    try {
+      console.log('🔄 Admin triggered bulk KYC sync');
+      
+      const syncResults = await CybridService.bulkSyncKycStatus();
+      
+      res.json({
+        success: true,
+        message: `KYC sync completed: ${syncResults.updated} merchants updated, ${syncResults.errors} errors`,
+        results: syncResults
+      });
+
+    } catch (error) {
+      console.error("Error performing bulk KYC sync:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to sync KYC statuses",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;

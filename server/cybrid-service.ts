@@ -196,8 +196,7 @@ export class CybridService {
       await storage.updateMerchant(merchantData.merchantId, {
         cybridCustomerGuid: customer.guid,
         cybridIntegrationStatus: 'active',
-        cybridLastSyncedAt: new Date(),
-        cybridEnvironment: this.ENVIRONMENT
+        cybridLastSyncedAt: new Date()
       });
 
       return customer;
@@ -354,6 +353,75 @@ export class CybridService {
     return this.makeRequest(`/api/identity_verifications/${verificationGuid}`) as Promise<CybridIdentityVerification>;
   }
 
+  // List all identity verifications for a customer
+  static async listIdentityVerifications(customerGuid: string): Promise<CybridIdentityVerification[]> {
+    try {
+      const response = await this.makeRequest(`/api/identity_verifications?customer_guid=${customerGuid}`) as any;
+      return response.objects || [];
+    } catch (error) {
+      console.error(`Failed to list identity verifications for customer ${customerGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // Get latest KYC status for a customer
+  static async getLatestKycStatus(customerGuid: string): Promise<{
+    status: 'pending' | 'approved' | 'rejected' | 'in_review';
+    verificationGuid?: string;
+    outcome?: string;
+    state?: string;
+  }> {
+    try {
+      // Skip for test GUIDs
+      if (customerGuid.startsWith('test-') || customerGuid.includes('test')) {
+        return { status: 'pending' };
+      }
+
+      const verifications = await this.listIdentityVerifications(customerGuid);
+      
+      if (!verifications || verifications.length === 0) {
+        return { status: 'pending' };
+      }
+
+      // Get the most recent verification
+      const latestVerification = verifications
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      // Map Cybrid states to our KYC status
+      let status: 'pending' | 'approved' | 'rejected' | 'in_review' = 'pending';
+      
+      switch (latestVerification.state) {
+        case 'storing':
+          status = latestVerification.outcome === 'passed' ? 'approved' : 
+                   latestVerification.outcome === 'failed' ? 'rejected' : 'in_review';
+          break;
+        case 'completed':
+          status = latestVerification.outcome === 'passed' ? 'approved' : 'rejected';
+          break;
+        case 'reviewing':
+        case 'waiting':
+          status = 'in_review';
+          break;
+        case 'failed':
+          status = 'rejected';
+          break;
+        default:
+          status = 'pending';
+      }
+
+      return {
+        status,
+        verificationGuid: latestVerification.guid,
+        outcome: latestVerification.outcome,
+        state: latestVerification.state
+      };
+
+    } catch (error) {
+      console.error(`Failed to get KYC status for customer ${customerGuid}:`, error);
+      return { status: 'pending' };
+    }
+  }
+
   // Create trading accounts for crypto deposits (BTC, ETH, USDC, USDT)
   static async createDepositAddresses(customerGuid: string, currencies: string[] = ['BTC', 'ETH', 'USDC', 'USDT']) {
     const addresses = [];
@@ -413,7 +481,7 @@ export class CybridService {
           merchantId: merchant.id,
           cybridCustomerGuid: customerGuid,
           cybridAccountGuid: account.guid,
-          currency: currency,
+          asset: currency,
           network: currency === 'BTC' ? 'bitcoin' : 'ethereum',
           address: address.address,
           isActive: true
@@ -515,6 +583,98 @@ export class CybridService {
 
     } catch (error) {
       console.error(`Failed to ensure Cybrid customer for merchant ${merchantData.merchantId}:`, error);
+      throw error;
+    }
+  }
+
+  // Bulk sync KYC status for all merchants with Cybrid customers
+  static async bulkSyncKycStatus(): Promise<{
+    totalMerchants: number;
+    updated: number;
+    errors: number;
+    results: Array<{
+      merchantId: string;
+      merchantName: string;
+      cybridCustomerGuid: string;
+      oldStatus: string;
+      newStatus: string;
+      error?: string;
+    }>;
+  }> {
+    const results: Array<{
+      merchantId: string;
+      merchantName: string;
+      cybridCustomerGuid: string;
+      oldStatus: string;
+      newStatus: string;
+      error?: string;
+    }> = [];
+
+    let updated = 0;
+    let errors = 0;
+
+    try {
+      // Get all merchants with Cybrid customer GUIDs
+      const merchants = await storage.getAllMerchants();
+      const merchantsWithCybrid = merchants.filter(m => m.cybridCustomerGuid);
+
+      console.log(`🔄 Starting bulk KYC sync for ${merchantsWithCybrid.length} merchants with Cybrid customers`);
+
+      for (const merchant of merchantsWithCybrid) {
+        try {
+          const oldStatus = merchant.kybStatus || 'pending';
+          
+          // Get latest KYC status from Cybrid
+          const kycStatus = await this.getLatestKycStatus(merchant.cybridCustomerGuid!);
+          
+          // Only update if status has changed
+          if (kycStatus.status !== oldStatus) {
+            await storage.updateMerchant(merchant.id, {
+              kybStatus: kycStatus.status,
+              cybridVerificationGuid: kycStatus.verificationGuid,
+              cybridLastSyncedAt: new Date()
+            });
+
+            console.log(`✅ Updated ${merchant.name}: ${oldStatus} → ${kycStatus.status}`);
+            updated++;
+          } else {
+            console.log(`⏸️  No change for ${merchant.name}: ${kycStatus.status}`);
+          }
+
+          results.push({
+            merchantId: merchant.id,
+            merchantName: merchant.name,
+            cybridCustomerGuid: merchant.cybridCustomerGuid!,
+            oldStatus,
+            newStatus: kycStatus.status
+          });
+
+        } catch (error) {
+          console.error(`❌ Failed to sync KYC for merchant ${merchant.name}:`, error);
+          errors++;
+
+          results.push({
+            merchantId: merchant.id,
+            merchantName: merchant.name,
+            cybridCustomerGuid: merchant.cybridCustomerGuid!,
+            oldStatus: merchant.kybStatus || 'pending',
+            newStatus: merchant.kybStatus || 'pending',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      console.log(`🎯 Bulk KYC sync complete: ${updated} updated, ${errors} errors out of ${merchantsWithCybrid.length} merchants`);
+
+      return {
+        totalMerchants: merchantsWithCybrid.length,
+        updated,
+        errors,
+        results
+      };
+
+    } catch (error) {
+      console.error('Failed to perform bulk KYC sync:', error);
       throw error;
     }
   }
