@@ -363,31 +363,42 @@ export class CybridService {
     throw new Error(`Failed to get persona inquiry ID after ${maxAttempts} attempts`);
   }
 
-  // Find existing identity verification for customer
-  static async findExistingVerification(customerGuid: string): Promise<CybridIdentityVerification | null> {
+  // Check for existing identity verifications for customer (especially "waiting" ones)
+  static async checkExistingVerifications(customerGuid: string): Promise<CybridIdentityVerification | null> {
     try {
-      console.log(`Looking for existing identity verification for customer: ${customerGuid}`);
+      console.log(`Checking existing identity verifications for customer: ${customerGuid}`);
       
       const verifications = await this.makeRequest(`/api/identity_verifications?customer_guid=${customerGuid}`, {
         method: 'GET'
       }) as { objects: CybridIdentityVerification[] };
 
       console.log(`Found ${verifications.objects.length} existing verifications`);
-      console.log('EXISTING VERIFICATIONS RESPONSE:', JSON.stringify(verifications, null, 2));
+      console.log('FULL VERIFICATIONS RESPONSE:', JSON.stringify(verifications, null, 2));
 
-      // Find the most recent incomplete verification
+      // Look for "waiting" status first (ready for persona session)
+      const waitingVerification = verifications.objects.find(v => 
+        v.state === 'waiting' && v.type === 'kyc' && v.method === 'document_submission'
+      );
+
+      if (waitingVerification) {
+        console.log(`Found existing WAITING verification: ${waitingVerification.guid}`);
+        return waitingVerification;
+      }
+
+      // Look for any incomplete verification that we can continue with
       const pendingVerification = verifications.objects.find(v => 
         v.state !== 'completed' && v.type === 'kyc' && v.method === 'document_submission'
       );
 
       if (pendingVerification) {
-        console.log(`Found existing pending verification: ${pendingVerification.guid}`);
+        console.log(`Found existing PENDING verification: ${pendingVerification.guid} (state: ${pendingVerification.state})`);
         return pendingVerification;
       }
 
+      console.log('No existing verifications found that can be reused');
       return null;
     } catch (error) {
-      console.error('Failed to find existing verification:', error);
+      console.error('Failed to check existing verifications:', error);
       return null;
     }
   }
@@ -400,12 +411,30 @@ export class CybridService {
     clientToken?: string;
   }> {
     try {
-      console.log(`Creating manual KYC verification for customer: ${customerGuid}`);
+      console.log(`Starting manual KYC verification for customer: ${customerGuid}`);
+      
+      // Step 1: Check for existing identity verifications first
+      const existingVerification = await this.checkExistingVerifications(customerGuid);
       
       let verification: CybridIdentityVerification;
+      let personaInquiryId: string;
 
-      try {
-        // Step 1: Try to create new identity verification
+      if (existingVerification) {
+        if (existingVerification.state === 'waiting' && existingVerification.persona_inquiry_id) {
+          // Perfect! We have a waiting verification with persona_inquiry_id ready
+          console.log(`Using existing WAITING verification: ${existingVerification.guid}`);
+          verification = existingVerification;
+          personaInquiryId = existingVerification.persona_inquiry_id;
+        } else {
+          // We have a pending verification, need to poll until waiting
+          console.log(`Found existing verification ${existingVerification.guid}, polling until ready...`);
+          verification = existingVerification;
+          personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
+        }
+      } else {
+        // No existing verification, create a new one
+        console.log('No existing verification found, creating new one...');
+        
         const verificationPayload = {
           type: 'kyc',
           method: 'document_submission',
@@ -417,30 +446,16 @@ export class CybridService {
           body: JSON.stringify(verificationPayload)
         }) as CybridIdentityVerification;
 
-        console.log(`Identity verification created: ${verification.guid}`);
+        console.log(`New identity verification created: ${verification.guid}`);
         console.log('FULL CYBRID CREATE RESPONSE:', JSON.stringify(verification, null, 2));
 
-      } catch (createError: any) {
-        if (createError.message.includes('409') && createError.message.includes('already exists')) {
-          console.log('Identity verification already exists, finding existing one...');
-          
-          const existingVerification = await this.findExistingVerification(customerGuid);
-          
-          if (!existingVerification) {
-            throw new Error('No existing verification found despite conflict error');
-          }
-          
-          verification = existingVerification;
-          console.log(`Using existing verification: ${verification.guid}`);
-        } else {
-          throw createError;
-        }
+        // Poll the newly created verification until ready
+        personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
       }
 
-      // Step 2: Poll until we get persona_inquiry_id (when state becomes "waiting")
-      const personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
-
-      // Step 3: Create persona session using the inquiry ID
+      // Step 2: Create persona session using the inquiry ID
+      console.log(`Creating persona session with inquiry ID: ${personaInquiryId}`);
+      
       const personaPayload = {
         persona_inquiry_id: personaInquiryId
       };
@@ -450,7 +465,7 @@ export class CybridService {
         body: JSON.stringify(personaPayload)
       }) as any;
 
-      console.log(`Persona session created:`, personaSession);
+      console.log(`Persona session created successfully`);
       console.log('FULL PERSONA SESSION RESPONSE:', JSON.stringify(personaSession, null, 2));
 
       return {
