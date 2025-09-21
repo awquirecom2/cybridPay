@@ -556,6 +556,7 @@ export class CybridService {
     verificationGuid?: string;
     outcome?: string;
     state?: string;
+    personaUrl?: string;
   }> {
     try {
       // Skip for test GUIDs
@@ -595,11 +596,19 @@ export class CybridService {
           status = 'pending';
       }
 
+      // Include persona URL if verification is waiting and has persona_inquiry_id
+      let personaUrl: string | undefined;
+      if (latestVerification.state === 'waiting' && latestVerification.persona_inquiry_id) {
+        personaUrl = `https://withpersona.com/verify?inquiry-id=${latestVerification.persona_inquiry_id}&environment-id=sandbox`;
+        console.log(`Found waiting verification with persona URL: ${personaUrl}`);
+      }
+
       return {
         status,
         verificationGuid: latestVerification.guid,
         outcome: latestVerification.outcome,
-        state: latestVerification.state
+        state: latestVerification.state,
+        personaUrl
       };
 
     } catch (error) {

@@ -597,7 +597,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: statusResult.status,
         state: statusResult.state,
         outcome: statusResult.outcome,
-        verificationGuid: statusResult.verificationGuid
+        verificationGuid: statusResult.verificationGuid,
+        personaUrl: statusResult.personaUrl
       });
       
     } catch (error) {

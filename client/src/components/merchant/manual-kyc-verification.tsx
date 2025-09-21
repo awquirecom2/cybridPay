@@ -24,12 +24,10 @@ export function ManualKycVerification({
   } | null>(null);
   const [isPolling, setIsPolling] = useState(false);
 
-  // Get current KYC status
+  // Get current KYC status (no polling here to avoid duplication with parent)
   const { data: kycStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
     queryKey: ['/api/cybrid/kyc-status'],
-    refetchInterval: isPolling ? 5000 : false, // Poll every 5 seconds when in progress
-    refetchIntervalInBackground: true,
-    staleTime: 1000 // Prevent excessive refetching
+    staleTime: 1000 // Let parent handle polling
   });
 
   // Handle status changes in useEffect to avoid render-time state updates
@@ -99,7 +97,7 @@ export function ManualKycVerification({
     }
   };
 
-  const getStatusMessage = (status: string) => {
+  const getStatusMessage = (status: string, hasPersonaUrl: boolean = false) => {
     switch (status) {
       case 'approved':
       case 'completed':
@@ -107,7 +105,9 @@ export function ManualKycVerification({
       case 'rejected':
         return "Identity verification was not successful. Please contact support for assistance.";
       case 'in_review':
-        return "Your identity verification is being reviewed. This typically takes 1-2 business days.";
+        return hasPersonaUrl 
+          ? "Your verification is ready to complete. Click the link below to finish the process."
+          : "Your identity verification is being reviewed. This typically takes 1-2 business days.";
       case 'pending':
       default:
         return "Identity verification is required to comply with financial regulations and enable payment processing.";
@@ -126,13 +126,22 @@ export function ManualKycVerification({
   };
 
   const handleCopyUrl = async () => {
-    if (verificationData?.personaUrl) {
+    const urlToCopy = verificationData?.personaUrl || (kycStatus as any)?.personaUrl;
+    if (urlToCopy) {
       try {
-        await navigator.clipboard.writeText(verificationData.personaUrl);
+        await navigator.clipboard.writeText(urlToCopy);
         // Could add a toast notification here
       } catch (error) {
         console.error('Failed to copy URL:', error);
       }
+    }
+  };
+
+  const handleOpenPersonaUrl = () => {
+    const urlToOpen = verificationData?.personaUrl || (kycStatus as any)?.personaUrl;
+    if (urlToOpen) {
+      window.open(urlToOpen, '_blank', 'noopener,noreferrer');
+      setIsPolling(true); // Start polling after opening verification
     }
   };
 
@@ -158,6 +167,13 @@ export function ManualKycVerification({
   }
 
   const currentStatus = (kycStatus as any)?.status || 'pending';
+  const personaUrl = verificationData?.personaUrl || (kycStatus as any)?.personaUrl;
+  const hasPersonaUrl = Boolean(personaUrl);
+
+  // Hide component when KYC is completed (approved/rejected) - merchant doesn't need to see it
+  if (currentStatus === 'approved' || currentStatus === 'completed' || currentStatus === 'rejected') {
+    return null;
+  }
 
   return (
     <Card className={className}>
@@ -174,7 +190,7 @@ export function ManualKycVerification({
         <Alert>
           <Shield className="h-4 w-4" />
           <AlertDescription>
-            {getStatusMessage(currentStatus)}
+            {getStatusMessage(currentStatus, hasPersonaUrl)}
           </AlertDescription>
         </Alert>
 
@@ -219,14 +235,14 @@ export function ManualKycVerification({
           </div>
         )}
 
-        {verificationData?.personaUrl && (
+        {personaUrl && (
           <div className="space-y-3">
             <div className="p-3 bg-muted rounded-md">
               <label className="text-sm font-medium mb-2 block">Your Verification Link:</label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={verificationData.personaUrl}
+                  value={personaUrl}
                   readOnly
                   className="flex-1 px-3 py-2 text-sm bg-background border rounded font-mono"
                   data-testid="input-verification-url"
@@ -241,6 +257,14 @@ export function ManualKycVerification({
                 </Button>
               </div>
             </div>
+            <Button 
+              onClick={handleOpenPersonaUrl}
+              className="w-full"
+              data-testid="button-open-verification"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Complete Verification
+            </Button>
           </div>
         )}
 

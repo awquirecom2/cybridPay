@@ -22,9 +22,9 @@ export function KybOnboarding() {
   // Get real-time KYC status from API using list endpoint
   const { data: kycStatus, isLoading: kycLoading, error: kycError, refetch: refetchKycStatus } = useQuery({
     queryKey: ['/api/cybrid/kyc-status'],
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Stop polling when status is completed or failed (final states)
-      const status = (data as any)?.status;
+      const status = (query.state.data as any)?.status;
       return (status === 'approved' || status === 'rejected') ? false : 5000;
     },
     refetchIntervalInBackground: true,
