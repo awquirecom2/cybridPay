@@ -341,8 +341,7 @@ export class CybridService {
             type: 'drivers_license'
           }
         ],
-        method: 'id_and_selfie',
-        customer_guid: customerGuid
+        method: 'id_and_selfie'
       };
 
       const verification = await this.makeRequest('/api/identity_verifications', {

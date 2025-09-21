@@ -27,7 +27,8 @@ export function ManualKycVerification({
   const { data: kycStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery({
     queryKey: ['/api/cybrid/kyc-status'],
     refetchInterval: isPolling ? 5000 : false, // Poll every 5 seconds when in progress
-    refetchIntervalInBackground: true
+    refetchIntervalInBackground: true,
+    staleTime: 1000 // Prevent excessive refetching
   });
 
   // Handle status changes in useEffect to avoid render-time state updates
