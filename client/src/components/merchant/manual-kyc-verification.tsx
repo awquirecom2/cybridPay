@@ -53,6 +53,8 @@ export function ManualKycVerification({
     },
     onSuccess: (data: any) => {
       console.log('Manual KYC started successfully:', data);
+      console.log('Data contains personaUrl:', !!data.personaUrl);
+      console.log('Full response data:', JSON.stringify(data, null, 2));
       setVerificationData({
         verificationGuid: data.verificationGuid,
         personaUrl: data.personaUrl,
@@ -258,6 +260,14 @@ export function ManualKycVerification({
                 Open Verification in New Tab
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Debug info - remove in production */}
+        {verificationData && (
+          <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+            <p>Debug: verificationData exists: {JSON.stringify(verificationData)}</p>
+            <p>Debug: currentStatus: {currentStatus}</p>
           </div>
         )}
 
