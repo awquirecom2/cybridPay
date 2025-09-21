@@ -336,7 +336,12 @@ export class CybridService {
       // Step 1: Create identity verification
       const verificationPayload = {
         type: 'kyc',
-        method: 'business_registration',
+        identification_numbers: [
+          {
+            type: 'drivers_license'
+          }
+        ],
+        method: 'id_and_selfie',
         customer_guid: customerGuid
       };
 
