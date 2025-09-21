@@ -31,7 +31,6 @@ export const merchants = pgTable("merchants", {
   description: text("description"),
   status: text("status").notNull().default("pending"), // pending, approved, suspended
   kybStatus: text("kyb_status").notNull().default("pending"), // pending, review, verified, failed
-  kycStatus: text("kyc_status").notNull().default("pending"), // pending, in_review, approved, rejected
   customFeeEnabled: boolean("custom_fee_enabled").default(false),
   customFeePercentage: text("custom_fee_percentage").default("2.5"),
   customFlatFee: text("custom_flat_fee").default("0.30"),

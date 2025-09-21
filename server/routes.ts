@@ -371,66 +371,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin endpoint to trigger KYC creation for a specific merchant
-  app.post("/api/admin/merchants/:id/trigger-kyc", requireAdmin, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const merchant = await storage.getMerchant(id);
-      
-      if (!merchant) {
-        return res.status(404).json({ error: "Merchant not found" });
-      }
-
-      // Ensure merchant is approved and has Cybrid customer
-      if (merchant.status !== 'approved') {
-        return res.status(400).json({ 
-          error: "Cannot trigger KYC for non-approved merchant",
-          merchantStatus: merchant.status 
-        });
-      }
-
-      if (!merchant.cybridCustomerGuid) {
-        return res.status(400).json({ 
-          error: "Merchant must have Cybrid customer before triggering KYC",
-          message: "Please ensure Cybrid customer is created first"
-        });
-      }
-
-      console.log(`🎯 Admin triggering KYC creation for merchant: ${merchant.name} (${merchant.id})`);
-
-      // Create identity verification using existing service method
-      const result = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
-      
-      // Update merchant with verification GUID for tracking
-      await storage.updateMerchant(merchant.id, {
-        cybridVerificationGuid: result.verificationGuid,
-        kycStatus: 'in_review',
-        cybridLastSyncedAt: new Date()
-      });
-      
-      res.json({
-        success: true,
-        merchant: {
-          id: merchant.id,
-          name: merchant.name
-        },
-        verification: {
-          guid: result.verificationGuid,
-          inquiryId: result.inquiryId,
-          personaUrl: result.personaUrl
-        },
-        message: "KYC verification created successfully. Merchant can now complete verification."
-      });
-      
-    } catch (error) {
-      console.error("Error triggering KYC for merchant:", error);
-      res.status(500).json({ 
-        error: "Failed to trigger KYC creation",
-        message: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
-
   app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -606,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update merchant with verification GUID for tracking
       await storage.updateMerchant(merchant.id, {
         cybridVerificationGuid: result.verificationGuid,
-        kycStatus: 'in_review',
+        kybStatus: 'in_review',
         cybridLastSyncedAt: new Date()
       });
       
