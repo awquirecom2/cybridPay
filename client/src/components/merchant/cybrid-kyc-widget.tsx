@@ -73,24 +73,45 @@ export function CybridKycWidget({
     
     script.onload = () => {
       console.log('✅ Cybrid SDK loaded from CDN');
-      // Poll for custom element registration
+      
+      // Add comprehensive debugging
+      console.log('🔍 Checking available custom elements...');
+      console.log('🔍 CustomElements registry:', window.customElements);
+      console.log('🔍 Global cybrid objects:', Object.keys(window).filter(k => k.toLowerCase().includes('cybrid')));
+      
+      // Poll for custom element registration with extended timeout
+      let pollCount = 0;
       const pollForSDK = setInterval(() => {
+        pollCount++;
+        console.log(`🔍 Poll attempt ${pollCount}: Checking for cybrid-app element...`);
+        
+        // List all registered custom elements for debugging
+        const customElementNames = [];
+        try {
+          // Try different possible element names
+          const possibleNames = ['cybrid-app', 'cybrid-sdk', 'cybrid-ui', 'cybrid-widget'];
+          for (const name of possibleNames) {
+            if (window.customElements?.get(name)) {
+              customElementNames.push(name);
+            }
+          }
+          console.log(`🔍 Found custom elements: ${customElementNames.join(', ') || 'none'}`);
+        } catch (e) {
+          console.log('🔍 Error checking custom elements:', e);
+        }
+        
         if (window.customElements?.get('cybrid-app')) {
-          console.log('✅ Cybrid SDK is ready');
+          console.log('✅ Cybrid SDK is ready - cybrid-app element found');
           setSdkReady(true);
           clearInterval(pollForSDK);
-        }
-      }, 100);
-      
-      // Cleanup after 10 seconds
-      setTimeout(() => {
-        clearInterval(pollForSDK);
-        if (!sdkReady) {
-          console.error('❌ Cybrid SDK components not registered within timeout');
+        } else if (pollCount >= 150) { // 15 seconds at 100ms intervals
+          console.error('❌ Cybrid SDK components not registered within 15 second timeout');
+          console.error('❌ Available elements were:', customElementNames);
+          clearInterval(pollForSDK);
           setError('Failed to register Cybrid SDK components');
           onError?.('Failed to register Cybrid SDK components');
         }
-      }, 10000);
+      }, 100);
     };
 
     script.onerror = () => {
