@@ -39,9 +39,9 @@ export function CybridKycWidget({
   const effectiveCustomerId = customerId || (merchantProfile as any)?.cybridCustomerGuid;
   const isLoading = profileLoading || tokenLoading;
 
-  // Load Cybrid SDK from installed NPM package
+  // Load Cybrid SDK from reliable CDN
   useEffect(() => {
-    console.log('🔧 Loading Cybrid SDK from NPM package...');
+    console.log('🔧 Loading Cybrid SDK from CDN...');
     
     // Check if already loaded
     if (window.customElements?.get('cybrid-app')) {
@@ -66,13 +66,13 @@ export function CybridKycWidget({
       return;
     }
 
-    // Load from NPM package
+    // Load from working CDN (jsDelivr) since node_modules serving has issues
     const script = document.createElement('script');
-    script.src = '/node_modules/@cybrid/cybrid-sdk-ui-js/cybrid-sdk-ui.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/@cybrid/cybrid-sdk-ui-js@latest/cybrid-sdk-ui.min.js';
     script.type = 'text/javascript';
     
     script.onload = () => {
-      console.log('✅ Cybrid SDK loaded from NPM package');
+      console.log('✅ Cybrid SDK loaded from CDN');
       // Poll for custom element registration
       const pollForSDK = setInterval(() => {
         if (window.customElements?.get('cybrid-app')) {
@@ -94,9 +94,9 @@ export function CybridKycWidget({
     };
 
     script.onerror = () => {
-      console.error('❌ Failed to load Cybrid SDK from NPM package');
-      setError('Failed to load Cybrid SDK from package');
-      onError?.('Failed to load Cybrid SDK from package');
+      console.error('❌ Failed to load Cybrid SDK from CDN');
+      setError('Failed to load Cybrid SDK');
+      onError?.('Failed to load Cybrid SDK');
     };
 
     document.head.appendChild(script);
