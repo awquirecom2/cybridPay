@@ -43,7 +43,7 @@ export function CybridKycWidget({
     const existingScript = document.querySelector('script[src*="cybrid-sdk-ui"]');
     if (!existingScript && effectiveCustomerId && cybridToken) {
       const script = document.createElement('script');
-      script.src = 'https://js.cybrid.app/v1/cybrid-sdk-ui.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/@cybrid/cybrid-sdk-ui-js@latest/cybrid-sdk-ui.min.js';
       script.onload = () => initializeCybridWidget();
       script.onerror = () => {
         setError('Failed to load Cybrid SDK');
@@ -80,16 +80,22 @@ export function CybridKycWidget({
         theme: 'LIGHT',
         customer: effectiveCustomerId,
         fiat: 'USD',
-        features: ['identity_verifications'],
+        features: ['kyc_identity_verifications'],
         environment: 'sandbox' // Match backend environment mapping
       };
 
       console.log('🔧 Widget config:', config);
-      (cybridApp as any).config = config;
+      
+      // Set authentication token (official docs use .auth property)
+      (cybridApp as any).auth = (cybridToken as any)?.accessToken;
+      console.log('🔧 Auth token set on widget');
 
-      // Set authentication token
-      (cybridApp as any).token = (cybridToken as any)?.accessToken;
-      console.log('🔧 Token set on widget');
+      // Set component type (required by official docs)
+      (cybridApp as any).component = 'identity-verification';
+      console.log('🔧 Component type set to identity-verification');
+
+      // Set configuration
+      (cybridApp as any).config = config;
 
       // Listen for verification events
       cybridApp.addEventListener('verification-complete', (event: any) => {
