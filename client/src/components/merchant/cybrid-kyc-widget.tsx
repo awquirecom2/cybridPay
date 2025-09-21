@@ -21,6 +21,7 @@ export function CybridKycWidget({
   const cybridRef = useRef<HTMLDivElement>(null);
   const [widgetLoaded, setWidgetLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sdkReady, setSdkReady] = useState(false);
 
   // Get merchant profile to retrieve Cybrid customer ID
   const { data: merchantProfile, isLoading: profileLoading } = useQuery({
@@ -38,29 +39,97 @@ export function CybridKycWidget({
   const effectiveCustomerId = customerId || (merchantProfile as any)?.cybridCustomerGuid;
   const isLoading = profileLoading || tokenLoading;
 
+  // Load Cybrid SDK from installed NPM package
   useEffect(() => {
-    // Load Cybrid SDK script if not already loaded
+    console.log('🔧 Loading Cybrid SDK from NPM package...');
+    
+    // Check if already loaded
+    if (window.customElements?.get('cybrid-app')) {
+      console.log('✅ Cybrid SDK already loaded');
+      setSdkReady(true);
+      return;
+    }
+
+    // Check if script already exists
     const existingScript = document.querySelector('script[src*="cybrid-sdk-ui"]');
-    if (!existingScript && effectiveCustomerId && cybridToken) {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@cybrid/cybrid-sdk-ui-js@latest/cybrid-sdk-ui.min.js';
-      script.onload = () => initializeCybridWidget();
-      script.onerror = () => {
-        setError('Failed to load Cybrid SDK');
-        onError?.('Failed to load Cybrid SDK');
-      };
-      document.head.appendChild(script);
-    } else if (effectiveCustomerId && cybridToken && (window as any).customElements?.get('cybrid-app')) {
-      // Script already loaded, initialize widget
+    if (existingScript) {
+      console.log('🔧 Cybrid script exists, waiting for load...');
+      const pollForSDK = setInterval(() => {
+        if (window.customElements?.get('cybrid-app')) {
+          console.log('✅ Cybrid SDK loaded from existing script');
+          setSdkReady(true);
+          clearInterval(pollForSDK);
+        }
+      }, 100);
+      
+      setTimeout(() => clearInterval(pollForSDK), 10000);
+      return;
+    }
+
+    // Load from NPM package
+    const script = document.createElement('script');
+    script.src = '/node_modules/@cybrid/cybrid-sdk-ui-js/cybrid-sdk-ui.min.js';
+    script.type = 'text/javascript';
+    
+    script.onload = () => {
+      console.log('✅ Cybrid SDK loaded from NPM package');
+      // Poll for custom element registration
+      const pollForSDK = setInterval(() => {
+        if (window.customElements?.get('cybrid-app')) {
+          console.log('✅ Cybrid SDK is ready');
+          setSdkReady(true);
+          clearInterval(pollForSDK);
+        }
+      }, 100);
+      
+      // Cleanup after 10 seconds
+      setTimeout(() => {
+        clearInterval(pollForSDK);
+        if (!sdkReady) {
+          console.error('❌ Cybrid SDK components not registered within timeout');
+          setError('Failed to register Cybrid SDK components');
+          onError?.('Failed to register Cybrid SDK components');
+        }
+      }, 10000);
+    };
+
+    script.onerror = () => {
+      console.error('❌ Failed to load Cybrid SDK from NPM package');
+      setError('Failed to load Cybrid SDK from package');
+      onError?.('Failed to load Cybrid SDK from package');
+    };
+
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup: remove script if component unmounts
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+  }, [sdkReady, onError]);
+
+  // Initialize widget when all dependencies are ready
+  useEffect(() => {
+    if (sdkReady && effectiveCustomerId && cybridToken && !error) {
+      console.log('🚀 All dependencies ready, initializing KYC widget...');
       initializeCybridWidget();
     }
-  }, [effectiveCustomerId, cybridToken]);
+  }, [sdkReady, effectiveCustomerId, cybridToken, error]);
 
   const initializeCybridWidget = () => {
-    if (!cybridRef.current || !effectiveCustomerId || !cybridToken) return;
+    if (!cybridRef.current || !effectiveCustomerId || !cybridToken || !sdkReady) {
+      console.log('⚠️ Missing dependencies for widget initialization:', {
+        hasContainer: !!cybridRef.current,
+        hasCustomerId: !!effectiveCustomerId,
+        hasToken: !!cybridToken,
+        sdkReady
+      });
+      return;
+    }
 
     try {
-      console.log('🔧 Initializing Cybrid widget with:', {
+      console.log('🔧 Initializing Cybrid NPM widget with:', {
         customerId: effectiveCustomerId,
         tokenPresent: !!(cybridToken as any)?.accessToken,
         tokenLength: (cybridToken as any)?.accessToken?.length || 0
@@ -69,7 +138,7 @@ export function CybridKycWidget({
       // Clear existing content
       cybridRef.current.innerHTML = '';
 
-      // Create cybrid-app element
+      // Create cybrid-app element using the NPM package
       const cybridApp = document.createElement('cybrid-app');
 
       // Configure the widget for KYC verification  
@@ -84,65 +153,86 @@ export function CybridKycWidget({
         environment: 'sandbox'
       };
       
-      console.log('🔧 Widget configuration:', {
+      console.log('🔧 NPM Widget configuration:', {
         customer: effectiveCustomerId,
         features: config.features,
         environment: config.environment,
         tokenLength: (cybridToken as any)?.accessToken?.length
       });
 
-      console.log('🔧 Widget config:', config);
+      // Set properties in the correct order per Cybrid docs
+      console.log('🔧 Setting NPM widget properties...');
       
-      // Official Cybrid SDK configuration approach
-      console.log('🔧 Setting widget properties...');
-      
-      // Set auth token first
+      // 1. Set auth token
       (cybridApp as any).auth = (cybridToken as any)?.accessToken;
-      console.log('🔧 Auth token set');
+      console.log('✅ Auth token set');
       
-      // Set config second  
+      // 2. Set config
       (cybridApp as any).config = config;
-      console.log('🔧 Config set');
+      console.log('✅ Config set');
       
-      // Set component last (this triggers initialization)
+      // 3. Set component (triggers initialization)
       (cybridApp as any).component = 'identity-verification';
-      console.log('🔧 Component set - widget should initialize now');
+      console.log('✅ Component set - NPM widget should initialize now');
 
-      // Add error listeners before appending
+      // Add comprehensive error handling
       cybridApp.addEventListener('error', (event: any) => {
-        console.error('🚨 Cybrid widget error:', event);
-        setError(`Widget error: ${event.detail?.message || 'Unknown error'}`);
+        console.error('🚨 Cybrid NPM widget error:', event);
+        const errorMessage = event.detail?.message || event.detail?.error || 'Unknown widget error';
+        setError(`Widget error: ${errorMessage}`);
+        onError?.(errorMessage);
       });
 
       // Listen for verification events
       cybridApp.addEventListener('verification-complete', (event: any) => {
-        console.log('KYC verification completed:', event.detail);
+        console.log('✅ KYC verification completed:', event.detail);
         setWidgetLoaded(true);
-        onVerificationComplete?.(event.detail.status);
+        setError(null);
+        onVerificationComplete?.(event.detail?.status || 'completed');
       });
 
       cybridApp.addEventListener('verification-error', (event: any) => {
-        console.error('KYC verification error:', event.detail);
-        setError(event.detail.message || 'Verification failed');
-        onError?.(event.detail.message || 'Verification failed');
+        console.error('❌ KYC verification error:', event.detail);
+        const errorMessage = event.detail?.message || 'Verification failed';
+        setError(errorMessage);
+        onError?.(errorMessage);
+      });
+
+      // Listen for widget load events
+      cybridApp.addEventListener('load', () => {
+        console.log('✅ Cybrid widget loaded successfully');
+        setWidgetLoaded(true);
+        setError(null);
+      });
+
+      cybridApp.addEventListener('ready', () => {
+        console.log('✅ Cybrid widget ready');
+        setWidgetLoaded(true);
+        setError(null);
       });
 
       // Append to container
       cybridRef.current.appendChild(cybridApp);
-      setWidgetLoaded(true);
+      
+      // Set initial state
       setError(null);
+      
+      console.log('🎯 NPM Cybrid widget appended to DOM');
 
     } catch (err) {
-      console.error('Failed to initialize Cybrid widget:', err);
-      setError('Failed to initialize verification widget');
-      onError?.('Failed to initialize verification widget');
+      console.error('💥 Failed to initialize Cybrid NPM widget:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize verification widget';
+      setError(errorMessage);
+      onError?.(errorMessage);
     }
   };
 
   const retryInitialization = () => {
+    console.log('🔄 Retrying KYC widget initialization...');
     setError(null);
     setWidgetLoaded(false);
-    initializeCybridWidget();
+    setSdkReady(false);
+    // This will trigger the useEffect to check SDK again
   };
 
   if (isLoading) {
@@ -247,7 +337,16 @@ export function CybridKycWidget({
             </AlertDescription>
           </Alert>
 
-          {!widgetLoaded && (
+          {!sdkReady && (
+            <div className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Loading Cybrid SDK...</span>
+              </div>
+            </div>
+          )}
+
+          {sdkReady && !widgetLoaded && (
             <div className="flex items-center justify-center py-8">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
