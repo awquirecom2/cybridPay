@@ -10,13 +10,28 @@ import { Progress } from "@/components/ui/progress"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery } from "@tanstack/react-query"
+import { queryClient } from "@/lib/queryClient"
 import { ManualKycVerification } from "./manual-kyc-verification"
 
 export function KybOnboarding() {
   const { toast } = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({})
-  const [kycVerificationStatus, setKycVerificationStatus] = useState<'pending' | 'completed' | 'failed'>('pending')
+  
+  // Get real-time KYC status from API using list endpoint
+  const { data: kycStatus, isLoading: kycLoading, refetch: refetchKycStatus } = useQuery({
+    queryKey: ['/api/cybrid/kyc-status'],
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchIntervalInBackground: true,
+    staleTime: 1000 // Consider data stale after 1 second
+  })
+  
+  // Map API status to component status with proper type checking
+  const apiStatus = (kycStatus as any)?.status
+  const kycVerificationStatus = apiStatus === 'approved' ? 'completed' :
+                                apiStatus === 'rejected' ? 'failed' :
+                                'pending'
   
   const form = useForm({
     defaultValues: {
@@ -86,7 +101,13 @@ export function KybOnboarding() {
 
   const getStepStatus = (stepId: number) => {
     if (stepId < currentStep) return "completed"
-    if (stepId === currentStep) return "current"
+    if (stepId === currentStep) {
+      // For step 3 (Director Verification), show as completed if KYC is done
+      if (stepId === 3 && kycVerificationStatus === 'completed') {
+        return "completed"
+      }
+      return "current"
+    }
     return "pending"
   }
 
@@ -290,14 +311,17 @@ export function KybOnboarding() {
 
   const handleKycComplete = (status: string) => {
     console.log('KYC verification completed with status:', status);
+    
+    // Invalidate and refetch KYC status to get latest data from list endpoint
+    queryClient.invalidateQueries({ queryKey: ['/api/cybrid/kyc-status'] });
+    refetchKycStatus();
+    
     if (status === 'passed' || status === 'approved') {
-      setKycVerificationStatus('completed');
       toast({
         title: "Identity Verification Complete",
         description: "Your identity has been successfully verified.",
       });
     } else {
-      setKycVerificationStatus('failed');
       toast({
         title: "Identity Verification Failed", 
         description: "Please contact support if you need assistance.",
@@ -308,7 +332,10 @@ export function KybOnboarding() {
 
   const handleKycError = (error: string) => {
     console.error('KYC verification error:', error);
-    setKycVerificationStatus('failed');
+    
+    // Invalidate cache to trigger status refresh
+    queryClient.invalidateQueries({ queryKey: ['/api/cybrid/kyc-status'] });
+    
     toast({
       title: "Verification Error",
       description: error,

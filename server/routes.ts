@@ -566,40 +566,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get KYC verification status
+  // Get KYC verification status using list endpoint for enhanced reliability
   app.get("/api/cybrid/kyc-status", requireMerchantAuthenticated, async (req, res) => {
     try {
       const merchant = req.user as any;
-      const { guid } = req.query;
       
       if (!merchant.cybridCustomerGuid) {
-        return res.json({ status: 'not_started' });
+        return res.json({ status: 'pending' });
       }
 
-      // Use provided GUID or fall back to merchant's stored verification GUID
-      const verificationGuid = (guid as string) || merchant.cybridVerificationGuid;
-      
-      if (!verificationGuid) {
-        return res.json({ status: 'not_started' });
-      }
-
-      // Get verification status using GUID
-      const statusResult = await CybridService.getVerificationStatus(verificationGuid);
+      // Use list endpoint approach to get latest KYC status for customer
+      const statusResult = await CybridService.getLatestKycStatus(merchant.cybridCustomerGuid);
       
       // Update merchant record if status changed
       if (statusResult.status !== merchant.kybStatus) {
-        await storage.updateMerchant(merchant.id, {
+        const updateData: any = {
           kybStatus: statusResult.status,
-          cybridVerificationGuid: verificationGuid,
           cybridLastSyncedAt: new Date()
-        });
+        };
+        
+        // Update verification GUID if available
+        if (statusResult.verificationGuid) {
+          updateData.cybridVerificationGuid = statusResult.verificationGuid;
+        }
+        
+        await storage.updateMerchant(merchant.id, updateData);
       }
       
       res.json({
         status: statusResult.status,
         state: statusResult.state,
         outcome: statusResult.outcome,
-        verificationGuid
+        verificationGuid: statusResult.verificationGuid
       });
       
     } catch (error) {
