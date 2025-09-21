@@ -72,6 +72,7 @@ export function ManualKycVerification({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
+      case 'completed':
         return <CheckCircle className="h-5 w-5 text-green-600" />;
       case 'rejected':
         return <XCircle className="h-5 w-5 text-red-600" />;
@@ -86,6 +87,7 @@ export function ManualKycVerification({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
+      case 'completed':
         return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Verified</Badge>;
       case 'rejected':
         return <Badge variant="destructive">Rejected</Badge>;
@@ -100,6 +102,7 @@ export function ManualKycVerification({
   const getStatusMessage = (status: string) => {
     switch (status) {
       case 'approved':
+      case 'completed':
         return "Your identity has been successfully verified. You can now access all merchant features.";
       case 'rejected':
         return "Identity verification was not successful. Please contact support for assistance.";
@@ -256,7 +259,7 @@ export function ManualKycVerification({
           </Alert>
         )}
 
-        {currentStatus === 'approved' && (
+        {(currentStatus === 'approved' || currentStatus === 'completed') && (
           <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800 dark:text-green-200">
