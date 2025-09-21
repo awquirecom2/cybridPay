@@ -582,16 +582,33 @@ export class CybridService {
         created_at: latestVerification.created_at
       });
 
+      // Fetch full verification details to get persona_inquiry_id
+      let fullVerification = latestVerification;
+      if (latestVerification.state === 'waiting' && !latestVerification.persona_inquiry_id) {
+        try {
+          console.log(`Fetching full verification details for GUID: ${latestVerification.guid}`);
+          fullVerification = await this.getIdentityVerification(latestVerification.guid);
+          console.log(`Full verification details:`, {
+            guid: fullVerification.guid,
+            state: fullVerification.state,
+            outcome: fullVerification.outcome,
+            persona_inquiry_id: fullVerification.persona_inquiry_id
+          });
+        } catch (error) {
+          console.error(`Failed to fetch full verification details for ${latestVerification.guid}:`, error);
+        }
+      }
+
       // Map Cybrid states to our KYC status
       let status: 'pending' | 'approved' | 'rejected' | 'in_review' = 'pending';
       
-      switch (latestVerification.state) {
+      switch (fullVerification.state) {
         case 'storing':
-          status = latestVerification.outcome === 'passed' ? 'approved' : 
-                   latestVerification.outcome === 'failed' ? 'rejected' : 'in_review';
+          status = fullVerification.outcome === 'passed' ? 'approved' : 
+                   fullVerification.outcome === 'failed' ? 'rejected' : 'in_review';
           break;
         case 'completed':
-          status = latestVerification.outcome === 'passed' ? 'approved' : 'rejected';
+          status = fullVerification.outcome === 'passed' ? 'approved' : 'rejected';
           break;
         case 'reviewing':
         case 'waiting':
@@ -606,16 +623,16 @@ export class CybridService {
 
       // Include persona URL if verification is waiting and has persona_inquiry_id
       let personaUrl: string | undefined;
-      if (latestVerification.state === 'waiting' && latestVerification.persona_inquiry_id) {
-        personaUrl = `https://withpersona.com/verify?inquiry-id=${latestVerification.persona_inquiry_id}&environment-id=sandbox`;
+      if (fullVerification.state === 'waiting' && fullVerification.persona_inquiry_id) {
+        personaUrl = `https://withpersona.com/verify?inquiry-id=${fullVerification.persona_inquiry_id}&environment-id=sandbox`;
         console.log(`Found waiting verification with persona URL: ${personaUrl}`);
       }
 
       return {
         status,
-        verificationGuid: latestVerification.guid,
-        outcome: latestVerification.outcome,
-        state: latestVerification.state,
+        verificationGuid: fullVerification.guid,
+        outcome: fullVerification.outcome,
+        state: fullVerification.state,
         personaUrl
       };
 
