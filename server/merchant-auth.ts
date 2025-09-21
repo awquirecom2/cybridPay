@@ -55,11 +55,25 @@ export function setupMerchantAuth(app: Express) {
   };
 
   // Merchant authentication routes
-  app.post("/api/merchant/login", passport.authenticate("merchant-local"), (req, res) => {
-    res.status(200).json({
-      success: true,
-      merchant: sanitizeMerchant(req.user)
-    });
+  app.post("/api/merchant/login", (req, res, next) => {
+    passport.authenticate("merchant-local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Authentication error" });
+      }
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+      
+      req.logIn(user, (err: any) => {
+        if (err) {
+          return res.status(500).json({ error: "Login failed" });
+        }
+        return res.status(200).json({
+          success: true,
+          merchant: sanitizeMerchant(user)
+        });
+      });
+    })(req, res, next);
   });
 
   app.post("/api/merchant/logout", (req, res, next) => {

@@ -81,11 +81,25 @@ export function setupAdminAuth(app: Express): void {
   };
 
   // Admin authentication routes
-  app.post("/api/admin/login", passport.authenticate("admin-local"), (req, res) => {
-    res.status(200).json({
-      success: true,
-      admin: sanitizeAdmin(req.user)
-    });
+  app.post("/api/admin/login", (req, res, next) => {
+    passport.authenticate("admin-local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ error: "Authentication error" });
+      }
+      if (!user) {
+        return res.status(401).json({ error: info?.message || "Invalid credentials" });
+      }
+      
+      req.logIn(user, (err: any) => {
+        if (err) {
+          return res.status(500).json({ error: "Login failed" });
+        }
+        return res.status(200).json({
+          success: true,
+          admin: sanitizeAdmin(user)
+        });
+      });
+    })(req, res, next);
   });
 
   app.post("/api/admin/logout", (req, res, next) => {
