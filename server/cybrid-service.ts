@@ -454,33 +454,17 @@ export class CybridService {
         personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
       }
 
-      // Step 2: Create persona session using the identity verification GUID
-      console.log(`Creating persona session with verification GUID: ${verification.guid}`);
-      
-      const personaPayload = {
-        identity_verification_guid: verification.guid
-      };
-
-      const personaSession = await this.makeRequest('/api/persona_sessions', {
-        method: 'POST',
-        body: JSON.stringify(personaPayload)
-      }) as any;
-
-      console.log(`Persona session created successfully`);
-      console.log('FULL PERSONA SESSION RESPONSE:', JSON.stringify(personaSession, null, 2));
-
-      // Step 3: Construct the Persona verification URL
-      const finalInquiryId = personaSession.inquiry_id || personaInquiryId;
-      const personaVerificationUrl = `https://withpersona.com/verify?inquiry-id=${finalInquiryId}&environment-id=sandbox`;
+      // Step 2: Create the Persona verification URL directly (no persona session needed)
+      const personaVerificationUrl = `https://withpersona.com/verify?inquiry-id=${personaInquiryId}&environment-id=sandbox`;
       
       console.log(`Persona verification URL created: ${personaVerificationUrl}`);
 
       return {
         verificationGuid: verification.guid,
-        inquiryId: finalInquiryId,
+        inquiryId: personaInquiryId,
         personaUrl: personaVerificationUrl,
-        redirectUrl: personaSession.redirect_url,
-        clientToken: personaSession.client_token
+        redirectUrl: personaVerificationUrl, // Use persona URL as redirect
+        clientToken: null
       };
 
     } catch (error) {
