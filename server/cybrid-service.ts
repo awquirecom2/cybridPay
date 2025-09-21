@@ -323,7 +323,61 @@ export class CybridService {
     }
   }
 
-  // Create identity verification session for KYC
+  // Create manual KYC identity verification (for Persona flow)
+  static async createManualKycVerification(customerGuid: string): Promise<CybridIdentityVerification & { personaInquiryId?: string }> {
+    try {
+      console.log(`Creating manual KYC verification for customer: ${customerGuid}`);
+      
+      const verificationPayload = {
+        type: 'kyc',
+        method: 'id_and_selfie',
+        customer_guid: customerGuid
+      };
+
+      const verification = await this.makeRequest('/api/identity_verifications', {
+        method: 'POST',
+        body: JSON.stringify(verificationPayload)
+      }) as CybridIdentityVerification;
+
+      console.log(`Manual KYC verification created: ${verification.guid}`);
+      return verification;
+
+    } catch (error) {
+      console.error(`Failed to create manual KYC verification for customer ${customerGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // Poll for Persona inquiry ID (required for manual KYC flow)
+  static async pollForPersonaInquiryId(verificationGuid: string, maxAttempts: number = 30): Promise<string> {
+    try {
+      console.log(`Polling for Persona inquiry ID for verification: ${verificationGuid}`);
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const verification = await this.getIdentityVerification(verificationGuid);
+        
+        if ((verification as any).persona_inquiry_id) {
+          console.log(`Found Persona inquiry ID: ${(verification as any).persona_inquiry_id}`);
+          return (verification as any).persona_inquiry_id;
+        }
+        
+        if (verification.state === 'failed') {
+          throw new Error('Identity verification failed');
+        }
+        
+        console.log(`Attempt ${attempt}/${maxAttempts}: No inquiry ID yet, waiting...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      }
+      
+      throw new Error('Timeout waiting for Persona inquiry ID');
+      
+    } catch (error) {
+      console.error(`Failed to get Persona inquiry ID for verification ${verificationGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // Create identity verification session for KYC (legacy method)
   static async createIdentityVerification(customerGuid: string): Promise<CybridIdentityVerification> {
     try {
       // For business customers, use KYB verification instead of KYC

@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
-import { CybridKycWidget } from "./cybrid-kyc-widget"
+import { ManualKycVerification } from "./manual-kyc-verification"
 
 export function KybOnboarding() {
   const { toast } = useToast()
@@ -374,10 +374,9 @@ export function KybOnboarding() {
         </CardContent>
       </Card>
 
-      <CybridKycWidget
+      <ManualKycVerification
         onVerificationComplete={handleKycComplete}
-        onError={handleKycError}
-        data-testid="cybrid-kyc-widget"
+        data-testid="manual-kyc-verification"
       />
 
       {kycVerificationStatus === 'completed' && (

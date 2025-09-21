@@ -526,6 +526,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Start manual KYC verification process
+  app.post("/api/cybrid/start-manual-kyc", requireMerchantAuthenticated, async (req, res) => {
+    try {
+      const merchant = req.user as any;
+      
+      // Ensure merchant has a Cybrid customer GUID
+      if (!merchant.cybridCustomerGuid) {
+        return res.status(400).json({ 
+          error: "Merchant account not linked to verification system. Please contact support." 
+        });
+      }
+
+      console.log(`Starting manual KYC for merchant ${merchant.id} with Cybrid customer ${merchant.cybridCustomerGuid}`);
+
+      // Step 1: Create identity verification
+      const verification = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
+      
+      // Step 2: Poll for Persona inquiry ID
+      const personaInquiryId = await CybridService.pollForPersonaInquiryId(verification.guid);
+      
+      // Update merchant with verification GUID for tracking
+      await storage.updateMerchant(merchant.id, {
+        cybridVerificationGuid: verification.guid,
+        kybStatus: 'in_review',
+        cybridLastSyncedAt: new Date()
+      });
+      
+      res.json({
+        success: true,
+        verificationGuid: verification.guid,
+        personaInquiryId,
+        verificationUrl: `https://withpersona.com/verify?inquiry-id=${personaInquiryId}`
+      });
+      
+    } catch (error) {
+      console.error("Failed to start manual KYC:", error);
+      res.status(500).json({ 
+        error: "Failed to start identity verification. Please try again." 
+      });
+    }
+  });
+
+  // Get KYC verification status
+  app.get("/api/cybrid/kyc-status", requireMerchantAuthenticated, async (req, res) => {
+    try {
+      const merchant = req.user as any;
+      
+      if (!merchant.cybridCustomerGuid) {
+        return res.json({ status: 'not_started' });
+      }
+
+      // Get latest KYC status from Cybrid
+      const kycStatus = await CybridService.getLatestKycStatus(merchant.cybridCustomerGuid);
+      
+      // Update merchant record if status changed
+      if (kycStatus.status !== merchant.kybStatus) {
+        await storage.updateMerchant(merchant.id, {
+          kybStatus: kycStatus.status,
+          cybridVerificationGuid: kycStatus.verificationGuid,
+          cybridLastSyncedAt: new Date()
+        });
+      }
+      
+      res.json({
+        status: kycStatus.status,
+        verificationGuid: kycStatus.verificationGuid,
+        outcome: kycStatus.outcome,
+        state: kycStatus.state
+      });
+      
+    } catch (error) {
+      console.error("Failed to get KYC status:", error);
+      res.status(500).json({ 
+        error: "Failed to get verification status" 
+      });
+    }
+  });
+
   // Cybrid webhook endpoint for receiving verification status updates  
   app.post("/api/webhooks/cybrid", async (req: any, res) => {
     try {
