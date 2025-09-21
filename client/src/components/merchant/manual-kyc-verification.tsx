@@ -52,9 +52,6 @@ export function ManualKycVerification({
       return response.json();
     },
     onSuccess: (data: any) => {
-      console.log('Manual KYC started successfully:', data);
-      console.log('Data contains personaUrl:', !!data.personaUrl);
-      console.log('Full response data:', JSON.stringify(data, null, 2));
       setVerificationData({
         verificationGuid: data.verificationGuid,
         personaUrl: data.personaUrl,
@@ -220,54 +217,27 @@ export function ManualKycVerification({
         )}
 
         {verificationData?.personaUrl && (
-          <div className="space-y-4">
-            <Alert>
-              <ExternalLink className="h-4 w-4" />
-              <AlertDescription>
-                Your verification link is ready. Copy the URL below or click to open it directly.
-              </AlertDescription>
-            </Alert>
-            
-            <div className="space-y-3">
-              <div className="p-3 bg-muted rounded-md">
-                <label className="text-sm font-medium mb-2 block">Verification URL:</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={verificationData.personaUrl}
-                    readOnly
-                    className="flex-1 px-2 py-1 text-sm bg-background border rounded text-muted-foreground font-mono"
-                    data-testid="input-verification-url"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCopyUrl}
-                    data-testid="button-copy-url"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
+          <div className="space-y-3">
+            <div className="p-3 bg-muted rounded-md">
+              <label className="text-sm font-medium mb-2 block">Your Verification Link:</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={verificationData.personaUrl}
+                  readOnly
+                  className="flex-1 px-3 py-2 text-sm bg-background border rounded font-mono"
+                  data-testid="input-verification-url"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyUrl}
+                  data-testid="button-copy-url"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
-              
-              <Button 
-                onClick={handleOpenVerification}
-                variant="outline"
-                className="w-full"
-                data-testid="button-open-verification"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open Verification in New Tab
-              </Button>
             </div>
-          </div>
-        )}
-
-        {/* Debug info - remove in production */}
-        {verificationData && (
-          <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-            <p>Debug: verificationData exists: {JSON.stringify(verificationData)}</p>
-            <p>Debug: currentStatus: {currentStatus}</p>
           </div>
         )}
 
