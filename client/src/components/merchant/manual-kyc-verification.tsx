@@ -163,7 +163,7 @@ export function ManualKycVerification({
           </AlertDescription>
         </Alert>
 
-        {currentStatus === 'pending' && (
+        {(currentStatus === 'pending' || currentStatus === 'not_started') && (
           <div className="space-y-4">
             <div className="space-y-2">
               <h4 className="font-medium">What you'll need:</h4>
