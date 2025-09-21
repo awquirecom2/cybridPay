@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Shield, ExternalLink, CheckCircle, XCircle, Clock, AlertTriangle, Copy } from "lucide-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 interface ManualKycVerificationProps {
   onVerificationComplete?: (status: string) => void;
@@ -43,29 +43,8 @@ export function ManualKycVerification({
     }
   }, [kycStatus, isPolling, onVerificationComplete]);
 
-  // Start manual KYC mutation
-  const startKycMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/cybrid/start-manual-kyc');
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      setVerificationData({
-        verificationGuid: data.verificationGuid,
-        personaUrl: data.personaUrl,
-        redirectUrl: data.redirectUrl,
-        inquiryId: data.inquiryId
-      });
-      setIsPolling(true);
-      
-      // Invalidate and refetch status to get latest state
-      queryClient.invalidateQueries({ queryKey: ['/api/cybrid/kyc-status'] });
-      refetchStatus();
-    },
-    onError: (error: any) => {
-      console.error('Failed to start manual KYC:', error);
-    }
-  });
+  // Removed start manual KYC mutation - admin-controlled workflow
+  // Merchants can no longer initiate KYC themselves
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -106,21 +85,21 @@ export function ManualKycVerification({
         return "Identity verification was not successful. Please contact support for assistance.";
       case 'in_review':
         return hasPersonaUrl 
-          ? "Your verification is ready to complete. Click the link below to finish the process."
+          ? "Your verification is ready to complete. Click the button below to open the verification link in a new window."
           : "Your identity verification is being reviewed. This typically takes 1-2 business days.";
       case 'pending':
       default:
-        return "Identity verification is required to comply with financial regulations and enable payment processing.";
+        return "Identity verification will be initiated by our admin team once your account is approved.";
     }
   };
 
-  const handleStartVerification = () => {
-    startKycMutation.mutate();
-  };
+  // Removed handleStartVerification - admin-controlled workflow
 
   const handleOpenVerification = () => {
-    if (verificationData?.personaUrl) {
-      window.open(verificationData.personaUrl, '_blank', 'noopener,noreferrer');
+    // In admin-controlled flow, personaUrl comes from API response, not verificationData
+    const urlToOpen = verificationData?.personaUrl || (kycStatus as any)?.personaUrl;
+    if (urlToOpen) {
+      window.open(urlToOpen, '_blank', 'noopener,noreferrer');
       setIsPolling(true); // Start polling after opening verification
     }
   };
@@ -138,11 +117,8 @@ export function ManualKycVerification({
   };
 
   const handleOpenPersonaUrl = () => {
-    const urlToOpen = verificationData?.personaUrl || (kycStatus as any)?.personaUrl;
-    if (urlToOpen) {
-      window.open(urlToOpen, '_blank', 'noopener,noreferrer');
-      setIsPolling(true); // Start polling after opening verification
-    }
+    // Use the unified handleOpenVerification function
+    handleOpenVerification();
   };
 
   if (statusLoading) {
@@ -196,42 +172,13 @@ export function ManualKycVerification({
 
         {(currentStatus === 'pending' || currentStatus === 'not_started') && (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <h4 className="font-medium">What you'll need:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                <li>• Government-issued photo ID (passport, driver's license, or national ID)</li>
-                <li>• A device with a camera for selfie verification</li>
-                <li>• 5-10 minutes to complete the process</li>
-              </ul>
-            </div>
-            
-            <Button 
-              onClick={handleStartVerification}
-              disabled={startKycMutation.isPending}
-              className="w-full"
-              data-testid="button-start-kyc"
-            >
-              {startKycMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Starting Verification...
-                </>
-              ) : (
-                <>
-                  <Shield className="h-4 w-4 mr-2" />
-                  Start Identity Verification
-                </>
-              )}
-            </Button>
-
-            {startKycMutation.isError && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  Failed to start verification. Please try again or contact support if the problem persists.
-                </AlertDescription>
-              </Alert>
-            )}
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertDescription>
+                Your identity verification will be initiated by our admin team once your merchant account is fully approved. 
+                Please wait for further instructions via email.
+              </AlertDescription>
+            </Alert>
           </div>
         )}
 
@@ -258,7 +205,7 @@ export function ManualKycVerification({
               </div>
             </div>
             <Button 
-              onClick={handleOpenPersonaUrl}
+              onClick={handleOpenVerification}
               className="w-full"
               data-testid="button-open-verification"
             >

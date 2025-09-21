@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +26,7 @@ interface MerchantData {
   description?: string;
   status: 'pending' | 'approved' | 'rejected' | 'deactivated';
   kybStatus: 'pending' | 'approved' | 'rejected' | 'in_review';
+  kycStatus: 'pending' | 'in_review' | 'approved' | 'rejected';
   customFeeEnabled: boolean;
   customFeePercentage: string;
   customFlatFee: string;
@@ -248,6 +249,29 @@ export function MerchantManagement() {
     }
   })
 
+  // Trigger KYC creation mutation for admin-controlled workflow
+  const triggerKycMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/trigger-kyc`)
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "KYC Verification Created",
+        description: `KYC verification initiated for ${data.merchant.name}. Merchant can now complete verification.`,
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "KYC Creation Failed",
+        description: error.message || "Failed to create KYC verification. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -356,6 +380,11 @@ export function MerchantManagement() {
 
     if (action === 'reset-credentials') {
       resetCredentialsMutation.mutate(merchantId)
+      return
+    }
+
+    if (action === 'trigger-kyc') {
+      triggerKycMutation.mutate(merchantId)
       return
     }
 
@@ -1182,6 +1211,21 @@ export function MerchantManagement() {
                             <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-create', merchant.id)}>
                               <RefreshCw className="h-4 w-4 mr-2" />
                               {merchant.cybridCustomerGuid ? 'Retry Cybrid Setup' : 'Create Cybrid Customer'}
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {/* KYC Management Actions - Admin-Controlled */}
+                          {merchant.status === 'approved' && 
+                           merchant.cybridCustomerGuid && 
+                           merchant.cybridIntegrationStatus === 'active' &&
+                           merchant.kycStatus === 'pending' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('trigger-kyc', merchant.id)}
+                              className="text-blue-600 focus:text-blue-600"
+                              data-testid={`button-trigger-kyc-${merchant.id}`}
+                            >
+                              <Shield className="h-4 w-4 mr-2" />
+                              Trigger KYC Verification
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
