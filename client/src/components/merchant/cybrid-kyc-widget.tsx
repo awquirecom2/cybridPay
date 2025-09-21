@@ -72,7 +72,7 @@ export function CybridKycWidget({
       // Create cybrid-app element
       const cybridApp = document.createElement('cybrid-app');
 
-      // Configure the widget for KYC verification
+      // Configure the widget for KYC verification  
       const config = {
         refreshInterval: 10000,
         routing: false,
@@ -81,21 +81,38 @@ export function CybridKycWidget({
         customer: effectiveCustomerId,
         fiat: 'USD',
         features: ['kyc_identity_verifications'],
-        environment: 'sandbox' // Match backend environment mapping
+        environment: 'sandbox'
       };
+      
+      console.log('🔧 Widget configuration:', {
+        customer: effectiveCustomerId,
+        features: config.features,
+        environment: config.environment,
+        tokenLength: (cybridToken as any)?.accessToken?.length
+      });
 
       console.log('🔧 Widget config:', config);
       
-      // Set authentication token (official docs use .auth property)
+      // Official Cybrid SDK configuration approach
+      console.log('🔧 Setting widget properties...');
+      
+      // Set auth token first
       (cybridApp as any).auth = (cybridToken as any)?.accessToken;
-      console.log('🔧 Auth token set on widget');
-
-      // Set component type (required by official docs)
-      (cybridApp as any).component = 'identity-verification';
-      console.log('🔧 Component type set to identity-verification');
-
-      // Set configuration
+      console.log('🔧 Auth token set');
+      
+      // Set config second  
       (cybridApp as any).config = config;
+      console.log('🔧 Config set');
+      
+      // Set component last (this triggers initialization)
+      (cybridApp as any).component = 'identity-verification';
+      console.log('🔧 Component set - widget should initialize now');
+
+      // Add error listeners before appending
+      cybridApp.addEventListener('error', (event: any) => {
+        console.error('🚨 Cybrid widget error:', event);
+        setError(`Widget error: ${event.detail?.message || 'Unknown error'}`);
+      });
 
       // Listen for verification events
       cybridApp.addEventListener('verification-complete', (event: any) => {
