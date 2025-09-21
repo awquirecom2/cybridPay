@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,16 +26,18 @@ export function ManualKycVerification({
     refetchIntervalInBackground: true
   });
 
-  // Handle status changes
-  if (kycStatus && (kycStatus as any).status) {
-    const status = (kycStatus as any).status;
-    if (status === 'approved' || status === 'rejected') {
-      if (isPolling) {
-        setIsPolling(false);
-        onVerificationComplete?.(status);
+  // Handle status changes in useEffect to avoid render-time state updates
+  useEffect(() => {
+    if (kycStatus && (kycStatus as any).status) {
+      const status = (kycStatus as any).status;
+      if (status === 'approved' || status === 'rejected') {
+        if (isPolling) {
+          setIsPolling(false);
+          onVerificationComplete?.(status);
+        }
       }
     }
-  }
+  }, [kycStatus, isPolling, onVerificationComplete]);
 
   // Start manual KYC mutation
   const startKycMutation = useMutation({

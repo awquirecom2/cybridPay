@@ -268,12 +268,12 @@ export function MerchantManagement() {
 
   const getKybBadge = (kybStatus: string) => {
     const variants = {
-      verified: { variant: "default" as const, text: "Verified" },
-      review: { variant: "secondary" as const, text: "In Review" },
+      approved: { variant: "default" as const, text: "Verified" },
+      in_review: { variant: "secondary" as const, text: "In Review" },
       pending: { variant: "secondary" as const, text: "Pending" },
-      failed: { variant: "destructive" as const, text: "Failed" }
+      rejected: { variant: "destructive" as const, text: "Rejected" }
     }
-    const config = variants[kybStatus as keyof typeof variants]
+    const config = variants[kybStatus as keyof typeof variants] || variants.pending
     
     return (
       <Badge variant={config.variant} className="text-xs">
