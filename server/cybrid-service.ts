@@ -72,6 +72,9 @@ export class CybridService {
   private static readonly CLIENT_SECRET = process.env.CYBRID_CLIENT_SECRET;
   private static readonly ENVIRONMENT = process.env.CYBRID_ENVIRONMENT || 'staging';
   private static readonly BASE_URL = CYBRID_API_URLS[CybridService.ENVIRONMENT as keyof typeof CYBRID_API_URLS];
+  
+  // Cache for verification details to avoid repeated API calls
+  private static verificationCache = new Map<string, { data: CybridIdentityVerification, expires: number }>();
 
   private static tokenCache = new TokenCache();
 
@@ -574,26 +577,48 @@ export class CybridService {
       const latestVerification = verifications
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
-      console.log(`Latest verification for customer ${customerGuid}:`, {
-        guid: latestVerification.guid,
-        state: latestVerification.state,
-        outcome: latestVerification.outcome,
-        persona_inquiry_id: latestVerification.persona_inquiry_id,
-        created_at: latestVerification.created_at
-      });
+      // Debug logging for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Latest verification for customer ${customerGuid}:`, {
+          guid: latestVerification.guid,
+          state: latestVerification.state,
+          outcome: latestVerification.outcome,
+          persona_inquiry_id: latestVerification.persona_inquiry_id ? 'present' : 'missing'
+        });
+      }
 
       // Fetch full verification details to get persona_inquiry_id
       let fullVerification = latestVerification;
       if (latestVerification.state === 'waiting' && !latestVerification.persona_inquiry_id) {
         try {
-          console.log(`Fetching full verification details for GUID: ${latestVerification.guid}`);
-          fullVerification = await this.getIdentityVerification(latestVerification.guid);
-          console.log(`Full verification details:`, {
-            guid: fullVerification.guid,
-            state: fullVerification.state,
-            outcome: fullVerification.outcome,
-            persona_inquiry_id: fullVerification.persona_inquiry_id
-          });
+          // Check cache first (valid for 30 seconds)
+          const cached = this.verificationCache.get(latestVerification.guid);
+          if (cached && cached.expires > Date.now()) {
+            fullVerification = cached.data;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Using cached verification details for GUID: ${latestVerification.guid}`);
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Fetching full verification details for GUID: ${latestVerification.guid}`);
+            }
+            fullVerification = await this.getIdentityVerification(latestVerification.guid);
+            
+            // Cache the result for 30 seconds
+            this.verificationCache.set(latestVerification.guid, {
+              data: fullVerification,
+              expires: Date.now() + 30000
+            });
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Full verification details:`, {
+                guid: fullVerification.guid,
+                state: fullVerification.state,
+                outcome: fullVerification.outcome,
+                persona_inquiry_id: fullVerification.persona_inquiry_id ? 'present' : 'missing'
+              });
+            }
+          }
         } catch (error) {
           console.error(`Failed to fetch full verification details for ${latestVerification.guid}:`, error);
         }
@@ -625,7 +650,9 @@ export class CybridService {
       let personaUrl: string | undefined;
       if (fullVerification.state === 'waiting' && fullVerification.persona_inquiry_id) {
         personaUrl = `https://withpersona.com/verify?inquiry-id=${fullVerification.persona_inquiry_id}&environment-id=sandbox`;
-        console.log(`Found waiting verification with persona URL: ${personaUrl}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Generated persona URL for verification ${fullVerification.guid}`);
+        }
       }
 
       return {
