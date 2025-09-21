@@ -16,7 +16,11 @@ export function ManualKycVerification({
   onVerificationComplete,
   className = ""
 }: ManualKycVerificationProps) {
-  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
+  const [verificationData, setVerificationData] = useState<{
+    verificationGuid: string;
+    redirectUrl?: string;
+    inquiryId: string;
+  } | null>(null);
   const [isPolling, setIsPolling] = useState(false);
 
   // Get current KYC status
@@ -47,7 +51,11 @@ export function ManualKycVerification({
     },
     onSuccess: (data: any) => {
       console.log('Manual KYC started successfully:', data);
-      setVerificationUrl(data.verificationUrl);
+      setVerificationData({
+        verificationGuid: data.verificationGuid,
+        redirectUrl: data.redirectUrl,
+        inquiryId: data.inquiryId
+      });
       setIsPolling(true);
       
       // Invalidate and refetch status to get latest state
@@ -106,8 +114,8 @@ export function ManualKycVerification({
   };
 
   const handleOpenVerification = () => {
-    if (verificationUrl) {
-      window.open(verificationUrl, '_blank', 'noopener,noreferrer');
+    if (verificationData?.redirectUrl) {
+      window.open(verificationData.redirectUrl, '_blank', 'noopener,noreferrer');
       setIsPolling(true); // Start polling after opening verification
     }
   };
@@ -195,7 +203,7 @@ export function ManualKycVerification({
           </div>
         )}
 
-        {verificationUrl && currentStatus === 'in_review' && (
+        {verificationData?.redirectUrl && currentStatus === 'in_review' && (
           <div className="space-y-4">
             <Alert>
               <ExternalLink className="h-4 w-4" />
@@ -216,7 +224,7 @@ export function ManualKycVerification({
           </div>
         )}
 
-        {currentStatus === 'in_review' && !verificationUrl && (
+        {currentStatus === 'in_review' && !verificationData?.redirectUrl && (
           <Alert>
             <Clock className="h-4 w-4" />
             <AlertDescription>

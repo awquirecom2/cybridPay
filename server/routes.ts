@@ -540,24 +540,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Starting manual KYC for merchant ${merchant.id} with Cybrid customer ${merchant.cybridCustomerGuid}`);
 
-      // Step 1: Create identity verification
-      const verification = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
-      
-      // Step 2: Poll for Persona inquiry ID
-      const personaInquiryId = await CybridService.pollForPersonaInquiryId(verification.guid);
+      // Create identity verification and persona session
+      const result = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
       
       // Update merchant with verification GUID for tracking
       await storage.updateMerchant(merchant.id, {
-        cybridVerificationGuid: verification.guid,
+        cybridVerificationGuid: result.verificationGuid,
         kybStatus: 'in_review',
         cybridLastSyncedAt: new Date()
       });
       
       res.json({
         success: true,
-        verificationGuid: verification.guid,
-        personaInquiryId,
-        verificationUrl: `https://withpersona.com/verify?inquiry-id=${personaInquiryId}`
+        verificationGuid: result.verificationGuid,
+        inquiryId: result.inquiryId,
+        redirectUrl: result.redirectUrl,
+        clientToken: result.clientToken
       });
       
     } catch (error) {
@@ -572,28 +570,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/cybrid/kyc-status", requireMerchantAuthenticated, async (req, res) => {
     try {
       const merchant = req.user as any;
+      const { guid } = req.query;
       
       if (!merchant.cybridCustomerGuid) {
         return res.json({ status: 'not_started' });
       }
 
-      // Get latest KYC status from Cybrid
-      const kycStatus = await CybridService.getLatestKycStatus(merchant.cybridCustomerGuid);
+      // Use provided GUID or fall back to merchant's stored verification GUID
+      const verificationGuid = (guid as string) || merchant.cybridVerificationGuid;
+      
+      if (!verificationGuid) {
+        return res.json({ status: 'not_started' });
+      }
+
+      // Get verification status using GUID
+      const statusResult = await CybridService.getVerificationStatus(verificationGuid);
       
       // Update merchant record if status changed
-      if (kycStatus.status !== merchant.kybStatus) {
+      if (statusResult.status !== merchant.kybStatus) {
         await storage.updateMerchant(merchant.id, {
-          kybStatus: kycStatus.status,
-          cybridVerificationGuid: kycStatus.verificationGuid,
+          kybStatus: statusResult.status,
+          cybridVerificationGuid: verificationGuid,
           cybridLastSyncedAt: new Date()
         });
       }
       
       res.json({
-        status: kycStatus.status,
-        verificationGuid: kycStatus.verificationGuid,
-        outcome: kycStatus.outcome,
-        state: kycStatus.state
+        status: statusResult.status,
+        state: statusResult.state,
+        outcome: statusResult.outcome,
+        verificationGuid
       });
       
     } catch (error) {

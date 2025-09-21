@@ -95,7 +95,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write identity_verifications:execute'
+          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write identity_verifications:execute persona_sessions:execute'
         })
       });
 
@@ -324,10 +324,16 @@ export class CybridService {
   }
 
   // Create manual KYC identity verification (for Persona flow)
-  static async createManualKycVerification(customerGuid: string): Promise<CybridIdentityVerification & { personaInquiryId?: string }> {
+  static async createManualKycVerification(customerGuid: string): Promise<{
+    verificationGuid: string;
+    inquiryId: string;
+    redirectUrl?: string;
+    clientToken?: string;
+  }> {
     try {
       console.log(`Creating manual KYC verification for customer: ${customerGuid}`);
       
+      // Step 1: Create identity verification
       const verificationPayload = {
         type: 'kyb',
         method: 'business_registration',
@@ -339,8 +345,26 @@ export class CybridService {
         body: JSON.stringify(verificationPayload)
       }) as CybridIdentityVerification;
 
-      console.log(`Manual KYC verification created: ${verification.guid}`);
-      return verification;
+      console.log(`Identity verification created: ${verification.guid}`);
+
+      // Step 2: Create persona session
+      const personaPayload = {
+        identity_verification_guid: verification.guid
+      };
+
+      const personaSession = await this.makeRequest('/api/persona_sessions', {
+        method: 'POST',
+        body: JSON.stringify(personaPayload)
+      }) as any;
+
+      console.log(`Persona session created:`, personaSession);
+
+      return {
+        verificationGuid: verification.guid,
+        inquiryId: personaSession.inquiry_id,
+        redirectUrl: personaSession.redirect_url,
+        clientToken: personaSession.client_token
+      };
 
     } catch (error) {
       console.error(`Failed to create manual KYC verification for customer ${customerGuid}:`, error);
@@ -349,30 +373,37 @@ export class CybridService {
   }
 
   // Poll for Persona inquiry ID (required for manual KYC flow)
-  static async pollForPersonaInquiryId(verificationGuid: string, maxAttempts: number = 30): Promise<string> {
+  static async getVerificationStatus(verificationGuid: string): Promise<{
+    status: 'pending' | 'in_review' | 'approved' | 'rejected';
+    state: string;
+    outcome: string;
+  }> {
     try {
-      console.log(`Polling for Persona inquiry ID for verification: ${verificationGuid}`);
+      console.log(`Getting verification status for: ${verificationGuid}`);
       
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const verification = await this.getIdentityVerification(verificationGuid);
-        
-        if ((verification as any).persona_inquiry_id) {
-          console.log(`Found Persona inquiry ID: ${(verification as any).persona_inquiry_id}`);
-          return (verification as any).persona_inquiry_id;
-        }
-        
-        if (verification.state === 'failed') {
-          throw new Error('Identity verification failed');
-        }
-        
-        console.log(`Attempt ${attempt}/${maxAttempts}: No inquiry ID yet, waiting...`);
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      const verification = await this.getIdentityVerification(verificationGuid);
+      
+      // Map Cybrid states to our simplified status
+      let status: 'pending' | 'in_review' | 'approved' | 'rejected';
+      
+      if (verification.state === 'completed' && verification.outcome === 'approved') {
+        status = 'approved';
+      } else if (verification.state === 'completed' && verification.outcome === 'rejected') {
+        status = 'rejected';
+      } else if (verification.state === 'review' || verification.state === 'pending_review') {
+        status = 'in_review';
+      } else {
+        status = 'pending';
       }
       
-      throw new Error('Timeout waiting for Persona inquiry ID');
+      return {
+        status,
+        state: verification.state,
+        outcome: verification.outcome
+      };
       
     } catch (error) {
-      console.error(`Failed to get Persona inquiry ID for verification ${verificationGuid}:`, error);
+      console.error(`Failed to get verification status for ${verificationGuid}:`, error);
       throw error;
     }
   }
