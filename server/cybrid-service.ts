@@ -407,6 +407,7 @@ export class CybridService {
   static async createManualKycVerification(customerGuid: string): Promise<{
     verificationGuid: string;
     inquiryId: string;
+    personaUrl: string;
     redirectUrl?: string;
     clientToken?: string;
   }> {
@@ -468,9 +469,16 @@ export class CybridService {
       console.log(`Persona session created successfully`);
       console.log('FULL PERSONA SESSION RESPONSE:', JSON.stringify(personaSession, null, 2));
 
+      // Step 3: Construct the Persona verification URL
+      const finalInquiryId = personaSession.inquiry_id || personaInquiryId;
+      const personaVerificationUrl = `https://withpersona.com/verify?inquiry-id=${finalInquiryId}&environment-id=sandbox`;
+      
+      console.log(`Persona verification URL created: ${personaVerificationUrl}`);
+
       return {
         verificationGuid: verification.guid,
-        inquiryId: personaSession.inquiry_id || personaInquiryId,
+        inquiryId: finalInquiryId,
+        personaUrl: personaVerificationUrl,
         redirectUrl: personaSession.redirect_url,
         clientToken: personaSession.client_token
       };

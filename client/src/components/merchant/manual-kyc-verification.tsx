@@ -18,6 +18,7 @@ export function ManualKycVerification({
 }: ManualKycVerificationProps) {
   const [verificationData, setVerificationData] = useState<{
     verificationGuid: string;
+    personaUrl: string;
     redirectUrl?: string;
     inquiryId: string;
   } | null>(null);
@@ -54,6 +55,7 @@ export function ManualKycVerification({
       console.log('Manual KYC started successfully:', data);
       setVerificationData({
         verificationGuid: data.verificationGuid,
+        personaUrl: data.personaUrl,
         redirectUrl: data.redirectUrl,
         inquiryId: data.inquiryId
       });
@@ -115,8 +117,8 @@ export function ManualKycVerification({
   };
 
   const handleOpenVerification = () => {
-    if (verificationData?.redirectUrl) {
-      window.open(verificationData.redirectUrl, '_blank', 'noopener,noreferrer');
+    if (verificationData?.personaUrl) {
+      window.open(verificationData.personaUrl, '_blank', 'noopener,noreferrer');
       setIsPolling(true); // Start polling after opening verification
     }
   };
