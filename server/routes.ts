@@ -372,6 +372,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync customer types from Cybrid to merchant records
+  app.post("/api/admin/merchants/sync-customer-types", requireAdmin, async (req, res) => {
+    try {
+      console.log('🔄 Admin triggered customer type sync from Cybrid');
+      
+      const syncResults = await CybridService.syncCustomerTypes();
+      
+      res.json({
+        success: true,
+        message: `Customer type sync completed: ${syncResults.updated} merchants updated, ${syncResults.errors} errors out of ${syncResults.totalCustomers} Cybrid customers`,
+        results: syncResults
+      });
+
+    } catch (error) {
+      console.error("Error performing customer type sync:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to sync customer types",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;

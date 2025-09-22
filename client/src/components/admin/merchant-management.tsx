@@ -259,6 +259,29 @@ export function MerchantManagement() {
     }
   })
 
+  // Sync customer types from Cybrid mutation
+  const syncCustomerTypesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/admin/merchants/sync-customer-types')
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Customer Types Synced",
+        description: data.message || "Customer types have been updated from Cybrid",
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Error",
+        description: "Failed to sync customer types. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -478,6 +501,19 @@ export function MerchantManagement() {
               <RotateCcw className="h-4 w-4 mr-2" />
             )}
             Sync KYC Status
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => syncCustomerTypesMutation.mutate()}
+            disabled={syncCustomerTypesMutation.isPending}
+            data-testid="button-sync-customer-types"
+          >
+            {syncCustomerTypesMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RotateCcw className="h-4 w-4 mr-2" />
+            )}
+            Sync Customer Types
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
@@ -1141,6 +1177,7 @@ export function MerchantManagement() {
                   <TableHead>Merchant</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>KYB</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Cybrid</TableHead>
                   <TableHead>Volume</TableHead>
                   <TableHead>Onboarded</TableHead>
@@ -1161,6 +1198,11 @@ export function MerchantManagement() {
                     </TableCell>
                     <TableCell>
                       {getKybBadge(merchant.kybStatus)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" data-testid={`text-customer-type-${merchant.id}`}>
+                        {merchant.cybridCustomerType === 'individual' ? 'Individual' : 'Business'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {getCybridStatusBadge(merchant.cybridIntegrationStatus)}

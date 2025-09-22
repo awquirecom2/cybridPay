@@ -256,9 +256,33 @@ export class CybridService {
   // Get all customers
   static async getAllCustomers(): Promise<CybridCustomer[]> {
     try {
-      const response = await this.makeRequest('/api/customers') as { objects: CybridCustomer[], total: number };
-      console.log(`Fetched ${response.objects.length} customers from Cybrid`);
-      return response.objects;
+      const allCustomers: CybridCustomer[] = [];
+      let page = 1; // Most APIs use 1-based pagination
+      let hasMore = true;
+      const pageSize = 100; // Cybrid default page size
+
+      while (hasMore) {
+        console.log(`Fetching customers page ${page}...`);
+        
+        const response = await this.makeRequest(`/api/customers?page=${page}&per_page=${pageSize}`) as { 
+          objects: CybridCustomer[], 
+          total: number,
+          page: number,
+          per_page: number 
+        };
+
+        allCustomers.push(...response.objects);
+        
+        // Check if we have more pages - stop when we get fewer items than pageSize or reach total
+        const currentPageItems = response.objects.length;
+        hasMore = currentPageItems === pageSize && allCustomers.length < response.total && currentPageItems > 0;
+        
+        console.log(`Page ${page}: ${currentPageItems} customers, Total fetched: ${allCustomers.length}/${response.total}`);
+        page++;
+      }
+
+      console.log(`✅ Fetched ALL ${allCustomers.length} customers from Cybrid across ${page} pages`);
+      return allCustomers;
     } catch (error) {
       console.error('Failed to fetch all Cybrid customers:', error);
       throw error;
@@ -979,6 +1003,117 @@ export class CybridService {
 
     } catch (error) {
       console.error('Failed to perform bulk KYC sync:', error);
+      throw error;
+    }
+  }
+
+  // Sync customer types from Cybrid to local merchant records
+  static async syncCustomerTypes(): Promise<{
+    totalCustomers: number;
+    totalMerchants: number;
+    updated: number;
+    errors: number;
+    results: Array<{
+      cybridCustomerGuid: string;
+      merchantId: string;
+      merchantName: string;
+      oldType: string;
+      newType: string;
+      error?: string;
+    }>;
+  }> {
+    const results: Array<{
+      cybridCustomerGuid: string;
+      merchantId: string;
+      merchantName: string;
+      oldType: string;
+      newType: string;
+      error?: string;
+    }> = [];
+
+    let updated = 0;
+    let errors = 0;
+
+    try {
+      console.log('🔄 Starting customer type sync from Cybrid...');
+
+      // Step 1: Fetch all customers from Cybrid
+      const cybridCustomers = await this.getAllCustomers();
+      console.log(`📥 Fetched ${cybridCustomers.length} customers from Cybrid`);
+
+      // Step 2: Get all merchants for matching
+      const allMerchants = await storage.getAllMerchants();
+      console.log(`📋 Found ${allMerchants.length} total merchants in system`);
+
+      // Step 3: Iterate through each Cybrid customer
+      for (const customer of cybridCustomers) {
+        try {
+          // Step 4: Check if this customer is mapped to any merchant
+          const merchant = await storage.getMerchantByCybridGuid(customer.guid);
+          
+          if (merchant) {
+            const currentType = merchant.cybridCustomerType;
+            const newType = customer.type;
+
+            // Step 5: Update merchant's customer type if different or missing
+            // Always update if currentType is null/undefined, or if types differ
+            const needsUpdate = !currentType || currentType !== newType;
+            
+            if (needsUpdate) {
+              await storage.updateMerchant(merchant.id, {
+                cybridCustomerType: newType,
+                cybridLastSyncedAt: new Date()
+              });
+
+              console.log(`✅ Updated merchant "${merchant.name}" (${merchant.id}): ${currentType || '(empty)'} → ${newType}`);
+              updated++;
+            } else {
+              console.log(`⏸️  No change for merchant "${merchant.name}": ${newType}`);
+            }
+
+            results.push({
+              cybridCustomerGuid: customer.guid,
+              merchantId: merchant.id,
+              merchantName: merchant.name,
+              oldType: currentType || '(empty)',
+              newType
+            });
+
+          } else {
+            // Customer exists in Cybrid but not mapped to any merchant
+            console.log(`⚠️  Cybrid customer ${customer.guid} (${customer.type}) not mapped to any merchant`);
+          }
+
+        } catch (error) {
+          console.error(`❌ Failed to process Cybrid customer ${customer.guid}:`, error);
+          errors++;
+
+          // Try to find merchant for error reporting
+          const merchant = await storage.getMerchantByCybridGuid(customer.guid).catch(() => null);
+          
+          results.push({
+            cybridCustomerGuid: customer.guid,
+            merchantId: merchant?.id || 'unknown',
+            merchantName: merchant?.name || 'Unknown',
+            oldType: merchant?.cybridCustomerType || 'unknown',
+            newType: customer.type,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      console.log(`🎯 Customer type sync complete: ${updated} updated, ${errors} errors out of ${cybridCustomers.length} customers`);
+
+      return {
+        totalCustomers: cybridCustomers.length,
+        totalMerchants: allMerchants.length,
+        updated,
+        errors,
+        results
+      };
+
+    } catch (error) {
+      console.error('Failed to perform customer type sync:', error);
       throw error;
     }
   }
