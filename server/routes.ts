@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -267,8 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cybridCustomer = await CybridService.ensureCustomer({
             merchantId: merchant.id,
             name: merchant.name,
-            email: merchant.email,
-            type: (merchant as any).cybridCustomerType || 'business' // Use stored customer type or default to business
+            email: merchant.email
           });
 
           cybridResult = {
@@ -372,6 +371,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint to trigger KYC creation for a specific merchant
+  app.post("/api/admin/merchants/:id/trigger-kyc", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const merchant = await storage.getMerchant(id);
+      
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Ensure merchant is approved and has Cybrid customer
+      if (merchant.status !== 'approved') {
+        return res.status(400).json({ 
+          error: "Cannot trigger KYC for non-approved merchant",
+          merchantStatus: merchant.status 
+        });
+      }
+
+      if (!merchant.cybridCustomerGuid) {
+        return res.status(400).json({ 
+          error: "Merchant must have Cybrid customer before triggering KYC",
+          message: "Please ensure Cybrid customer is created first"
+        });
+      }
+
+      console.log(`🎯 Admin triggering KYC creation for merchant: ${merchant.name} (${merchant.id})`);
+
+      // Create identity verification using existing service method
+      const result = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
+      
+      // Update merchant with verification GUID for tracking
+      await storage.updateMerchant(merchant.id, {
+        cybridVerificationGuid: result.verificationGuid,
+        kycStatus: 'in_review',
+        cybridLastSyncedAt: new Date()
+      });
+      
+      res.json({
+        success: true,
+        merchant: {
+          id: merchant.id,
+          name: merchant.name
+        },
+        verification: {
+          guid: result.verificationGuid,
+          inquiryId: result.inquiryId,
+          personaUrl: result.personaUrl
+        },
+        message: "KYC verification created successfully. Merchant can now complete verification."
+      });
+      
+    } catch (error) {
+      console.error("Error triggering KYC for merchant:", error);
+      res.status(500).json({ 
+        error: "Failed to trigger KYC creation",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   app.delete("/api/admin/merchants/:id", requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
@@ -392,7 +451,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/merchants/:id/cybrid-customer", requireAdmin, async (req, res) => {
     try {
       const { id } = cybridCustomerParamsSchema.parse(req.params);
-      const { type } = cybridCustomerCreateSchema.parse(req.body);
       const merchant = await storage.getMerchant(id);
       
       if (!merchant) {
@@ -420,12 +478,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create or ensure Cybrid customer exists with specified type
+      // Create or ensure Cybrid customer exists
       const cybridCustomer = await CybridService.ensureCustomer({
         merchantId: merchant.id,
         name: merchant.name,
-        email: merchant.email,
-        type: type
+        email: merchant.email
       });
 
       res.json({
@@ -549,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update merchant with verification GUID for tracking
       await storage.updateMerchant(merchant.id, {
         cybridVerificationGuid: result.verificationGuid,
-        kybStatus: 'in_review',
+        kycStatus: 'in_review',
         cybridLastSyncedAt: new Date()
       });
       
