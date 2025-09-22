@@ -1651,6 +1651,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create deposit address for a merchant's trade account (admin only)
+  app.post('/api/admin/merchants/:id/create-deposit-address', requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { asset = 'USDC' } = req.body;
+
+      // Validate request body
+      const validatedBody = createTradeAccountSchema.parse({ asset });
+
+      // Get merchant details
+      const merchant = await storage.getMerchant(id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Check if merchant is approved
+      if (merchant.status !== 'approved') {
+        return res.status(400).json({
+          error: "Merchant must be approved before creating deposit addresses",
+          merchantStatus: merchant.status
+        });
+      }
+
+      // Check if merchant has Cybrid customer
+      if (!merchant.cybridCustomerGuid) {
+        return res.status(400).json({
+          error: "Merchant must have a Cybrid customer account",
+          message: "Create Cybrid customer first"
+        });
+      }
+
+      // Check if merchant has active trade account for this asset
+      if (!merchant.cybridTradeAccountGuid || merchant.tradeAccountAsset !== asset || merchant.tradeAccountStatus !== 'created') {
+        return res.status(400).json({
+          error: "Merchant must have an active trade account for this asset",
+          message: `Create a ${asset} trade account first`,
+          tradeAccountStatus: merchant.tradeAccountStatus
+        });
+      }
+
+      // Check for existing deposit address for this asset
+      if (merchant.depositAddressGuid && merchant.depositAddressAsset === asset) {
+        return res.status(400).json({
+          error: "Deposit address already exists for this asset",
+          existingAddress: {
+            guid: merchant.depositAddressGuid,
+            address: merchant.depositAddress,
+            asset: merchant.depositAddressAsset,
+            status: merchant.depositAddressStatus
+          }
+        });
+      }
+
+      // Update status to pending
+      await storage.updateMerchant(id, {
+        depositAddressStatus: 'pending'
+      });
+
+      try {
+        // Create deposit address via Cybrid
+        const depositAddress = await CybridService.createDepositAddress(merchant.cybridTradeAccountGuid, asset);
+        
+        // Update merchant with successful deposit address creation
+        await storage.updateMerchant(id, {
+          depositAddressGuid: depositAddress.guid,
+          depositAddress: depositAddress.address,
+          depositAddressStatus: 'created',
+          depositAddressAsset: asset,
+          depositAddressCreatedAt: new Date()
+        });
+
+        console.log(`✅ Successfully created ${asset} deposit address for merchant ${merchant.name}: ${depositAddress.address}`);
+
+        res.json({
+          success: true,
+          depositAddress: {
+            guid: depositAddress.guid,
+            address: depositAddress.address,
+            asset: asset,
+            status: 'created',
+            createdAt: new Date().toISOString()
+          }
+        });
+
+      } catch (cybridError) {
+        // Update status to error
+        await storage.updateMerchant(id, {
+          depositAddressStatus: 'error',
+          cybridLastError: cybridError instanceof Error ? cybridError.message : 'Unknown error'
+        });
+
+        console.error(`Failed to create deposit address for merchant ${merchant.name}:`, cybridError);
+        
+        res.status(500).json({
+          error: "Failed to create deposit address",
+          details: cybridError instanceof Error ? cybridError.message : 'Unknown error'
+        });
+      }
+
+    } catch (error) {
+      console.error("Error in deposit address creation:", error);
+      res.status(500).json({ error: "Failed to create deposit address" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
