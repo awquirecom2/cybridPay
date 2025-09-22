@@ -50,6 +50,19 @@ export interface CybridAddress {
   created_at: string;
 }
 
+export interface CybridDepositAddress {
+  guid: string;
+  customer_guid: string;
+  account_guid: string;
+  address: string;
+  asset: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+  expired_at?: string;
+  labels?: string[];
+}
+
 // Cybrid Banking API base URLs
 const CYBRID_API_URLS = {
   sandbox: 'https://bank.sandbox.cybrid.app',
@@ -103,7 +116,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read customers:read customers:write customers:execute accounts:read accounts:execute identity_verifications:read prices:read quotes:read'
+          scope: 'banks:read customers:read customers:write customers:execute accounts:read accounts:execute deposit_addresses:execute identity_verifications:read prices:read quotes:read'
         })
       });
 
@@ -881,6 +894,37 @@ export class CybridService {
 
     } catch (error) {
       console.error(`Failed to create trade account for customer ${customerGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // Create a deposit address for a trading account
+  static async createDepositAddress(accountGuid: string, asset: string = 'USDC'): Promise<CybridDepositAddress> {
+    const normalizedAsset = asset.toUpperCase();
+    console.log(`Creating deposit address for account: ${accountGuid}, asset: ${normalizedAsset}`);
+    
+    try {
+      // Create deposit address payload
+      const depositPayload = {
+        account_guid: accountGuid,
+        labels: [`${normalizedAsset}-Custodian-GUID`]
+      };
+
+      console.log(`Deposit address payload: account_guid=${depositPayload.account_guid}, labels=${depositPayload.labels}`);
+
+      // Create the deposit address
+      const depositAddress = await this.makeRequest('/api/deposit_addresses', {
+        method: 'POST',
+        body: JSON.stringify(depositPayload)
+      }) as CybridDepositAddress;
+
+      console.log(`✅ Successfully created deposit address: ${depositAddress.guid}`);
+      console.log(`Address: ${depositAddress.address}, state: ${depositAddress.state}`);
+
+      return depositAddress;
+
+    } catch (error) {
+      console.error(`Failed to create deposit address for account ${accountGuid}:`, error);
       throw error;
     }
   }
