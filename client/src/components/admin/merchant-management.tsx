@@ -44,6 +44,11 @@ interface MerchantData {
   tradeAccountStatus?: 'pending' | 'created' | 'error';
   tradeAccountAsset?: string;
   tradeAccountCreatedAt?: string;
+  depositAddressGuid?: string;
+  depositAddress?: string;
+  depositAddressStatus?: 'no_address' | 'pending' | 'created' | 'error';
+  depositAddressAsset?: string;
+  depositAddressCreatedAt?: string;
 }
 
 interface CybridStatusData {
@@ -383,6 +388,103 @@ export function MerchantManagement() {
     }
   })
 
+  // Create deposit address mutation
+  const createDepositAddressMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/create-deposit-address`, {
+        asset: 'USDC'
+      })
+      return await response.json()
+    },
+    retry: (failureCount, error: any) => {
+      // Retry network errors and temporary server errors up to 2 times
+      if (failureCount < 2) {
+        // Parse status code from error message (format: "500: Server Error")
+        const statusMatch = error.message?.match(/^(\d{3}):/)
+        const status = statusMatch ? parseInt(statusMatch[1]) : null
+        
+        if (
+          (status && status >= 500 && status < 600) || // Server errors
+          status === 429 || // Rate limiting
+          error.name === 'TypeError' || // Network failures
+          error.name === 'NetworkError' ||
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('fetch')
+        ) {
+          return true
+        }
+      }
+      return false
+    },
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
+    onSuccess: (data: any) => {
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Deposit Address Created",
+        description: `USDC deposit address created successfully: ${data.depositAddress?.address || 'Address ready'}`,
+      })
+    },
+    onError: (error: any) => {
+      console.error("Deposit address creation error:", error)
+      
+      // Parse status code from error message (format: "404: Not Found" or similar)
+      const statusMatch = error.message?.match(/^(\d{3}):\s*(.+)$/)
+      const status = statusMatch ? parseInt(statusMatch[1]) : null
+      const serverMessage = statusMatch ? statusMatch[2] : error.message
+      
+      // Provide specific error messages based on error type
+      let title = "Deposit Address Error"
+      let description = "Failed to create deposit address. Please try again."
+      let suggestions = ""
+
+      if (status === 404) {
+        title = "Merchant Not Found"
+        description = "The selected merchant could not be found."
+        suggestions = "Please refresh the page and try again."
+      } else if (status === 400) {
+        // Handle specific 400 error cases based on error message
+        const errorMessage = serverMessage || ""
+        
+        if (errorMessage.includes("must be approved")) {
+          title = "Merchant Not Approved"
+          description = "Deposit addresses can only be created for approved merchants."
+          suggestions = "Please approve the merchant first, then try again."
+        } else if (errorMessage.includes("Cybrid customer")) {
+          title = "Cybrid Customer Missing"
+          description = "Merchant must have a Cybrid customer account before creating deposit addresses."
+          suggestions = "Create a Cybrid customer for this merchant first."
+        } else if (errorMessage.includes("active trade account")) {
+          title = "Trade Account Required"
+          description = "Merchant must have an active trade account before creating deposit addresses."
+          suggestions = "Create a trade account for this merchant first."
+        } else if (errorMessage.includes("already exists")) {
+          title = "Deposit Address Exists"
+          description = "A deposit address already exists for this merchant and asset."
+          suggestions = "Check the existing address status or try a different asset."
+        } else {
+          description = errorMessage || description
+        }
+      } else if (status && status >= 500) {
+        title = "Server Error"
+        description = "An internal server error occurred while creating the deposit address."
+        suggestions = "Please try again in a few minutes or contact support if the issue persists."
+      } else if (error.name === 'TypeError' || error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+        title = "Connection Error"
+        description = "Unable to connect to the server."
+        suggestions = "Please check your internet connection and try again."
+      } else {
+        description = serverMessage || description
+      }
+
+      toast({
+        title,
+        description: suggestions ? `${description} ${suggestions}` : description,
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -478,6 +580,41 @@ export function MerchantManagement() {
     )
   }
 
+  const getDepositAddressBadge = (merchant: MerchantData) => {
+    // If no deposit address GUID and no status, show "No Address"
+    if (!merchant.depositAddressGuid && (!merchant.depositAddressStatus || merchant.depositAddressStatus === 'no_address')) {
+      return (
+        <Badge variant="outline" className="text-xs" data-testid={`status-deposit-address-${merchant.id}`}>
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          No Address
+        </Badge>
+      )
+    }
+
+    const variants = {
+      created: { variant: "default" as const, icon: Wallet, text: "Created" },
+      pending: { variant: "secondary" as const, icon: Clock, text: "Creating..." },
+      error: { variant: "destructive" as const, icon: XCircle, text: "Failed" }
+    }
+    
+    // If we have a GUID but no status, assume it's created
+    let status = merchant.depositAddressStatus
+    if (merchant.depositAddressGuid && !status) {
+      status = 'created'
+    }
+    
+    const config = variants[status as keyof typeof variants] || variants.error
+    const Icon = config.icon
+    
+    return (
+      <Badge variant={config.variant} className="text-xs flex items-center gap-1" data-testid={`status-deposit-address-${merchant.id}`}>
+        <Icon className="h-3 w-3" />
+        {config.text}
+        {merchant.depositAddressAsset && ` (${merchant.depositAddressAsset})`}
+      </Badge>
+    )
+  }
+
   const filteredMerchants = merchants.filter((merchant: MerchantData) => {
     const matchesSearch = merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          merchant.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -532,6 +669,11 @@ export function MerchantManagement() {
 
     if (action === 'create-trade-account') {
       createTradeAccountMutation.mutate(merchantId)
+      return
+    }
+
+    if (action === 'create-deposit-address') {
+      createDepositAddressMutation.mutate(merchantId)
       return
     }
 
@@ -1321,6 +1463,7 @@ export function MerchantManagement() {
                   <TableHead>Type</TableHead>
                   <TableHead>Cybrid</TableHead>
                   <TableHead>Trade Account</TableHead>
+                  <TableHead>Deposit Address</TableHead>
                   <TableHead>Volume</TableHead>
                   <TableHead>Onboarded</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -1351,6 +1494,9 @@ export function MerchantManagement() {
                     </TableCell>
                     <TableCell>
                       {getTradeAccountBadge(merchant)}
+                    </TableCell>
+                    <TableCell>
+                      {getDepositAddressBadge(merchant)}
                     </TableCell>
                     <TableCell className="font-mono">{merchant.volume}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -1437,6 +1583,28 @@ export function MerchantManagement() {
                                 <TrendingUp className="h-4 w-4 mr-2" />
                               )}
                               Create USDC Trade Account
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Create Deposit Address - Only show if merchant has active trade account but no deposit address */}
+                          {merchant.status === 'approved' && 
+                           merchant.cybridCustomerGuid && 
+                           merchant.cybridIntegrationStatus === 'active' && 
+                           merchant.cybridTradeAccountGuid &&
+                           merchant.tradeAccountStatus === 'created' &&
+                           !merchant.depositAddressGuid && 
+                           merchant.depositAddressStatus !== 'pending' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('create-deposit-address', merchant.id)}
+                              disabled={createDepositAddressMutation.isPending}
+                              data-testid={`menu-create-deposit-address-${merchant.id}`}
+                            >
+                              {createDepositAddressMutation.isPending ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Wallet className="h-4 w-4 mr-2" />
+                              )}
+                              Create USDC Deposit Address
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>

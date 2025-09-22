@@ -54,6 +54,12 @@ export const merchants = pgTable("merchants", {
   tradeAccountStatus: text("trade_account_status").default("none"), // none, pending, created, error
   tradeAccountAsset: text("trade_account_asset"), // USDC, BTC, etc.
   tradeAccountCreatedAt: timestamp("trade_account_created_at"), // When trade account was created
+  // Deposit address tracking fields
+  depositAddressGuid: text("deposit_address_guid"), // Cybrid deposit address GUID
+  depositAddress: text("deposit_address"), // The actual deposit address
+  depositAddressStatus: text("deposit_address_status").default("no_address"), // no_address, pending, created, error
+  depositAddressAsset: text("deposit_address_asset"), // USDC, BTC, etc.
+  depositAddressCreatedAt: timestamp("deposit_address_created_at"), // When deposit address was created
   dateOnboarded: timestamp("date_onboarded").default(sql`NOW()`),
   createdAt: timestamp("created_at").default(sql`NOW()`),
   updatedAt: timestamp("updated_at").default(sql`NOW()`)
