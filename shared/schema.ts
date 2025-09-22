@@ -217,6 +217,13 @@ export const cybridDepositAddressSchema = z.object({
   network: z.string().optional()
 });
 
+export const createTradeAccountSchema = z.object({
+  asset: z.enum(["USDC"], {
+    required_error: "Asset is required",
+    invalid_type_error: "Only USDC trading accounts are currently supported"
+  }).default("USDC")
+});
+
 // Webhook events table for idempotency tracking
 export const webhookEvents = pgTable("webhook_events", {
   id: serial("id").primaryKey(),

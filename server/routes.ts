@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -522,6 +522,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching deposit addresses:", error);
       res.status(500).json({ error: "Failed to fetch deposit addresses" });
+    }
+  });
+
+  // Create trade account for KYC-completed merchant
+  app.post("/api/admin/merchants/:id/create-trade-account", requireAdmin, async (req, res) => {
+    try {
+      const { id } = cybridCustomerParamsSchema.parse(req.params);
+      const { asset } = createTradeAccountSchema.parse(req.body);
+      
+      // Get merchant and validate requirements
+      const merchant = await storage.getMerchant(id);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      // Validate merchant is approved
+      if (merchant.status !== 'approved') {
+        return res.status(400).json({ 
+          error: "Merchant must be approved before creating trade account",
+          merchantStatus: merchant.status
+        });
+      }
+
+      // Validate merchant has Cybrid customer
+      if (!merchant.cybridCustomerGuid) {
+        return res.status(400).json({ 
+          error: "Merchant must have Cybrid customer before creating trade account",
+          message: "Create Cybrid customer first"
+        });
+      }
+
+      // Check KYC status through Cybrid
+      try {
+        const kycStatus = await CybridService.getLatestKycStatus(merchant.cybridCustomerGuid);
+        if (kycStatus.status !== 'approved') {
+          return res.status(400).json({
+            error: "Merchant KYC must be approved before creating trade account",
+            kycStatus: kycStatus.status
+          });
+        }
+      } catch (kycError) {
+        return res.status(400).json({
+          error: "Unable to verify KYC status",
+          message: "KYC status check failed"
+        });
+      }
+
+      // Check for existing trade account
+      if (merchant.cybridTradeAccountGuid && merchant.tradeAccountAsset === asset) {
+        return res.status(400).json({
+          error: "Trade account already exists for this asset",
+          existingAccount: {
+            guid: merchant.cybridTradeAccountGuid,
+            asset: merchant.tradeAccountAsset,
+            status: merchant.tradeAccountStatus
+          }
+        });
+      }
+
+      // Update status to pending
+      await storage.updateMerchant(id, {
+        tradeAccountStatus: 'pending'
+      });
+
+      try {
+        // Create trade account via Cybrid
+        const tradeAccount = await CybridService.createTradeAccount(merchant.cybridCustomerGuid, asset);
+        
+        // Update merchant with successful trade account creation
+        await storage.updateMerchant(id, {
+          cybridTradeAccountGuid: tradeAccount.guid,
+          tradeAccountStatus: 'created',
+          tradeAccountAsset: asset,
+          tradeAccountCreatedAt: new Date()
+        });
+
+        console.log(`✅ Successfully created ${asset} trade account for merchant ${merchant.name}: ${tradeAccount.guid}`);
+
+        res.json({
+          success: true,
+          tradeAccount: {
+            guid: tradeAccount.guid,
+            asset: asset,
+            name: tradeAccount.name,
+            status: 'created',
+            createdAt: new Date().toISOString()
+          }
+        });
+
+      } catch (cybridError) {
+        // Update status to error
+        await storage.updateMerchant(id, {
+          tradeAccountStatus: 'error',
+          cybridLastError: cybridError instanceof Error ? cybridError.message : 'Unknown error'
+        });
+
+        console.error(`Failed to create trade account for merchant ${merchant.name}:`, cybridError);
+        
+        res.status(500).json({
+          error: "Failed to create trade account",
+          details: cybridError instanceof Error ? cybridError.message : 'Unknown error'
+        });
+      }
+
+    } catch (error) {
+      console.error("Error in trade account creation:", error);
+      res.status(500).json({ error: "Failed to create trade account" });
     }
   });
 
