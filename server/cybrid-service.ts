@@ -184,9 +184,11 @@ export class CybridService {
     try {
       console.log(`Creating Cybrid ${customerType} customer for merchant ${merchantData.merchantId}`);
 
-      // Follow Cybrid documentation: only send type for Platform KYC method
+      // Include merchant details for better customer identification
       const customerPayload = {
-        type: customerType
+        type: customerType,
+        name: merchantData.name,
+        external_customer_id: merchantData.merchantId
       };
 
       const customer = await this.makeRequest('/api/customers', {
