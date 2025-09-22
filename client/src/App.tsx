@@ -121,7 +121,8 @@ function Router() {
 function AppLayout() {
   const [location] = useLocation();
   const isLandingPage = location === '/';
-  const isPortalRoute = location.startsWith('/admin') || location.startsWith('/merchant');
+  const isLoginRoute = location === '/admin/login' || location === '/merchant/login';
+  const isPortalRoute = (location.startsWith('/admin') || location.startsWith('/merchant')) && !isLoginRoute;
   
   // Determine user role based on current path
   const getUserRole = (path: string): "admin" | "merchant" | "customer" => {
@@ -132,12 +133,12 @@ function AppLayout() {
 
   const userRole = getUserRole(location);
 
-  // For landing page, render without sidebar
-  if (isLandingPage) {
+  // For landing page and login pages, render without sidebar
+  if (isLandingPage || isLoginRoute) {
     return <Router />;
   }
 
-  // For portal routes, render with sidebar
+  // For authenticated portal routes, render with sidebar
   if (isPortalRoute) {
     const style = {
       "--sidebar-width": "20rem",       // 320px for better content
