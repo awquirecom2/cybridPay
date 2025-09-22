@@ -557,14 +557,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const merchant = req.user as any;
       
-      // Ensure merchant has a Cybrid customer GUID
-      if (!merchant.cybridCustomerGuid) {
-        return res.status(400).json({ 
-          error: "Merchant account not linked to verification system. Please contact support." 
-        });
+      // Auto-create Cybrid customer for individual merchants if missing
+      let cybridCustomerGuid = merchant.cybridCustomerGuid;
+      
+      if (!cybridCustomerGuid) {
+        // For individual merchants, auto-create Cybrid customer to start KYC
+        if (merchant.cybridCustomerType === 'individual') {
+          console.log(`Auto-creating Cybrid customer for individual merchant ${merchant.id}`);
+          
+          const cybridCustomer = await CybridService.ensureCustomer({
+            merchantId: merchant.id,
+            name: merchant.name,
+            email: merchant.email,
+            type: 'individual'
+          });
+          
+          cybridCustomerGuid = cybridCustomer.guid;
+          console.log(`Created Cybrid customer ${cybridCustomerGuid} for individual merchant ${merchant.id}`);
+        } else {
+          // Business merchants need admin approval first
+          return res.status(400).json({ 
+            error: "Business merchant account requires admin approval before KYC verification. Please contact support." 
+          });
+        }
       }
 
-      console.log(`Starting manual KYC for merchant ${merchant.id} with Cybrid customer ${merchant.cybridCustomerGuid}`);
+      console.log(`Starting manual KYC for merchant ${merchant.id} with Cybrid customer ${cybridCustomerGuid}`);
 
       // Create identity verification and persona session
       const result = await CybridService.createManualKycVerification(merchant.cybridCustomerGuid);
