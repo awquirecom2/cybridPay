@@ -42,6 +42,7 @@ export const merchants = pgTable("merchants", {
   integrations: text("integrations").array().default([]),
   // Cybrid customer mapping fields
   cybridCustomerGuid: text("cybrid_customer_guid"), // Maps to Cybrid customer GUID
+  cybridCustomerType: text("cybrid_customer_type").default("business"), // business or individual
   cybridVerificationGuid: text("cybrid_verification_status"), // Tracks KYC verification status
   cybridIntegrationStatus: text("cybrid_integration_status").default("pending"), // pending, active, error
   cybridLastError: text("cybrid_last_error"), // Store last error message
@@ -66,6 +67,11 @@ export const adminCreateMerchantSchema = insertMerchantSchema.omit({
   password: true,
   status: true,
   kybStatus: true
+}).extend({
+  cybridCustomerType: z.enum(["business", "individual"], {
+    required_error: "Customer type is required",
+    invalid_type_error: "Customer type must be either 'business' or 'individual'"
+  }).default("business")
 });
 
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;

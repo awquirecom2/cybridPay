@@ -267,7 +267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cybridCustomer = await CybridService.ensureCustomer({
             merchantId: merchant.id,
             name: merchant.name,
-            email: merchant.email
+            email: merchant.email,
+            type: (merchant as any).cybridCustomerType || 'business' // Use stored customer type or default to business
           });
 
           cybridResult = {

@@ -37,6 +37,7 @@ interface MerchantData {
   volume: string;
   dateOnboarded: string;
   cybridCustomerGuid?: string;
+  cybridCustomerType?: 'business' | 'individual';
   cybridIntegrationStatus?: 'none' | 'pending' | 'active' | 'error';
   cybridLastError?: string;
 }
@@ -67,7 +68,8 @@ export function MerchantManagement() {
     name: "",
     email: "",
     businessType: "",
-    website: ""
+    website: "",
+    cybridCustomerType: "business"
   })
   const [editMerchant, setEditMerchant] = useState({
     name: "",
@@ -119,7 +121,7 @@ export function MerchantManagement() {
       setGeneratedCredentials(data.credentials)
       setShowCredentials(true)
       setShowCreateDialog(false)
-      setNewMerchant({ name: "", email: "", businessType: "", website: "" })
+      setNewMerchant({ name: "", email: "", businessType: "", website: "", cybridCustomerType: "business" })
       refetchMerchants()
       queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
       toast({
@@ -537,6 +539,21 @@ export function MerchantManagement() {
                   placeholder="https://techcorp.com"
                   data-testid="input-merchant-website"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cybridCustomerType">Cybrid Customer Type</Label>
+                <Select value={newMerchant.cybridCustomerType} onValueChange={(value: "business" | "individual") => setNewMerchant(prev => ({ ...prev, cybridCustomerType: value }))}>
+                  <SelectTrigger data-testid="select-merchant-cybrid-customer-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="business">Business Customer</SelectItem>
+                    <SelectItem value="individual">Individual Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This determines the KYC/KYB verification type when the merchant is approved
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -998,22 +1015,16 @@ export function MerchantManagement() {
             </div>
           )}
 
-          {/* Customer Type Selection - only shown when creating new customer */}
-          {selectedMerchant && (!cybridStatus?.hasCustomer || cybridStatus?.integrationStatus === 'error') && (
+          {/* Customer Type Display - show the type selected during merchant creation */}
+          {selectedMerchant && (
             <div className="space-y-3 border-t pt-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Customer Type</Label>
-                <Select value={customerType} onValueChange={(value: "business" | "individual") => setCustomerType(value)}>
-                  <SelectTrigger data-testid="select-customer-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="business">Business Customer</SelectItem>
-                    <SelectItem value="individual">Individual Customer</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="p-2 bg-muted rounded text-sm">
+                  {(selectedMerchant.cybridCustomerType || 'business') === 'business' ? 'Business Customer' : 'Individual Customer'}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Choose whether to create an individual or business customer account in Cybrid
+                  Customer type was selected during merchant creation and cannot be changed
                 </p>
               </div>
             </div>
@@ -1028,14 +1039,15 @@ export function MerchantManagement() {
                 onClick={() => {
                   if (selectedMerchant) {
                     setShowCybridDialog(false)
-                    createCybridCustomerMutation.mutate({ merchantId: selectedMerchant.id, customerType })
+                    const storedCustomerType = (selectedMerchant.cybridCustomerType || 'business') as "business" | "individual"
+                    createCybridCustomerMutation.mutate({ merchantId: selectedMerchant.id, customerType: storedCustomerType })
                   }
                 }}
                 disabled={createCybridCustomerMutation.isPending}
                 data-testid="button-create-cybrid-customer"
               >
                 {createCybridCustomerMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-                {cybridStatus?.hasCustomer ? 'Retry Setup' : `Create ${customerType === 'business' ? 'Business' : 'Individual'} Customer`}
+                {cybridStatus?.hasCustomer ? 'Retry Setup' : `Create ${(selectedMerchant.cybridCustomerType || 'business') === 'business' ? 'Business' : 'Individual'} Customer`}
               </Button>
             )}
           </DialogFooter>
