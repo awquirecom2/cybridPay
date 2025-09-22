@@ -5,7 +5,11 @@ import { CredentialEncryption } from './transak-service';
 export interface CybridCustomer {
   guid: string;
   type: string;
-  name: string;
+  name: {
+    first?: string;
+    last?: string;
+    full?: string;
+  };
   external_customer_id: string;
   bank_guid: string;
   state: string;
@@ -175,19 +179,49 @@ export class CybridService {
     return response.json();
   }
 
-  // Create business customer for a merchant
-  static async createBusinessCustomer(merchantData: {
+  // Create customer for a merchant (business or individual)
+  static async createCustomer(merchantData: {
     merchantId: string;
     name: string;
     email: string;
-  }): Promise<CybridCustomer> {
+  }, customerType: 'business' | 'individual' = 'business'): Promise<CybridCustomer> {
     try {
-      console.log(`Creating Cybrid customer for merchant ${merchantData.merchantId}`);
+      console.log(`Creating Cybrid ${customerType} customer for merchant ${merchantData.merchantId}`);
 
-      // Follow Cybrid documentation: only send type for Platform KYC method
-      const customerPayload = {
-        type: 'business'
+      // Include merchant details for better customer identification
+      // Format name according to Cybrid API requirements
+      let customerPayload: any = {
+        type: customerType,
+        external_customer_id: merchantData.merchantId
       };
+
+      if (customerType === 'individual') {
+        // For individuals, Cybrid expects first and last name
+        const nameParts = merchantData.name.trim().split(' ').filter(part => part.length > 0);
+        
+        let firstName, lastName;
+        if (nameParts.length >= 2) {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        } else {
+          // Handle single word names - Cybrid requires both first and last
+          firstName = nameParts[0] || 'Individual';
+          lastName = 'User'; // Use a valid fallback
+        }
+        
+        // Ensure minimum requirements for Cybrid
+        customerPayload.name = {
+          first: firstName.length >= 1 ? firstName : 'Individual',
+          last: lastName.length >= 1 ? lastName : 'User'
+        };
+      } else {
+        // For businesses, Cybrid expects full company name
+        customerPayload.name = {
+          full: merchantData.name.trim() || 'Business Entity'
+        };
+      }
+
+      console.log(`Customer payload:`, JSON.stringify(customerPayload, null, 2));
 
       const customer = await this.makeRequest('/api/customers', {
         method: 'POST',
@@ -797,6 +831,7 @@ export class CybridService {
     merchantId: string;
     name: string;
     email: string;
+    type?: 'individual' | 'business';
   }): Promise<CybridCustomer> {
     try {
       // SECONDARY GUARD: Verify merchant is approved before creating customer
@@ -826,7 +861,8 @@ export class CybridService {
       }
 
       // Create new customer if doesn't exist
-      return await this.createBusinessCustomer(merchantData);
+      const customerType = merchantData.type || 'business';
+      return await this.createCustomer(merchantData, customerType);
 
     } catch (error) {
       console.error(`Failed to ensure Cybrid customer for merchant ${merchantData.merchantId}:`, error);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw, Shield } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,7 +26,6 @@ interface MerchantData {
   description?: string;
   status: 'pending' | 'approved' | 'rejected' | 'deactivated';
   kybStatus: 'pending' | 'approved' | 'rejected' | 'in_review';
-  kycStatus: 'pending' | 'in_review' | 'approved' | 'rejected';
   customFeeEnabled: boolean;
   customFeePercentage: string;
   customFlatFee: string;
@@ -38,6 +37,7 @@ interface MerchantData {
   volume: string;
   dateOnboarded: string;
   cybridCustomerGuid?: string;
+  cybridCustomerType?: 'business' | 'individual';
   cybridIntegrationStatus?: 'none' | 'pending' | 'active' | 'error';
   cybridLastError?: string;
 }
@@ -48,7 +48,11 @@ interface CybridStatusData {
   integrationStatus: string;
   customer?: {
     guid: string;
-    name: string;
+    name: {
+      first?: string;
+      last?: string;
+      full?: string;
+    };
     state: string;
     type: string;
   };
@@ -68,7 +72,8 @@ export function MerchantManagement() {
     name: "",
     email: "",
     businessType: "",
-    website: ""
+    website: "",
+    cybridCustomerType: "business"
   })
   const [editMerchant, setEditMerchant] = useState({
     name: "",
@@ -97,6 +102,9 @@ export function MerchantManagement() {
   const [resetCredentials, setResetCredentials] = useState<{username: string; password: string} | null>(null)
   const [resetMerchantName, setResetMerchantName] = useState("")
 
+  // State for customer type selection
+  const [customerType, setCustomerType] = useState<"business" | "individual">("business")
+
   // Fetch merchants from API
   const { data: merchants = [], isLoading: merchantsLoading, refetch: refetchMerchants } = useQuery({
     queryKey: ['/api/admin/merchants'],
@@ -117,7 +125,7 @@ export function MerchantManagement() {
       setGeneratedCredentials(data.credentials)
       setShowCredentials(true)
       setShowCreateDialog(false)
-      setNewMerchant({ name: "", email: "", businessType: "", website: "" })
+      setNewMerchant({ name: "", email: "", businessType: "", website: "", cybridCustomerType: "business" })
       refetchMerchants()
       queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
       toast({
@@ -160,8 +168,10 @@ export function MerchantManagement() {
 
   // Cybrid customer creation mutation
   const createCybridCustomerMutation = useMutation({
-    mutationFn: async (merchantId: string) => {
-      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/cybrid-customer`)
+    mutationFn: async (params: { merchantId: string; customerType: "business" | "individual" }) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${params.merchantId}/cybrid-customer`, {
+        type: params.customerType
+      })
       return await response.json()
     },
     onSuccess: () => {
@@ -244,29 +254,6 @@ export function MerchantManagement() {
       toast({
         title: "Sync Error",
         description: "Failed to sync KYC statuses. Please try again.",
-        variant: "destructive",
-      })
-    }
-  })
-
-  // Trigger KYC creation mutation for admin-controlled workflow
-  const triggerKycMutation = useMutation({
-    mutationFn: async (merchantId: string) => {
-      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/trigger-kyc`)
-      return await response.json()
-    },
-    onSuccess: (data: any) => {
-      refetchMerchants()
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
-      toast({
-        title: "KYC Verification Created",
-        description: `KYC verification initiated for ${data.merchant.name}. Merchant can now complete verification.`,
-      })
-    },
-    onError: (error: any) => {
-      toast({
-        title: "KYC Creation Failed",
-        description: error.message || "Failed to create KYC verification. Please try again.",
         variant: "destructive",
       })
     }
@@ -369,22 +356,18 @@ export function MerchantManagement() {
     // Cybrid management actions
     if (action === 'cybrid-status') {
       setSelectedMerchant(merchant)
+      setCustomerType("business") // Reset to default when opening dialog
       fetchCybridStatusMutation.mutate(merchantId)
       return
     }
 
     if (action === 'cybrid-create') {
-      createCybridCustomerMutation.mutate(merchantId)
+      createCybridCustomerMutation.mutate({ merchantId, customerType: "business" })
       return
     }
 
     if (action === 'reset-credentials') {
       resetCredentialsMutation.mutate(merchantId)
-      return
-    }
-
-    if (action === 'trigger-kyc') {
-      triggerKycMutation.mutate(merchantId)
       return
     }
 
@@ -560,6 +543,21 @@ export function MerchantManagement() {
                   placeholder="https://techcorp.com"
                   data-testid="input-merchant-website"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cybridCustomerType">Cybrid Customer Type</Label>
+                <Select value={newMerchant.cybridCustomerType} onValueChange={(value: "business" | "individual") => setNewMerchant(prev => ({ ...prev, cybridCustomerType: value }))}>
+                  <SelectTrigger data-testid="select-merchant-cybrid-customer-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="business">Business Customer</SelectItem>
+                    <SelectItem value="individual">Individual Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This determines the KYC/KYB verification type when the merchant is approved
+                </p>
               </div>
             </div>
             <DialogFooter>
@@ -993,7 +991,12 @@ export function MerchantManagement() {
                   <div className="p-3 bg-muted rounded-lg space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">{cybridStatus.customer.name}</span>
+                      <span className="font-medium">
+                        {cybridStatus.customer.name?.full || 
+                         (cybridStatus.customer.name?.first && cybridStatus.customer.name?.last 
+                           ? `${cybridStatus.customer.name.first} ${cybridStatus.customer.name.last}` 
+                           : 'N/A')}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">State:</span>
@@ -1021,6 +1024,21 @@ export function MerchantManagement() {
             </div>
           )}
 
+          {/* Customer Type Display - show the type selected during merchant creation */}
+          {selectedMerchant && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Customer Type</Label>
+                <div className="p-2 bg-muted rounded text-sm">
+                  {(selectedMerchant.cybridCustomerType || 'business') === 'business' ? 'Business Customer' : 'Individual Customer'}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Customer type was selected during merchant creation and cannot be changed
+                </p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCybridDialog(false)}>
               Close
@@ -1030,14 +1048,15 @@ export function MerchantManagement() {
                 onClick={() => {
                   if (selectedMerchant) {
                     setShowCybridDialog(false)
-                    createCybridCustomerMutation.mutate(selectedMerchant.id)
+                    const storedCustomerType = (selectedMerchant.cybridCustomerType || 'business') as "business" | "individual"
+                    createCybridCustomerMutation.mutate({ merchantId: selectedMerchant.id, customerType: storedCustomerType })
                   }
                 }}
                 disabled={createCybridCustomerMutation.isPending}
                 data-testid="button-create-cybrid-customer"
               >
                 {createCybridCustomerMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-                {cybridStatus?.hasCustomer ? 'Retry Setup' : 'Create Customer'}
+                {cybridStatus?.hasCustomer ? 'Retry Setup' : `Create ${(selectedMerchant.cybridCustomerType || 'business') === 'business' ? 'Business' : 'Individual'} Customer`}
               </Button>
             )}
           </DialogFooter>
@@ -1211,21 +1230,6 @@ export function MerchantManagement() {
                             <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-create', merchant.id)}>
                               <RefreshCw className="h-4 w-4 mr-2" />
                               {merchant.cybridCustomerGuid ? 'Retry Cybrid Setup' : 'Create Cybrid Customer'}
-                            </DropdownMenuItem>
-                          )}
-                          
-                          {/* KYC Management Actions - Admin-Controlled */}
-                          {merchant.status === 'approved' && 
-                           merchant.cybridCustomerGuid && 
-                           merchant.cybridIntegrationStatus === 'active' &&
-                           merchant.kycStatus === 'pending' && (
-                            <DropdownMenuItem 
-                              onClick={() => handleMerchantAction('trigger-kyc', merchant.id)}
-                              className="text-blue-600 focus:text-blue-600"
-                              data-testid={`button-trigger-kyc-${merchant.id}`}
-                            >
-                              <Shield className="h-4 w-4 mr-2" />
-                              Trigger KYC Verification
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
