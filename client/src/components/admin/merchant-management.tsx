@@ -48,7 +48,11 @@ interface CybridStatusData {
   integrationStatus: string;
   customer?: {
     guid: string;
-    name: string;
+    name: {
+      first?: string;
+      last?: string;
+      full?: string;
+    };
     state: string;
     type: string;
   };
@@ -987,7 +991,12 @@ export function MerchantManagement() {
                   <div className="p-3 bg-muted rounded-lg space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Name:</span>
-                      <span className="font-medium">{cybridStatus.customer.name}</span>
+                      <span className="font-medium">
+                        {cybridStatus.customer.name?.full || 
+                         (cybridStatus.customer.name?.first && cybridStatus.customer.name?.last 
+                           ? `${cybridStatus.customer.name.first} ${cybridStatus.customer.name.last}` 
+                           : 'N/A')}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">State:</span>

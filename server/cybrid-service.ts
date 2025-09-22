@@ -5,7 +5,11 @@ import { CredentialEncryption } from './transak-service';
 export interface CybridCustomer {
   guid: string;
   type: string;
-  name: string;
+  name: {
+    first?: string;
+    last?: string;
+    full?: string;
+  };
   external_customer_id: string;
   bank_guid: string;
   state: string;
@@ -185,11 +189,25 @@ export class CybridService {
       console.log(`Creating Cybrid ${customerType} customer for merchant ${merchantData.merchantId}`);
 
       // Include merchant details for better customer identification
-      const customerPayload = {
+      // Format name according to Cybrid API requirements
+      let customerPayload: any = {
         type: customerType,
-        name: merchantData.name,
         external_customer_id: merchantData.merchantId
       };
+
+      if (customerType === 'individual') {
+        // For individuals, Cybrid expects first and last name
+        const nameParts = merchantData.name.split(' ');
+        customerPayload.name = {
+          first: nameParts[0] || merchantData.name,
+          last: nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Customer'
+        };
+      } else {
+        // For businesses, Cybrid expects full company name
+        customerPayload.name = {
+          full: merchantData.name
+        };
+      }
 
       const customer = await this.makeRequest('/api/customers', {
         method: 'POST',
