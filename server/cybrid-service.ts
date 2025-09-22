@@ -197,15 +197,27 @@ export class CybridService {
 
       if (customerType === 'individual') {
         // For individuals, Cybrid expects first and last name
-        const nameParts = merchantData.name.split(' ');
+        const nameParts = merchantData.name.trim().split(' ').filter(part => part.length > 0);
+        
+        let firstName, lastName;
+        if (nameParts.length >= 2) {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        } else {
+          // Handle single word names - Cybrid requires both first and last
+          firstName = nameParts[0] || 'Individual';
+          lastName = 'User'; // Use a valid fallback
+        }
+        
+        // Ensure minimum requirements for Cybrid
         customerPayload.name = {
-          first: nameParts[0] || merchantData.name,
-          last: nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Customer'
+          first: firstName.length >= 1 ? firstName : 'Individual',
+          last: lastName.length >= 1 ? lastName : 'User'
         };
       } else {
         // For businesses, Cybrid expects full company name
         customerPayload.name = {
-          full: merchantData.name
+          full: merchantData.name.trim() || 'Business Entity'
         };
       }
 
