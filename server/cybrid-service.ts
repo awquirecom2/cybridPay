@@ -175,18 +175,18 @@ export class CybridService {
     return response.json();
   }
 
-  // Create business customer for a merchant
-  static async createBusinessCustomer(merchantData: {
+  // Create customer for a merchant (business or individual)
+  static async createCustomer(merchantData: {
     merchantId: string;
     name: string;
     email: string;
-  }): Promise<CybridCustomer> {
+  }, customerType: 'business' | 'individual' = 'business'): Promise<CybridCustomer> {
     try {
-      console.log(`Creating Cybrid customer for merchant ${merchantData.merchantId}`);
+      console.log(`Creating Cybrid ${customerType} customer for merchant ${merchantData.merchantId}`);
 
       // Follow Cybrid documentation: only send type for Platform KYC method
       const customerPayload = {
-        type: 'business'
+        type: customerType
       };
 
       const customer = await this.makeRequest('/api/customers', {
@@ -797,6 +797,7 @@ export class CybridService {
     merchantId: string;
     name: string;
     email: string;
+    type?: 'individual' | 'business';
   }): Promise<CybridCustomer> {
     try {
       // SECONDARY GUARD: Verify merchant is approved before creating customer
@@ -826,7 +827,8 @@ export class CybridService {
       }
 
       // Create new customer if doesn't exist
-      return await this.createBusinessCustomer(merchantData);
+      const customerType = merchantData.type || 'business';
+      return await this.createCustomer(merchantData, customerType);
 
     } catch (error) {
       console.error(`Failed to ensure Cybrid customer for merchant ${merchantData.merchantId}:`, error);

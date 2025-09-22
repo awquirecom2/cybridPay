@@ -96,6 +96,9 @@ export function MerchantManagement() {
   const [resetCredentials, setResetCredentials] = useState<{username: string; password: string} | null>(null)
   const [resetMerchantName, setResetMerchantName] = useState("")
 
+  // State for customer type selection
+  const [customerType, setCustomerType] = useState<"business" | "individual">("business")
+
   // Fetch merchants from API
   const { data: merchants = [], isLoading: merchantsLoading, refetch: refetchMerchants } = useQuery({
     queryKey: ['/api/admin/merchants'],
@@ -159,8 +162,10 @@ export function MerchantManagement() {
 
   // Cybrid customer creation mutation
   const createCybridCustomerMutation = useMutation({
-    mutationFn: async (merchantId: string) => {
-      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/cybrid-customer`)
+    mutationFn: async (params: { merchantId: string; customerType: "business" | "individual" }) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${params.merchantId}/cybrid-customer`, {
+        type: params.customerType
+      })
       return await response.json()
     },
     onSuccess: () => {
@@ -345,12 +350,13 @@ export function MerchantManagement() {
     // Cybrid management actions
     if (action === 'cybrid-status') {
       setSelectedMerchant(merchant)
+      setCustomerType("business") // Reset to default when opening dialog
       fetchCybridStatusMutation.mutate(merchantId)
       return
     }
 
     if (action === 'cybrid-create') {
-      createCybridCustomerMutation.mutate(merchantId)
+      createCybridCustomerMutation.mutate({ merchantId, customerType: "business" })
       return
     }
 
@@ -992,6 +998,27 @@ export function MerchantManagement() {
             </div>
           )}
 
+          {/* Customer Type Selection - only shown when creating new customer */}
+          {selectedMerchant && (!cybridStatus?.hasCustomer || cybridStatus?.integrationStatus === 'error') && (
+            <div className="space-y-3 border-t pt-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Customer Type</Label>
+                <Select value={customerType} onValueChange={(value: "business" | "individual") => setCustomerType(value)}>
+                  <SelectTrigger data-testid="select-customer-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="business">Business Customer</SelectItem>
+                    <SelectItem value="individual">Individual Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose whether to create an individual or business customer account in Cybrid
+                </p>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCybridDialog(false)}>
               Close
@@ -1001,14 +1028,14 @@ export function MerchantManagement() {
                 onClick={() => {
                   if (selectedMerchant) {
                     setShowCybridDialog(false)
-                    createCybridCustomerMutation.mutate(selectedMerchant.id)
+                    createCybridCustomerMutation.mutate({ merchantId: selectedMerchant.id, customerType })
                   }
                 }}
                 disabled={createCybridCustomerMutation.isPending}
                 data-testid="button-create-cybrid-customer"
               >
                 {createCybridCustomerMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-                {cybridStatus?.hasCustomer ? 'Retry Setup' : 'Create Customer'}
+                {cybridStatus?.hasCustomer ? 'Retry Setup' : `Create ${customerType === 'business' ? 'Business' : 'Individual'} Customer`}
               </Button>
             )}
           </DialogFooter>

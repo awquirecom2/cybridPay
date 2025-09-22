@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -391,6 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/merchants/:id/cybrid-customer", requireAdmin, async (req, res) => {
     try {
       const { id } = cybridCustomerParamsSchema.parse(req.params);
+      const { type } = cybridCustomerCreateSchema.parse(req.body);
       const merchant = await storage.getMerchant(id);
       
       if (!merchant) {
@@ -418,11 +419,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create or ensure Cybrid customer exists
+      // Create or ensure Cybrid customer exists with specified type
       const cybridCustomer = await CybridService.ensureCustomer({
         merchantId: merchant.id,
         name: merchant.name,
-        email: merchant.email
+        email: merchant.email,
+        type: type
       });
 
       res.json({

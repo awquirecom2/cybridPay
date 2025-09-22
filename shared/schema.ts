@@ -194,6 +194,13 @@ export const cybridCustomerParamsSchema = z.object({
   id: z.string().min(1, "Merchant ID is required")
 });
 
+export const cybridCustomerCreateSchema = z.object({
+  type: z.enum(["individual", "business"], {
+    required_error: "Customer type is required",
+    invalid_type_error: "Customer type must be either 'individual' or 'business'"
+  }).default("business")
+});
+
 export const cybridDepositAddressSchema = z.object({
   asset: z.string().min(1, "Asset is required"),
   network: z.string().optional()
