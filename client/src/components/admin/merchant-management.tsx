@@ -462,6 +462,10 @@ export function MerchantManagement() {
           title = "Deposit Address Exists"
           description = "A deposit address already exists for this merchant and asset."
           suggestions = "Check the existing address status or try a different asset."
+        } else if (errorMessage.includes("Customer verification required") || errorMessage.includes("unverified_customer")) {
+          title = "Customer Verification Required"
+          description = "The Cybrid customer account must be verified before creating deposit addresses."
+          suggestions = "Please complete the KYC verification process in Cybrid first, then try again."
         } else {
           description = errorMessage || description
         }

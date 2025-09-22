@@ -1744,9 +1744,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.error(`Failed to create deposit address for merchant ${merchant.name}:`, cybridError);
         
+        // Parse Cybrid error for specific error handling
+        const errorMessage = cybridError instanceof Error ? cybridError.message : 'Unknown error';
+        
+        // Check for specific Cybrid error conditions
+        if (errorMessage.includes('unverified_customer') || errorMessage.includes('Customer has not been verified')) {
+          return res.status(400).json({
+            error: "Customer verification required",
+            message: "The Cybrid customer account must be verified before creating deposit addresses. Please complete the KYC verification process in Cybrid first.",
+            details: errorMessage
+          });
+        }
+        
+        if (errorMessage.includes('422')) {
+          return res.status(400).json({
+            error: "Invalid request",
+            message: "The deposit address creation request was invalid. Please check the account status and try again.",
+            details: errorMessage
+          });
+        }
+        
         res.status(500).json({
           error: "Failed to create deposit address",
-          details: cybridError instanceof Error ? cybridError.message : 'Unknown error'
+          details: errorMessage
         });
       }
 
