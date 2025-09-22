@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,6 +40,10 @@ interface MerchantData {
   cybridCustomerType?: 'business' | 'individual';
   cybridIntegrationStatus?: 'none' | 'pending' | 'active' | 'error';
   cybridLastError?: string;
+  cybridTradeAccountGuid?: string;
+  tradeAccountStatus?: 'pending' | 'created' | 'error';
+  tradeAccountAsset?: string;
+  tradeAccountCreatedAt?: string;
 }
 
 interface CybridStatusData {
@@ -282,6 +286,31 @@ export function MerchantManagement() {
     }
   })
 
+  // Create trade account mutation
+  const createTradeAccountMutation = useMutation({
+    mutationFn: async (merchantId: string) => {
+      const response = await apiRequest('POST', `/api/admin/merchants/${merchantId}/create-trade-account`, {
+        asset: 'USDC'
+      })
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      refetchMerchants()
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
+      toast({
+        title: "Trade Account Created",
+        description: `USDC trade account created successfully: ${data.tradeAccount?.guid || 'Account ready'}`,
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Trade Account Error",
+        description: error.details || "Failed to create trade account. Please try again.",
+        variant: "destructive",
+      })
+    }
+  })
+
   const getStatusBadge = (status: string) => {
     const variants = {
       approved: { variant: "default" as const, icon: CheckCircle, text: "Approved" },
@@ -342,6 +371,41 @@ export function MerchantManagement() {
     )
   }
 
+  const getTradeAccountBadge = (merchant: MerchantData) => {
+    // If no trade account GUID and no status, show "No Account"
+    if (!merchant.cybridTradeAccountGuid && !merchant.tradeAccountStatus) {
+      return (
+        <Badge variant="outline" className="text-xs" data-testid={`status-trade-account-${merchant.id}`}>
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          No Account
+        </Badge>
+      )
+    }
+
+    const variants = {
+      created: { variant: "default" as const, icon: TrendingUp, text: "Active" },
+      pending: { variant: "secondary" as const, icon: Clock, text: "Creating..." },
+      error: { variant: "destructive" as const, icon: XCircle, text: "Failed" }
+    }
+    
+    // If we have a GUID but no status, assume it's created
+    let status = merchant.tradeAccountStatus
+    if (merchant.cybridTradeAccountGuid && !status) {
+      status = 'created'
+    }
+    
+    const config = variants[status as keyof typeof variants] || variants.error
+    const Icon = config.icon
+    
+    return (
+      <Badge variant={config.variant} className="text-xs flex items-center gap-1" data-testid={`status-trade-account-${merchant.id}`}>
+        <Icon className="h-3 w-3" />
+        {config.text}
+        {merchant.tradeAccountAsset && ` (${merchant.tradeAccountAsset})`}
+      </Badge>
+    )
+  }
+
   const filteredMerchants = merchants.filter((merchant: MerchantData) => {
     const matchesSearch = merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          merchant.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -391,6 +455,11 @@ export function MerchantManagement() {
 
     if (action === 'reset-credentials') {
       resetCredentialsMutation.mutate(merchantId)
+      return
+    }
+
+    if (action === 'create-trade-account') {
+      createTradeAccountMutation.mutate(merchantId)
       return
     }
 
@@ -1179,6 +1248,7 @@ export function MerchantManagement() {
                   <TableHead>KYB</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Cybrid</TableHead>
+                  <TableHead>Trade Account</TableHead>
                   <TableHead>Volume</TableHead>
                   <TableHead>Onboarded</TableHead>
                   <TableHead className="w-12"></TableHead>
@@ -1206,6 +1276,9 @@ export function MerchantManagement() {
                     </TableCell>
                     <TableCell>
                       {getCybridStatusBadge(merchant.cybridIntegrationStatus)}
+                    </TableCell>
+                    <TableCell>
+                      {getTradeAccountBadge(merchant)}
                     </TableCell>
                     <TableCell className="font-mono">{merchant.volume}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -1272,6 +1345,26 @@ export function MerchantManagement() {
                             <DropdownMenuItem onClick={() => handleMerchantAction('cybrid-create', merchant.id)}>
                               <RefreshCw className="h-4 w-4 mr-2" />
                               {merchant.cybridCustomerGuid ? 'Retry Cybrid Setup' : 'Create Cybrid Customer'}
+                            </DropdownMenuItem>
+                          )}
+                          {/* Trade Account Management */}
+                          {merchant.status === 'approved' && 
+                           merchant.cybridCustomerGuid && 
+                           merchant.cybridIntegrationStatus === 'active' && 
+                           merchant.kybStatus === 'approved' && 
+                           !merchant.cybridTradeAccountGuid && 
+                           merchant.tradeAccountStatus !== 'pending' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('create-trade-account', merchant.id)}
+                              disabled={createTradeAccountMutation.isPending}
+                              data-testid={`menu-create-trade-account-${merchant.id}`}
+                            >
+                              {createTradeAccountMutation.isPending ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TrendingUp className="h-4 w-4 mr-2" />
+                              )}
+                              Create USDC Trade Account
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
