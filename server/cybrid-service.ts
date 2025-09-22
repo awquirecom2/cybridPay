@@ -401,7 +401,7 @@ export class CybridService {
   }
 
   // Check for existing identity verifications for customer (especially "waiting" ones)
-  static async checkExistingVerifications(customerGuid: string): Promise<CybridIdentityVerification | null> {
+  static async checkExistingVerifications(customerGuid: string, method?: string): Promise<CybridIdentityVerification | null> {
     try {
       console.log(`Checking existing identity verifications for customer: ${customerGuid}`);
       
@@ -414,21 +414,21 @@ export class CybridService {
 
       // Look for "waiting" status first (ready for persona session)
       const waitingVerification = verifications.objects.find(v => 
-        v.state === 'waiting' && v.type === 'kyc' && v.method === 'document_submission'
+        v.state === 'waiting' && v.type === 'kyc' && (method ? v.method === method : true)
       );
 
       if (waitingVerification) {
-        console.log(`Found existing WAITING verification: ${waitingVerification.guid}`);
+        console.log(`Found existing WAITING verification: ${waitingVerification.guid} (method: ${waitingVerification.method})`);
         return waitingVerification;
       }
 
       // Look for any incomplete verification that we can continue with
       const pendingVerification = verifications.objects.find(v => 
-        v.state !== 'completed' && v.type === 'kyc' && v.method === 'document_submission'
+        v.state !== 'completed' && v.type === 'kyc' && (method ? v.method === method : true)
       );
 
       if (pendingVerification) {
-        console.log(`Found existing PENDING verification: ${pendingVerification.guid} (state: ${pendingVerification.state})`);
+        console.log(`Found existing PENDING verification: ${pendingVerification.guid} (state: ${pendingVerification.state}, method: ${pendingVerification.method})`);
         return pendingVerification;
       }
 
@@ -451,8 +451,16 @@ export class CybridService {
     try {
       console.log(`Starting manual KYC verification for customer: ${customerGuid}`);
       
-      // Step 1: Check for existing identity verifications first
-      const existingVerification = await this.checkExistingVerifications(customerGuid);
+      // Step 1: Get customer details to determine type (individual vs business)
+      const customer = await this.getCustomer(customerGuid);
+      console.log(`Customer type: ${customer.type}`);
+      
+      // Determine verification method based on customer type
+      const verificationMethod = customer.type === 'individual' ? 'id_and_selfie' : 'document_submission';
+      console.log(`Using verification method: ${verificationMethod} for customer type: ${customer.type}`);
+      
+      // Step 2: Check for existing identity verifications first
+      const existingVerification = await this.checkExistingVerifications(customerGuid, verificationMethod);
       
       let verification: CybridIdentityVerification;
       let personaInquiryId: string;
@@ -473,11 +481,24 @@ export class CybridService {
         // No existing verification, create a new one
         console.log('No existing verification found, creating new one...');
         
-        const verificationPayload = {
+        // Create verification payload based on customer type
+        let verificationPayload: any = {
           type: 'kyc',
-          method: 'document_submission',
+          method: verificationMethod,
           customer_guid: customerGuid
         };
+
+        // For individual customers using id_and_selfie, add identification_numbers
+        if (customer.type === 'individual' && verificationMethod === 'id_and_selfie') {
+          verificationPayload.identification_numbers = [
+            {
+              type: 'drivers_license'
+            }
+          ];
+          console.log('Added identification_numbers for individual customer verification');
+        }
+
+        console.log('Verification payload:', JSON.stringify(verificationPayload, null, 2));
 
         verification = await this.makeRequest('/api/identity_verifications', {
           method: 'POST',
@@ -491,7 +512,7 @@ export class CybridService {
         personaInquiryId = await this.pollForPersonaInquiryId(verification.guid);
       }
 
-      // Step 2: Create the Persona verification URL directly (no persona session needed)
+      // Step 3: Create the Persona verification URL directly (no persona session needed)
       const personaVerificationUrl = `https://withpersona.com/verify?inquiry-id=${personaInquiryId}&environment-id=sandbox`;
       
       console.log(`Persona verification URL created: ${personaVerificationUrl}`);
