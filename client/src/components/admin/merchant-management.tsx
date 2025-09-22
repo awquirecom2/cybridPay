@@ -294,6 +294,27 @@ export function MerchantManagement() {
       })
       return await response.json()
     },
+    retry: (failureCount, error: any) => {
+      // Retry network errors and temporary server errors up to 2 times
+      if (failureCount < 2) {
+        // Parse status code from error message (format: "500: Server Error")
+        const statusMatch = error.message?.match(/^(\d{3}):/)
+        const status = statusMatch ? parseInt(statusMatch[1]) : null
+        
+        if (
+          (status && status >= 500 && status < 600) || // Server errors
+          status === 429 || // Rate limiting
+          error.name === 'TypeError' || // Network failures
+          error.name === 'NetworkError' ||
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('fetch')
+        ) {
+          return true
+        }
+      }
+      return false
+    },
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
     onSuccess: (data: any) => {
       refetchMerchants()
       queryClient.invalidateQueries({ queryKey: ['/api/admin/merchants'] })
@@ -303,9 +324,60 @@ export function MerchantManagement() {
       })
     },
     onError: (error: any) => {
+      console.error("Trade account creation error:", error)
+      
+      // Parse status code from error message (format: "404: Not Found" or similar)
+      const statusMatch = error.message?.match(/^(\d{3}):\s*(.+)$/)
+      const status = statusMatch ? parseInt(statusMatch[1]) : null
+      const serverMessage = statusMatch ? statusMatch[2] : error.message
+      
+      // Provide specific error messages based on error type
+      let title = "Trade Account Error"
+      let description = "Failed to create trade account. Please try again."
+      let suggestions = ""
+
+      if (status === 404) {
+        title = "Merchant Not Found"
+        description = "The selected merchant could not be found."
+        suggestions = "Please refresh the page and try again."
+      } else if (status === 400) {
+        // Handle specific 400 error cases based on error message
+        const errorMessage = serverMessage || ""
+        
+        if (errorMessage.includes("must be approved")) {
+          title = "Merchant Not Approved"
+          description = "Trade accounts can only be created for approved merchants."
+          suggestions = "Please approve the merchant first, then try again."
+        } else if (errorMessage.includes("Cybrid customer")) {
+          title = "Cybrid Customer Missing"
+          description = "Merchant must have a Cybrid customer account before creating a trade account."
+          suggestions = "Create a Cybrid customer for this merchant first."
+        } else if (errorMessage.includes("KYC must be approved")) {
+          title = "KYC Not Approved"
+          description = "Merchant's KYC verification must be approved before creating trade accounts."
+          suggestions = "Try syncing KYC status first, or wait for KYC approval to complete."
+        } else if (errorMessage.includes("already exists")) {
+          title = "Trade Account Exists"
+          description = "A trade account already exists for this merchant and asset."
+          suggestions = "Check the existing account status or try a different asset."
+        } else {
+          description = errorMessage || description
+        }
+      } else if (status && status >= 500) {
+        title = "Server Error"
+        description = "An internal server error occurred while creating the trade account."
+        suggestions = "Please try again in a few minutes or contact support if the issue persists."
+      } else if (error.name === 'TypeError' || error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+        title = "Connection Error"
+        description = "Unable to connect to the server."
+        suggestions = "Please check your internet connection and try again."
+      } else {
+        description = serverMessage || description
+      }
+
       toast({
-        title: "Trade Account Error",
-        description: error.details || "Failed to create trade account. Please try again.",
+        title,
+        description: suggestions ? `${description} ${suggestions}` : description,
         variant: "destructive",
       })
     }
