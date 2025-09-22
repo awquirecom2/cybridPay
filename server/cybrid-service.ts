@@ -103,7 +103,7 @@ export class CybridService {
           grant_type: 'client_credentials',
           client_id: this.CLIENT_ID!,
           client_secret: this.CLIENT_SECRET!,
-          scope: 'banks:read customers:read customers:write customers:execute accounts:read prices:read quotes:read identity_verifications:read identity_verifications:write identity_verifications:execute persona_sessions:execute'
+          scope: 'banks:read customers:read customers:write customers:execute accounts:read accounts:write accounts:execute prices:read quotes:read identity_verifications:read identity_verifications:write identity_verifications:execute persona_sessions:execute'
         })
       });
 
@@ -832,6 +832,55 @@ export class CybridService {
 
     } catch (error) {
       console.error(`Failed to create deposit addresses for customer ${customerGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // Create a single trading account for a merchant (used for admin trade account creation)
+  static async createTradeAccount(customerGuid: string, asset: string = 'USDC'): Promise<CybridAccount> {
+    // Normalize asset to uppercase
+    const normalizedAsset = asset.toUpperCase();
+    console.log(`Creating ${normalizedAsset} trade account for customer: ${customerGuid}`);
+    
+    try {
+      // Create trading account payload
+      const accountPayload = {
+        type: 'trading',
+        customer_guid: customerGuid,
+        asset: normalizedAsset,
+        name: `${normalizedAsset} Trading Account`
+      };
+
+      console.log(`Trade account payload: type=${accountPayload.type}, asset=${accountPayload.asset}`);
+
+      // Create the trading account
+      const account = await this.makeRequest('/api/accounts', {
+        method: 'POST',
+        body: JSON.stringify(accountPayload)
+      }) as CybridAccount;
+
+      console.log(`✅ Successfully created ${asset} trading account: ${account.guid}`);
+
+      // Wait for account to be ready 
+      let attempts = 0;
+      let accountReady = false;
+      
+      while (attempts < 10 && !accountReady) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        const accountStatus = await this.makeRequest(`/api/accounts/${account.guid}`) as CybridAccount;
+        accountReady = accountStatus.state === 'storing';
+        attempts++;
+        console.log(`Account ${account.guid} status check ${attempts}: state=${accountStatus.state}`);
+      }
+
+      if (!accountReady) {
+        console.warn(`Account ${account.guid} not ready after 20 seconds, but created successfully`);
+      }
+
+      return account;
+
+    } catch (error) {
+      console.error(`Failed to create trade account for customer ${customerGuid}:`, error);
       throw error;
     }
   }
