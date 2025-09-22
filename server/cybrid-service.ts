@@ -209,6 +209,8 @@ export class CybridService {
         };
       }
 
+      console.log(`Customer payload:`, JSON.stringify(customerPayload, null, 2));
+
       const customer = await this.makeRequest('/api/customers', {
         method: 'POST',
         body: JSON.stringify(customerPayload)
