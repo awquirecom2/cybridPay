@@ -161,6 +161,16 @@ export default function AdminLogin() {
         </Card>
 
         <div className="text-center mt-6">
+          <div className="mb-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setLocation('/')}
+              data-testid="button-back-home"
+            >
+              Back to Home
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">
             Secure admin access • CryptoPay Platform
           </p>
