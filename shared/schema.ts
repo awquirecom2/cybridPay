@@ -49,6 +49,11 @@ export const merchants = pgTable("merchants", {
   cybridLastAttemptAt: timestamp("cybrid_last_attempt_at"), // Last integration attempt
   cybridLastSyncedAt: timestamp("cybrid_last_synced_at"), // Last successful sync
   depositAddressesCreated: boolean("deposit_addresses_created").default(false),
+  // Trade account tracking fields
+  cybridTradeAccountGuid: text("cybrid_trade_account_guid"), // Cybrid trade account GUID
+  tradeAccountStatus: text("trade_account_status").default("none"), // none, pending, created, error
+  tradeAccountAsset: text("trade_account_asset"), // USDC, BTC, etc.
+  tradeAccountCreatedAt: timestamp("trade_account_created_at"), // When trade account was created
   dateOnboarded: timestamp("date_onboarded").default(sql`NOW()`),
   createdAt: timestamp("created_at").default(sql`NOW()`),
   updatedAt: timestamp("updated_at").default(sql`NOW()`)
