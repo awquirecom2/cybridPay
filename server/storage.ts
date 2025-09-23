@@ -33,6 +33,11 @@ export interface IStorage {
   updateAdmin(id: string, updates: Partial<InsertAdmin>): Promise<Admin | undefined>;
   updateAdminLastLogin(id: string): Promise<void>;
   deleteAdmin(id: string): Promise<boolean>;
+  
+  // Admin password reset methods
+  updateAdminResetToken(id: string, resetToken: string, resetTokenExpiry: Date): Promise<Admin | undefined>;
+  getAdminByResetToken(resetToken: string): Promise<Admin | undefined>;
+  clearAdminResetToken(id: string): Promise<Admin | undefined>;
 
   // Merchant credentials methods
   getMerchantCredentials(merchantId: string, provider: string): Promise<MerchantCredentials | undefined>;
@@ -176,6 +181,38 @@ export class DatabaseStorage implements IStorage {
   async deleteAdmin(id: string): Promise<boolean> {
     const result = await db.delete(admins).where(eq(admins.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Admin password reset methods
+  async updateAdminResetToken(id: string, resetToken: string, resetTokenExpiry: Date): Promise<Admin | undefined> {
+    const result = await db.update(admins)
+      .set({ 
+        resetToken: resetToken,
+        resetTokenExpiry: resetTokenExpiry 
+      })
+      .where(eq(admins.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAdminByResetToken(resetToken: string): Promise<Admin | undefined> {
+    const result = await db.select().from(admins)
+      .where(and(
+        eq(admins.resetToken, resetToken),
+        sql`${admins.resetTokenExpiry} > NOW()`
+      ));
+    return result[0];
+  }
+
+  async clearAdminResetToken(id: string): Promise<Admin | undefined> {
+    const result = await db.update(admins)
+      .set({ 
+        resetToken: null,
+        resetTokenExpiry: null 
+      })
+      .where(eq(admins.id, id))
+      .returning();
+    return result[0];
   }
 
   // Merchant credentials methods

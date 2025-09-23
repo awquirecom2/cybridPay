@@ -120,6 +120,107 @@ export function setupAdminAuth(app: Express): void {
     res.json(sanitizeAdmin(req.user));
   });
 
+  // Password reset endpoints (no authentication required)
+  app.post("/api/admin/request-password-reset", async (req, res) => {
+    try {
+      const { identifier } = req.body; // Can be username or email
+      
+      if (!identifier) {
+        return res.status(400).json({ error: "Username or email is required" });
+      }
+
+      // Find admin by username or email
+      let admin = await storage.getAdminByUsername(identifier);
+      if (!admin) {
+        admin = await storage.getAdminByEmail(identifier);
+      }
+
+      // Always return success to prevent username/email enumeration
+      if (!admin) {
+        return res.status(200).json({ 
+          success: true, 
+          message: "If an admin account with that identifier exists, a password reset token has been generated."
+        });
+      }
+
+      // Check if admin is active
+      if (admin.status !== 'active') {
+        return res.status(200).json({ 
+          success: true, 
+          message: "If an admin account with that identifier exists, a password reset token has been generated."
+        });
+      }
+
+      // Generate secure reset token
+      const crypto = await import('crypto');
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+      // Store reset token
+      await storage.updateAdminResetToken(admin.id, resetToken, resetTokenExpiry);
+
+      // In production, you would send an email with the reset link
+      // For now, we'll just return the token for testing
+      console.log(`Password reset token for ${admin.username}: ${resetToken}`);
+      console.log(`Reset URL: /admin/reset-password?token=${resetToken}`);
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Password reset token has been generated. Check the server logs for the reset link.",
+        // In production, remove this - only for development
+        resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
+      });
+
+    } catch (error) {
+      console.error("Error requesting password reset:", error);
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/admin/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token and new password are required" });
+      }
+
+      // Validate password strength
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters long" });
+      }
+
+      // Find admin by reset token (includes expiry check)
+      const admin = await storage.getAdminByResetToken(token);
+      if (!admin) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Check if admin is active
+      if (admin.status !== 'active') {
+        return res.status(403).json({ error: "Admin account is suspended" });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update password and clear reset token
+      await storage.updateAdmin(admin.id, { password: hashedPassword });
+      await storage.clearAdminResetToken(admin.id);
+
+      console.log(`Password reset successful for admin: ${admin.username}`);
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Password has been reset successfully. You can now log in with your new password."
+      });
+
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   // Middleware to protect admin routes
   app.use("/api/admin", async (req, res, next) => {
     // Allow bootstrap route (must be first check)
@@ -127,8 +228,9 @@ export function setupAdminAuth(app: Express): void {
       return next();
     }
 
-    // Allow login/logout/profile routes to pass through
-    if (req.path === "/login" || req.path === "/logout" || req.path === "/profile") {
+    // Allow login/logout/profile/password-reset routes to pass through
+    if (req.path === "/login" || req.path === "/logout" || req.path === "/profile" || 
+        req.path === "/request-password-reset" || req.path === "/reset-password") {
       return next();
     }
 
