@@ -100,6 +100,9 @@ export const admins = pgTable("admins", {
   role: text("role").notNull().default("admin"), // admin, super_admin
   status: text("status").notNull().default("active"), // active, suspended
   lastLoginAt: timestamp("last_login_at"),
+  // Password reset fields
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   createdAt: timestamp("created_at").default(sql`NOW()`),
   updatedAt: timestamp("updated_at").default(sql`NOW()`)
 });
