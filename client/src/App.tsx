@@ -23,6 +23,7 @@ import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
 import { Accounts } from "@/components/merchant/accounts";
 import MerchantLogin from "@/pages/merchant-login";
 import AdminLogin from "@/pages/admin-login";
+import AdminPasswordReset from "@/pages/admin-password-reset";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -46,6 +47,7 @@ function Router() {
       {/* Authentication Routes */}
       <Route path="/merchant/login" component={MerchantLogin} />
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/reset-password" component={AdminPasswordReset} />
       
       {/* Admin Portal Routes - Protected */}
       <Route path="/admin">
@@ -121,7 +123,7 @@ function Router() {
 function AppLayout() {
   const [location] = useLocation();
   const isLandingPage = location === '/';
-  const isLoginRoute = location === '/admin/login' || location === '/merchant/login';
+  const isLoginRoute = location === '/admin/login' || location === '/merchant/login' || location === '/admin/reset-password';
   const isPortalRoute = (location.startsWith('/admin') || location.startsWith('/merchant')) && !isLoginRoute;
   
   // Determine user role based on current path

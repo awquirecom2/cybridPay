@@ -157,6 +157,18 @@ export default function AdminLogin() {
                 </Button>
               </form>
             </Form>
+            
+            <div className="text-center">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setLocation('/admin/reset-password')}
+                data-testid="link-forgot-password"
+                className="text-sm text-muted-foreground hover:text-primary p-0 h-auto font-normal"
+              >
+                Forgot your password?
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

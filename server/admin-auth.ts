@@ -5,6 +5,7 @@ import { promisify } from "util";
 import type { Express } from "express";
 import { storage } from "./storage";
 import { adminLoginSchema } from "@shared/schema";
+import rateLimit from "express-rate-limit";
 
 const scryptAsync = promisify(scrypt);
 
@@ -120,8 +121,29 @@ export function setupAdminAuth(app: Express): void {
     res.json(sanitizeAdmin(req.user));
   });
 
+  // Rate limiting for password reset endpoints
+  const passwordResetRequestLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 3, // Limit each IP to 3 password reset requests per windowMs
+    message: {
+      error: "Too many password reset attempts. Please try again later."
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const passwordResetLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 password reset attempts per windowMs
+    message: {
+      error: "Too many password reset attempts. Please try again later."
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // Password reset endpoints (no authentication required)
-  app.post("/api/admin/request-password-reset", async (req, res) => {
+  app.post("/api/admin/request-password-reset", passwordResetRequestLimit, async (req, res) => {
     try {
       const { identifier } = req.body; // Can be username or email
       
@@ -154,15 +176,18 @@ export function setupAdminAuth(app: Express): void {
       // Generate secure reset token
       const crypto = await import('crypto');
       const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
       const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-      // Store reset token
-      await storage.updateAdminResetToken(admin.id, resetToken, resetTokenExpiry);
+      // Store hashed reset token
+      await storage.updateAdminResetToken(admin.id, resetTokenHash, resetTokenExpiry);
 
       // In production, you would send an email with the reset link
-      // For now, we'll just return the token for testing
-      console.log(`Password reset token for ${admin.username}: ${resetToken}`);
-      console.log(`Reset URL: /admin/reset-password?token=${resetToken}`);
+      // For now, we'll just return the token for testing (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Password reset token for ${admin.username}: ${resetToken}`);
+        console.log(`Reset URL: /admin/reset-password?token=${resetToken}`);
+      }
 
       res.status(200).json({ 
         success: true, 
@@ -177,7 +202,7 @@ export function setupAdminAuth(app: Express): void {
     }
   });
 
-  app.post("/api/admin/reset-password", async (req, res) => {
+  app.post("/api/admin/reset-password", passwordResetLimit, async (req, res) => {
     try {
       const { token, newPassword } = req.body;
       
@@ -191,7 +216,9 @@ export function setupAdminAuth(app: Express): void {
       }
 
       // Find admin by reset token (includes expiry check)
-      const admin = await storage.getAdminByResetToken(token);
+      const crypto = await import('crypto');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const admin = await storage.getAdminByResetTokenHash(tokenHash);
       if (!admin) {
         return res.status(400).json({ error: "Invalid or expired reset token" });
       }

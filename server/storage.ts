@@ -35,8 +35,8 @@ export interface IStorage {
   deleteAdmin(id: string): Promise<boolean>;
   
   // Admin password reset methods
-  updateAdminResetToken(id: string, resetToken: string, resetTokenExpiry: Date): Promise<Admin | undefined>;
-  getAdminByResetToken(resetToken: string): Promise<Admin | undefined>;
+  updateAdminResetToken(id: string, resetTokenHash: string, resetTokenExpiry: Date): Promise<Admin | undefined>;
+  getAdminByResetTokenHash(resetTokenHash: string): Promise<Admin | undefined>;
   clearAdminResetToken(id: string): Promise<Admin | undefined>;
 
   // Merchant credentials methods
@@ -184,10 +184,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Admin password reset methods
-  async updateAdminResetToken(id: string, resetToken: string, resetTokenExpiry: Date): Promise<Admin | undefined> {
+  async updateAdminResetToken(id: string, resetTokenHash: string, resetTokenExpiry: Date): Promise<Admin | undefined> {
     const result = await db.update(admins)
       .set({ 
-        resetToken: resetToken,
+        resetToken: resetTokenHash,
         resetTokenExpiry: resetTokenExpiry 
       })
       .where(eq(admins.id, id))
@@ -195,10 +195,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAdminByResetToken(resetToken: string): Promise<Admin | undefined> {
+  async getAdminByResetTokenHash(resetTokenHash: string): Promise<Admin | undefined> {
     const result = await db.select().from(admins)
       .where(and(
-        eq(admins.resetToken, resetToken),
+        eq(admins.resetToken, resetTokenHash),
         sql`${admins.resetTokenExpiry} > NOW()`
       ));
     return result[0];
