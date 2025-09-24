@@ -65,11 +65,7 @@ export function ReceiveCrypto() {
   const [isCreatingPaymentLink, setIsCreatingPaymentLink] = useState(false)
   const [paymentLink, setPaymentLink] = useState("")
   const [quoteDetails, setQuoteDetails] = useState<any>(null)
-  const [walletValidation, setWalletValidation] = useState<{
-    isValid: boolean | null;
-    isValidating: boolean;
-    error: string | null;
-  }>({ isValid: null, isValidating: false, error: null })
+  // Removed wallet validation state since we'll use dropdown with valid addresses only
   
   const form = useForm({
     defaultValues: {
@@ -110,6 +106,12 @@ export function ReceiveCrypto() {
   const { data: networksData, isLoading: isLoadingNetworks, error: networksError } = useQuery({
     queryKey: ['/api/public/transak/networks'],
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  })
+
+  // Fetch merchant deposit addresses from Cybrid
+  const { data: depositAddressesData, isLoading: isLoadingDepositAddresses, error: depositAddressesError } = useQuery({
+    queryKey: ['/api/merchant/deposit-addresses'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
 
   // Use the existing crypto-currencies endpoint which has all the data we need
@@ -334,39 +336,20 @@ export function ReceiveCrypto() {
     return usdPaymentMethods
   })()
 
-  // Wallet validation function using combined crypto-network selection
-  const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
-    if (!address || !cryptoNetworkCombined) return
-    
-    // Parse crypto and network from combined value (e.g., "USDC-ethereum")
-    const [cryptoCurrency, network] = cryptoNetworkCombined.split('-')
-    if (!cryptoCurrency || !network) return
-    
-    setWalletValidation({ isValid: null, isValidating: true, error: null })
-    
-    try {
-      const response = await fetch(
-        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${address}`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Validation failed')
-      }
-      
-      const result = await response.json()
-      setWalletValidation({ 
-        isValid: result.isValid === true, 
-        isValidating: false, 
-        error: result.isValid === false ? 'Invalid wallet address' : null 
-      })
-    } catch (error) {
-      setWalletValidation({ 
-        isValid: false, 
-        isValidating: false, 
-        error: 'Unable to validate wallet address' 
-      })
+  // Prepare deposit address options for dropdown from Cybrid
+  const depositAddressOptions = (() => {
+    if (!(depositAddressesData as any)?.success || !(depositAddressesData as any)?.addresses) {
+      return []
     }
-  }
+    
+    return (depositAddressesData as any).addresses.map((addr: any) => ({
+      value: addr.address,
+      label: `${addr.asset} - ${addr.address.slice(0, 12)}...${addr.address.slice(-8)}`,
+      asset: addr.asset,
+      network: addr.network || 'ethereum', // Default to ethereum if network not specified
+      fullAddress: addr.address
+    }))
+  })()
 
   // Real-time quote fetching function (without creating payment link)
   const fetchQuote = async (formData: any) => {
@@ -864,34 +847,55 @@ export function ReceiveCrypto() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
-                          Wallet Address
-                          {walletValidation.isValidating && (
+                          Customer Wallet Address
+                          {isLoadingDepositAddresses && (
                             <Loader2 className="h-4 w-4 animate-spin" />
-                          )}
-                          {walletValidation.isValid === true && (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          )}
-                          {walletValidation.isValid === false && (
-                            <AlertTriangle className="h-4 w-4 text-red-500" />
                           )}
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Enter customer's wallet address"
-                            {...field}
-                            onBlur={() => {
-                              field.onBlur()
-                              validateWalletAddress(field.value, form.watch("cryptoNetworkCombined"))
-                            }}
-                            data-testid="input-wallet-address"
-                          />
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isLoadingDepositAddresses || depositAddressOptions.length === 0}
+                            data-testid="select-wallet-address"
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={
+                                isLoadingDepositAddresses 
+                                  ? "Loading deposit addresses..." 
+                                  : depositAddressOptions.length === 0 
+                                    ? "No deposit addresses available" 
+                                    : "Select a deposit address"
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {depositAddressOptions.map((option: any) => (
+                                <SelectItem 
+                                  key={option.value} 
+                                  value={option.value}
+                                  data-testid={`option-wallet-${option.asset.toLowerCase()}`}
+                                >
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{option.asset} Address</span>
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                      {option.fullAddress}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </FormControl>
                         <FormMessage />
-                        {walletValidation.error && (
-                          <p className="text-sm text-red-500">{walletValidation.error}</p>
+                        {depositAddressesError && (
+                          <p className="text-sm text-red-500">
+                            Error loading deposit addresses. Please try refreshing the page.
+                          </p>
                         )}
-                        {walletValidation.isValid === true && (
-                          <p className="text-sm text-green-500">Valid wallet address</p>
+                        {depositAddressOptions.length === 0 && !isLoadingDepositAddresses && !depositAddressesError && (
+                          <p className="text-sm text-muted-foreground">
+                            No deposit addresses available. Please complete KYB verification first.
+                          </p>
                         )}
                       </FormItem>
                     )}
