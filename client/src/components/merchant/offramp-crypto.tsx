@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building, Copy, Wallet, DollarSign, Clock, CreditCard } from "lucide-react"
+import { ArrowUpFromLine, ExternalLink, Loader2, CheckCircle, AlertTriangle, Banknote, Building, Copy, Wallet, DollarSign, Clock, CreditCard, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest } from "@/lib/queryClient"
+import { useMerchantProfile } from "@/hooks/use-merchant-profile"
 
 // Crypto Icon Component with real Transak images
 const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: string, crypto: string, className?: string }) => {
@@ -62,6 +64,7 @@ const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: st
 
 export function OfframpCrypto() {
   const { toast } = useToast()
+  const { data: merchantProfile, isLoading: isLoadingProfile, isKycComplete } = useMerchantProfile()
   const [activeProvider, setActiveProvider] = useState<'transak' | 'cybrid'>('transak')
   const [isCreatingOfframp, setIsCreatingOfframp] = useState(false)
   const [payoutDetails, setPayoutDetails] = useState<any>(null)
@@ -105,12 +108,14 @@ export function OfframpCrypto() {
   const { data: cryptoCurrenciesData, isLoading: isLoadingCrypto, error: cryptoError } = useQuery({
     queryKey: ['/api/public/transak/crypto-currencies'],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: isKycComplete, // Only fetch when KYC is verified
   })
 
   // Fetch fiat currencies with payment methods using the exact user-specified fetch
   const { data: fiatCurrenciesData, isLoading: isLoadingPaymentMethods } = useQuery({
     queryKey: ['/api/public/transak/fiat-currencies'],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: isKycComplete, // Only fetch when KYC is verified
   })
 
   const transakForm = useForm({
@@ -134,17 +139,12 @@ export function OfframpCrypto() {
     }
   })
 
-  // TODO: Check merchant status and available bank accounts
-  const merchantStatus = {
-    kybCompleted: true,
-    custodianAccountCreated: true,
-    bankAccountsConnected: true,
-    availableBalance: {
-      USDC: "2500.00",
-      USDT: "1800.50", 
-      ETH: "0.75",
-      BTC: "0.05"
-    }
+  // Mock crypto balances - TODO: Replace with real Cybrid account balances
+  const mockAvailableBalance = {
+    USDC: "2500.00",
+    USDT: "1800.50", 
+    ETH: "0.75",
+    BTC: "0.05"
   }
 
   // Create combined crypto-network options for dropdown with real API data
@@ -439,9 +439,8 @@ export function OfframpCrypto() {
       return
     }
 
-    if (!merchantStatus.kybCompleted || !merchantStatus.custodianAccountCreated) {
-      return
-    }
+    // KYC verification is already checked at component level
+    // This function will only be called if KYC is complete
 
     setIsLoadingQuote(true)
     console.log('Fetching real-time offramp quote with data:', formData)
@@ -488,7 +487,7 @@ export function OfframpCrypto() {
     }, 500) // 500ms debounce
 
     return () => clearTimeout(debounceTimer)
-  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.payoutMethod, merchantStatus.kybCompleted, merchantStatus.custodianAccountCreated])
+  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.payoutMethod, isKycComplete])
 
   const cybridPayoutMethods = [
     { value: "ach", label: "ACH Transfer" },
@@ -497,23 +496,8 @@ export function OfframpCrypto() {
 
   // Function to create Transak offramp session with fresh quote
   const handleTransakOfframp = async (data: any) => {
-    if (!merchantStatus.kybCompleted) {
-      toast({
-        title: "KYB Required",
-        description: "Complete your KYB verification before creating offramp sessions.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (!merchantStatus.custodianAccountCreated) {
-      toast({
-        title: "Custodian Account Required", 
-        description: "Create your custodian account before accessing offramp functionality.",
-        variant: "destructive"
-      })
-      return
-    }
+    // KYC verification is already checked at component level
+    // This function will only be called if KYC is complete
 
     // Check if current form values match the displayed quote
     if (!quoteDetails || 
@@ -683,7 +667,28 @@ export function OfframpCrypto() {
     cybridForm.reset()
   }
 
-  if (!merchantStatus.kybCompleted || !merchantStatus.custodianAccountCreated) {
+  // Show loading state while checking KYC status
+  if (isLoadingProfile) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Offramp Crypto</h1>
+          <p className="text-muted-foreground">
+            Convert your cryptocurrency to fiat currency
+          </p>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center py-6">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="ml-2">Loading merchant profile...</span>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // KYC verification required
+  if (!isKycComplete) {
     return (
       <div className="space-y-6">
         <div>
@@ -693,29 +698,27 @@ export function OfframpCrypto() {
           </p>
         </div>
 
-        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-              <AlertTriangle className="h-5 w-5" />
-              Account Setup Required
-            </CardTitle>
-            <CardDescription className="text-yellow-700 dark:text-yellow-300">
-              Complete your KYB verification and create a custodian account to access offramp functionality
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {!merchantStatus.kybCompleted && (
-              <Button asChild variant="outline">
-                <a href="/merchant/onboarding">Complete KYB Verification</a>
+        <Alert data-testid="alert-kyc-required">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>KYC Verification Required</AlertTitle>
+          <AlertDescription className="space-y-4">
+            <p>
+              To access offramp features and convert cryptocurrency to fiat currency, you must complete your business verification (KYC/KYB).
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button asChild data-testid="button-complete-kyc">
+                <a href="/merchant/kyb-onboarding">
+                  Complete Verification
+                </a>
               </Button>
-            )}
-            {!merchantStatus.custodianAccountCreated && (
-              <Button asChild variant="outline">
-                <a href="/merchant/accounts">Create Custodian Account</a>
+              <Button variant="outline" asChild data-testid="button-learn-more">
+                <a href="/merchant/dashboard">
+                  Return to Dashboard
+                </a>
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -739,7 +742,7 @@ export function OfframpCrypto() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(merchantStatus.availableBalance).map(([crypto, balance]) => (
+            {Object.entries(mockAvailableBalance).map(([crypto, balance]) => (
               <div key={crypto} className="text-center p-3 border rounded-lg">
                 <div className="font-mono text-lg font-bold">{balance}</div>
                 <div className="text-sm text-muted-foreground">{crypto}</div>
