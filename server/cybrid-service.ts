@@ -398,6 +398,41 @@ export class CybridService {
     }
   }
 
+  // Fetch deposit addresses using customer token
+  static async getCustomerDepositAddresses(customerGuid: string): Promise<CybridDepositAddress[]> {
+    try {
+      console.log(`Fetching deposit addresses for customer: ${customerGuid}`);
+      
+      // Get customer token with deposit_addresses:read scope
+      const customerTokenResponse = await this.createCustomerToken(customerGuid);
+      
+      // Use customer token to fetch deposit addresses
+      const depositAddressesResponse = await fetch('https://bank.sandbox.cybrid.app/api/deposit_addresses', {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'authorization': `Bearer ${customerTokenResponse.token}`
+        }
+      });
+
+      if (!depositAddressesResponse.ok) {
+        const errorText = await depositAddressesResponse.text();
+        console.error(`Failed to fetch deposit addresses: ${depositAddressesResponse.status} ${depositAddressesResponse.statusText}`);
+        console.error('Error response:', errorText);
+        throw new Error(`Failed to fetch deposit addresses: ${depositAddressesResponse.status} ${depositAddressesResponse.statusText}`);
+      }
+
+      const data = await depositAddressesResponse.json();
+      console.log(`Successfully fetched ${data.objects ? data.objects.length : 0} deposit addresses`);
+      console.log('Deposit addresses data:', JSON.stringify(data, null, 2));
+      
+      return data.objects || [];
+    } catch (error) {
+      console.error('Failed to fetch customer deposit addresses:', error);
+      throw error;
+    }
+  }
+
   // Helper method to poll identity verification until it reaches "waiting" status
   static async pollForPersonaInquiryId(verificationGuid: string, maxAttempts: number = 30): Promise<string> {
     console.log(`Polling for persona inquiry ID for verification: ${verificationGuid}`);

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Wallet, Plus, CheckCircle, AlertTriangle, ExternalLink, Copy, Settings } from "lucide-react"
+import { Wallet, Plus, CheckCircle, AlertTriangle, ExternalLink, Copy, Settings, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -7,11 +7,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery } from "@tanstack/react-query"
+
+interface DepositAddress {
+  created_at: string;
+  updated_at: string;
+  guid: string;
+  bank_guid: string;
+  customer_guid: string;
+  account_guid: string;
+  asset: string;
+  state: string;
+  address: string;
+  format: string;
+  labels: string[];
+}
+
+interface DepositAddressesResponse {
+  success: boolean;
+  addresses: DepositAddress[];
+}
 
 export function Accounts() {
   const { toast } = useToast()
   const [isCreatingCustodian, setIsCreatingCustodian] = useState(false)
   const [isConnectingBank, setIsConnectingBank] = useState(false)
+
+  // Fetch deposit addresses from API
+  const { 
+    data: depositAddressesData, 
+    isLoading: isLoadingAddresses, 
+    error: addressesError 
+  } = useQuery<DepositAddressesResponse>({
+    queryKey: ['/api/merchant/deposit-addresses'],
+    enabled: true, // Only fetch if merchant has custodian account
+  })
 
   // TODO: Replace with real merchant account data
   const merchantStatus = {
@@ -24,32 +54,6 @@ export function Accounts() {
     id: "cybrid_account_12345",
     status: "active",
     createdAt: "2024-01-15",
-    wallets: [
-      { 
-        currency: "USDC", 
-        address: "0x742d35Cc6Bf05322B38d82E73456789abcdef123", 
-        balance: "2,485.67",
-        network: "ethereum"
-      },
-      { 
-        currency: "USDT", 
-        address: "0x742d35Cc6Bf05322B38d82E73456789abcdef456", 
-        balance: "1,832.45",
-        network: "ethereum"
-      },
-      { 
-        currency: "ETH", 
-        address: "0x742d35Cc6Bf05322B38d82E73456789abcdef789", 
-        balance: "0.756",
-        network: "ethereum"
-      },
-      { 
-        currency: "BTC", 
-        address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", 
-        balance: "0.0456",
-        network: "bitcoin"
-      }
-    ]
   }
 
   const connectedBankAccounts = [
@@ -302,33 +306,67 @@ export function Accounts() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {custodianAccount.wallets.map((wallet, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="font-semibold">{wallet.currency}</div>
-                    <Badge variant="outline" className="text-xs">{wallet.network}</Badge>
+          {isLoadingAddresses ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <span>Loading deposit addresses...</span>
+            </div>
+          ) : addressesError ? (
+            <div className="text-center p-6">
+              <AlertTriangle className="h-12 w-12 mx-auto text-yellow-500 mb-4" />
+              <h3 className="font-semibold mb-2">Unable to Load Addresses</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Failed to fetch your deposit addresses. Please try refreshing the page.
+              </p>
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </div>
+          ) : depositAddressesData?.success && depositAddressesData?.addresses?.length > 0 ? (
+            <div className="space-y-4">
+              {depositAddressesData.addresses.map((address: DepositAddress) => (
+                <div key={address.guid} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold">{address.asset}</div>
+                      <Badge variant="outline" className="text-xs">
+                        {address.asset === 'BTC' ? 'Bitcoin' : 'Ethereum'}
+                      </Badge>
+                      {address.state === 'created' && (
+                        <Badge variant="default" className="text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground font-mono">
+                      {address.address}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Created: {new Date(address.created_at).toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground font-mono">
-                    {wallet.address}
+                  <div className="text-right space-y-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => copyAddress(address.address, address.asset)}
+                      data-testid={`button-copy-address-${address.asset.toLowerCase()}`}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
                   </div>
                 </div>
-                <div className="text-right space-y-1">
-                  <div className="font-mono font-bold">{wallet.balance} {wallet.currency}</div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => copyAddress(wallet.address, wallet.currency)}
-                    data-testid={`button-copy-address-${wallet.currency.toLowerCase()}`}
-                  >
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center p-6 text-muted-foreground">
+              <Wallet className="h-12 w-12 mx-auto mb-4" />
+              <p>No deposit addresses found</p>
+              <p className="text-sm">Deposit addresses will appear here once your account is fully set up</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

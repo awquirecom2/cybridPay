@@ -59,6 +59,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Merchant endpoint to get their deposit addresses
+  app.get("/api/merchant/deposit-addresses", async (req, res) => {
+    try {
+      // Check if merchant is authenticated
+      if (!req.session.merchant) {
+        return res.status(401).json({ error: "Merchant authentication required" });
+      }
+
+      const merchantId = req.session.merchant.id;
+      
+      // Get merchant from storage to access customer_guid
+      const merchant = await storage.getMerchant(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ error: "Merchant not found" });
+      }
+
+      if (!merchant.customer_guid) {
+        return res.status(400).json({ error: "Merchant does not have a Cybrid customer ID" });
+      }
+
+      // Fetch deposit addresses using Cybrid service
+      const addresses = await CybridService.getCustomerDepositAddresses(merchant.customer_guid);
+      
+      res.json({
+        success: true,
+        addresses
+      });
+    } catch (error) {
+      console.error('Merchant deposit address endpoint error:', error);
+      res.status(500).json({
+        error: "Failed to fetch deposit addresses",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Setup authentication systems (AFTER auth core)
   setupMerchantAuth(app);
   setupAdminAuth(app);
