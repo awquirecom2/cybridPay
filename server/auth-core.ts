@@ -129,3 +129,21 @@ export function requireMerchant(req: any, res: any, next: any) {
   
   next();
 }
+
+// KYC verification middleware for onramp/offramp features
+export function requireMerchantKycVerified(req: any, res: any, next: any) {
+  if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'merchant') {
+    return res.status(401).json({ error: "Merchant authentication required" });
+  }
+  
+  // Check KYC completion: kybStatus must be 'verified' and cybridCustomerGuid must be present
+  if (req.user.kybStatus !== 'verified' || !req.user.cybridCustomerGuid) {
+    return res.status(403).json({ 
+      error: "KYC verification required to access this feature",
+      code: "KYC_REQUIRED",
+      message: "Please complete your KYB (Know Your Business) verification to access onramp and offramp features."
+    });
+  }
+  
+  next();
+}

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated } from "./auth-core";
+import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated, requireMerchantKycVerified } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema } from "@shared/schema";
@@ -60,34 +60,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Merchant endpoint to get their deposit addresses
-  app.get("/api/merchant/deposit-addresses", requireMerchantAuthenticated, async (req, res) => {
+  app.get("/api/merchant/deposit-addresses", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: "User not found in request" });
-      }
-      
       const merchantId = req.user.id;
       console.log(`Fetching deposit addresses for merchant: ${merchantId}`);
       
-      // Get merchant from storage to access customer_guid
-      const merchant = await storage.getMerchant(merchantId);
-      console.log("Merchant data:", {
-        id: merchant?.id,
-        name: merchant?.name,
-        cybridCustomerGuid: merchant?.cybridCustomerGuid,
-        hasCustomerGuid: !!merchant?.cybridCustomerGuid
-      });
-      
-      if (!merchant) {
-        return res.status(404).json({ error: "Merchant not found" });
-      }
-
-      if (!merchant.cybridCustomerGuid) {
-        return res.status(400).json({ error: "Merchant does not have a Cybrid customer ID. Please complete KYB verification first." });
-      }
-
-      // Fetch deposit addresses using Cybrid service
-      const addresses = await CybridService.getCustomerDepositAddresses(merchant.cybridCustomerGuid);
+      // Fetch deposit addresses using Cybrid service (KYC already verified by middleware)
+      const addresses = await CybridService.getCustomerDepositAddresses(req.user.cybridCustomerGuid);
       
       res.json({
         success: true,
@@ -1236,7 +1215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // POST /pricing-quote - Get pricing quote using platform-wide credentials
-  app.post("/api/merchant/transak/pricing-quote", requireMerchant, async (req, res) => {
+  app.post("/api/merchant/transak/pricing-quote", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
       const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, paymentMethod } = req.body;
 
@@ -1310,7 +1289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /create-session - Create Transak widget session for payment processing
-  app.post("/api/merchant/transak/create-session", requireMerchant, async (req, res) => {
+  app.post("/api/merchant/transak/create-session", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
       // Validate request body using Zod schema
       const validatedData = createTransakSessionSchema.parse(req.body);
@@ -1362,7 +1341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /offramp-pricing-quote - Get pricing quote for SELL operations using platform-wide credentials
-  app.post("/api/merchant/transak/offramp-pricing-quote", requireMerchant, async (req, res) => {
+  app.post("/api/merchant/transak/offramp-pricing-quote", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
       const { cryptoAmount, cryptoNetworkCombined, fiatCurrency, payoutMethod, walletAddress } = req.body;
 
@@ -1494,7 +1473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /test-offramp-session - Test endpoint to create a SELL session with sample data
-  app.post("/api/merchant/transak/test-offramp-session", requireMerchant, async (req, res) => {
+  app.post("/api/merchant/transak/test-offramp-session", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
       console.log('[DEBUG] Creating test offramp session...');
       
@@ -1539,7 +1518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /create-offramp-session - Create Transak widget session for offramp processing
-  app.post("/api/merchant/transak/create-offramp-session", requireMerchant, async (req, res) => {
+  app.post("/api/merchant/transak/create-offramp-session", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
       console.log('[DEBUG] Raw request body for offramp session:', JSON.stringify(req.body, null, 2));
       // Validate request body - reuse the existing schema but modify for SELL operation

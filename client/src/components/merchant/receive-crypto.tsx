@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react"
-import { ArrowDownToLine, Copy, ExternalLink, Loader2, CheckCircle, AlertTriangle, CreditCard, Smartphone, Building2, Clock, DollarSign } from "lucide-react"
+import { ArrowDownToLine, Copy, ExternalLink, Loader2, CheckCircle, AlertTriangle, CreditCard, Smartphone, Building2, Clock, DollarSign, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useForm } from "react-hook-form"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useQuery } from "@tanstack/react-query"
 import { apiRequest } from "@/lib/queryClient"
+import { useMerchantProfile } from "@/hooks/use-merchant-profile"
 
 // Crypto Icon Component with real Transak images
 const CryptoIcon = ({ imageUrl, crypto, className = "w-6 h-6" }: { imageUrl?: string, crypto: string, className?: string }) => {
@@ -66,6 +68,9 @@ export function ReceiveCrypto() {
   const [paymentLink, setPaymentLink] = useState("")
   const [quoteDetails, setQuoteDetails] = useState<any>(null)
   // Removed wallet validation state since we'll use dropdown with valid addresses only
+
+  // Check merchant KYC status
+  const { merchant, isKycComplete, kycStatus, isLoading: isLoadingProfile } = useMerchantProfile()
   
   const form = useForm({
     defaultValues: {
@@ -78,11 +83,8 @@ export function ReceiveCrypto() {
     }
   })
 
-  // TODO: Check if merchant has completed KYB and created custodian account
-  const merchantStatus = {
-    kybCompleted: true, // This should come from real data
-    custodianAccountCreated: true // This should come from real data
-  }
+  // Use real merchant data instead of hardcoded status
+  // Note: merchantStatus replaced by useMerchantProfile hook above
 
   // Fetch real crypto currencies from Transak API
   const { data: cryptoCurrenciesData, isLoading: isLoadingCrypto, error: cryptoError } = useQuery({
@@ -108,10 +110,11 @@ export function ReceiveCrypto() {
     staleTime: 10 * 60 * 1000, // Cache for 10 minutes
   })
 
-  // Fetch merchant deposit addresses from Cybrid
+  // Fetch merchant deposit addresses from Cybrid (only when KYC is complete)
   const { data: depositAddressesData, isLoading: isLoadingDepositAddresses, error: depositAddressesError } = useQuery({
     queryKey: ['/api/merchant/deposit-addresses'],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: isKycComplete, // Only fetch when KYC is verified
   })
 
   // Use the existing crypto-currencies endpoint which has all the data we need
@@ -358,7 +361,7 @@ export function ReceiveCrypto() {
       return
     }
 
-    if (!merchantStatus.kybCompleted || !merchantStatus.custodianAccountCreated) {
+    if (!isKycComplete) {
       return
     }
 
@@ -406,23 +409,14 @@ export function ReceiveCrypto() {
     }, 500) // 500ms debounce
 
     return () => clearTimeout(debounceTimer)
-  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.paymentMethod, merchantStatus.kybCompleted, merchantStatus.custodianAccountCreated])
+  }, [formValues.cryptoAmount, formValues.cryptoNetworkCombined, formValues.fiatCurrency, formValues.paymentMethod, isKycComplete])
 
   // Function to create Transak session with fresh quote to ensure no stale data
   const handleCreatePaymentLink = async (data: any) => {
-    if (!merchantStatus.kybCompleted) {
+    if (!isKycComplete) {
       toast({
-        title: "KYB Required",
-        description: "Complete your KYB verification before creating payment links.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    if (!merchantStatus.custodianAccountCreated) {
-      toast({
-        title: "Custodian Account Required", 
-        description: "Create your Cybrid custodian account before receiving crypto payments.",
+        title: "KYB Verification Required",
+        description: "Please complete your KYB verification before creating payment links.",
         variant: "destructive"
       })
       return
@@ -561,41 +555,29 @@ export function ReceiveCrypto() {
     form.reset()
   }
 
-  // Block access if requirements not met
-  if (!merchantStatus.kybCompleted) {
+  // Show loading state while fetching profile
+  if (isLoadingProfile) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Receive Crypto</h1>
-          <p className="text-muted-foreground">
-            Generate payment links for customers to send you cryptocurrency
-          </p>
-        </div>
-
-        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-              <AlertTriangle className="h-5 w-5" />
-              KYB Verification Required
-            </CardTitle>
-            <CardDescription className="text-yellow-700 dark:text-yellow-300">
-              Complete your Know Your Business verification to start receiving crypto payments
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild data-testid="button-complete-kyb">
-              <a href="/merchant/onboarding">
-                Complete KYB Verification
-                <ExternalLink className="h-4 w-4 ml-2" />
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading merchant profile...</span>
       </div>
     )
   }
 
-  if (!merchantStatus.custodianAccountCreated) {
+  // Show KYC gating UI if not complete
+  if (!isKycComplete) {
+    const getKycMessage = () => {
+      if (kycStatus.status === 'pending') {
+        return "Your KYB verification is currently being processed."
+      } else if (kycStatus.status === 'review') {
+        return "Your KYB verification is under review."
+      } else if (kycStatus.status === 'failed') {
+        return "Your KYB verification failed. Please try again."
+      }
+      return "Complete your KYB verification to access onramp and offramp features."
+    }
+
     return (
       <div className="space-y-6">
         <div>
@@ -605,25 +587,27 @@ export function ReceiveCrypto() {
           </p>
         </div>
 
-        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-              <AlertTriangle className="h-5 w-5" />
-              Custodian Account Required
-            </CardTitle>
-            <CardDescription className="text-yellow-700 dark:text-yellow-300">
-              Create your Cybrid custodian account to securely store received cryptocurrency
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild data-testid="button-create-custodian">
-              <a href="/merchant/accounts">
-                Create Custodian Account
-                <ExternalLink className="h-4 w-4 ml-2" />
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
+        <Alert data-testid="alert-kyc-required">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>KYB Verification Required</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>{getKycMessage()}</p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button asChild data-testid="button-complete-kyb">
+                <a href="/merchant/kyb-onboarding">
+                  {kycStatus.status === 'failed' ? 'Retry KYB Verification' : 'Complete KYB Verification'}
+                  <ExternalLink className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+              <Button variant="outline" asChild data-testid="button-view-accounts">
+                <a href="/merchant/accounts">
+                  View Account Status
+                  <ExternalLink className="h-4 w-4 ml-2" />
+                </a>
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
       </div>
     )
   }
