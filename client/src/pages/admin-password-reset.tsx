@@ -63,7 +63,7 @@ export default function AdminPasswordReset() {
       resetForm.setValue('token', tokenFromUrl);
       setStep('reset');
     }
-  }, [tokenFromUrl, resetForm]);
+  }, [tokenFromUrl]);
 
   const requestResetMutation = useMutation({
     mutationFn: async (data: ResetRequest) => {

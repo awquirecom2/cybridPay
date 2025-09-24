@@ -28,7 +28,7 @@ export default function AdminLogin() {
     if (adminProfile) {
       setLocation('/admin');
     }
-  }, [adminProfile, setLocation]);
+  }, [adminProfile]);
 
   const form = useForm<AdminLogin>({
     resolver: zodResolver(adminLoginSchema),
