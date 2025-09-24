@@ -67,12 +67,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get merchant from storage to access customer_guid
       const merchant = await storage.getMerchant(merchantId);
+      console.log("Merchant data:", {
+        id: merchant?.id,
+        name: merchant?.name,
+        customer_guid: merchant?.customer_guid,
+        hasCustomerGuid: !!merchant?.customer_guid
+      });
+      
       if (!merchant) {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
       if (!merchant.customer_guid) {
-        return res.status(400).json({ error: "Merchant does not have a Cybrid customer ID" });
+        return res.status(400).json({ error: "Merchant does not have a Cybrid customer ID. Please complete KYB verification first." });
       }
 
       // Fetch deposit addresses using Cybrid service
