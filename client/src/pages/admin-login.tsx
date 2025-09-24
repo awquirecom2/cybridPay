@@ -21,6 +21,27 @@ export default function AdminLogin() {
   const { data: adminProfile } = useQuery({
     queryKey: ['/api/admin/profile'],
     retry: false,
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/admin/profile', {
+          credentials: 'include',
+        });
+        
+        if (response.status === 401) {
+          return null; // Not authenticated, return null instead of throwing
+        }
+        
+        if (!response.ok) {
+          throw new Error(`${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+      } catch (error) {
+        // Handle network errors gracefully
+        console.debug('Admin profile check failed:', error);
+        return null;
+      }
+    },
   });
 
   // Redirect if already logged in (moved to useEffect to avoid render-time state updates)
