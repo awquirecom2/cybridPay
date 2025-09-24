@@ -62,6 +62,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant endpoint to get their deposit addresses
   app.get("/api/merchant/deposit-addresses", requireMerchantAuthenticated, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not found in request" });
+      }
+      
       const merchantId = req.user.id;
       console.log(`Fetching deposit addresses for merchant: ${merchantId}`);
       
@@ -70,20 +74,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Merchant data:", {
         id: merchant?.id,
         name: merchant?.name,
-        customer_guid: merchant?.customer_guid,
-        hasCustomerGuid: !!merchant?.customer_guid
+        cybridCustomerGuid: merchant?.cybridCustomerGuid,
+        hasCustomerGuid: !!merchant?.cybridCustomerGuid
       });
       
       if (!merchant) {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
-      if (!merchant.customer_guid) {
+      if (!merchant.cybridCustomerGuid) {
         return res.status(400).json({ error: "Merchant does not have a Cybrid customer ID. Please complete KYB verification first." });
       }
 
       // Fetch deposit addresses using Cybrid service
-      const addresses = await CybridService.getCustomerDepositAddresses(merchant.customer_guid);
+      const addresses = await CybridService.getCustomerDepositAddresses(merchant.cybridCustomerGuid);
       
       res.json({
         success: true,
