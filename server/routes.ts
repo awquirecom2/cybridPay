@@ -60,14 +60,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Merchant endpoint to get their deposit addresses
-  app.get("/api/merchant/deposit-addresses", async (req, res) => {
+  app.get("/api/merchant/deposit-addresses", requireMerchantAuthenticated, async (req, res) => {
     try {
-      // Check if merchant is authenticated
-      if (!req.session.merchant) {
-        return res.status(401).json({ error: "Merchant authentication required" });
-      }
-
-      const merchantId = req.session.merchant.id;
+      const merchantId = req.user.id;
+      console.log(`Fetching deposit addresses for merchant: ${merchantId}`);
       
       // Get merchant from storage to access customer_guid
       const merchant = await storage.getMerchant(merchantId);
