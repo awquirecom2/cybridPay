@@ -71,11 +71,6 @@ export function OfframpCrypto() {
   const [paymentLink, setPaymentLink] = useState("")
   const [isLoadingQuote, setIsLoadingQuote] = useState(false)
   const [quoteDetails, setQuoteDetails] = useState<any>(null)
-  const [walletValidation, setWalletValidation] = useState<{
-    isValid: boolean | null;
-    isValidating: boolean;
-    error: string | null;
-  }>({ isValid: null, isValidating: false, error: null })
 
   // Simple crypto options for Cybrid (fallback)
   const supportedCrypto = [
@@ -118,6 +113,13 @@ export function OfframpCrypto() {
     enabled: isKycComplete, // Only fetch when KYC is verified
   })
 
+  // Fetch merchant deposit addresses from Cybrid (only when KYC is complete)
+  const { data: depositAddressesData, isLoading: isLoadingDepositAddresses, error: depositAddressesError } = useQuery({
+    queryKey: ['/api/merchant/deposit-addresses'],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: isKycComplete, // Only fetch when KYC is verified
+  })
+
   const transakForm = useForm({
     defaultValues: {
       cryptoAmount: "",
@@ -138,6 +140,21 @@ export function OfframpCrypto() {
       bankAccount: ""
     }
   })
+
+  // Prepare deposit address options for dropdown from Cybrid
+  const depositAddressOptions = (() => {
+    if (!(depositAddressesData as any)?.success || !(depositAddressesData as any)?.addresses) {
+      return []
+    }
+    
+    return (depositAddressesData as any).addresses.map((addr: any) => ({
+      value: addr.address,
+      label: `${addr.asset} - ${addr.address.slice(0, 12)}...${addr.address.slice(-8)}`,
+      asset: addr.asset,
+      network: addr.network || 'ethereum', // Default to ethereum if network not specified
+      fullAddress: addr.address
+    }))
+  })()
 
   // Mock crypto balances - TODO: Replace with real Cybrid account balances
   const mockAvailableBalance = {
@@ -398,39 +415,6 @@ export function OfframpCrypto() {
     }
   }, [transakForm.watch('fiatCurrency'), transakForm])
 
-  // Wallet validation function using combined crypto-network selection
-  const validateWalletAddress = async (address: string, cryptoNetworkCombined: string) => {
-    if (!address || !cryptoNetworkCombined) return
-    
-    // Parse crypto and network from combined value (e.g., "USDC-ethereum")
-    const [cryptoCurrency, network] = cryptoNetworkCombined.split('-')
-    if (!cryptoCurrency || !network) return
-    
-    setWalletValidation({ isValid: null, isValidating: true, error: null })
-    
-    try {
-      const response = await fetch(
-        `/api/public/transak/verify-wallet-address?cryptoCurrency=${cryptoCurrency}&network=${network}&walletAddress=${address}`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Validation failed')
-      }
-      
-      const result = await response.json()
-      setWalletValidation({ 
-        isValid: result.isValid === true, 
-        isValidating: false, 
-        error: result.isValid === false ? 'Invalid wallet address' : null 
-      })
-    } catch (error) {
-      setWalletValidation({ 
-        isValid: false, 
-        isValidating: false, 
-        error: 'Unable to validate wallet address' 
-      })
-    }
-  }
 
   // Real-time quote fetching function for offramp (without creating payment link)
   const fetchOfframpQuote = async (formData: any) => {
@@ -828,14 +812,7 @@ export function OfframpCrypto() {
                             <FormControl>
                               <Select 
                                 value={field.value} 
-                                onValueChange={(value) => {
-                                  field.onChange(value)
-                                  // Trigger wallet validation when crypto/network changes
-                                  const currentWallet = transakForm.getValues('walletAddress')
-                                  if (currentWallet) {
-                                    validateWalletAddress(currentWallet, value)
-                                  }
-                                }}
+                                onValueChange={field.onChange}
                               >
                                 <SelectTrigger data-testid="select-transak-crypto-network">
                                   <SelectValue placeholder="Select cryptocurrency and network" />
@@ -869,39 +846,57 @@ export function OfframpCrypto() {
                         name="walletAddress"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Your Wallet Address</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              Your Wallet Address
+                              {isLoadingDepositAddresses && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              )}
+                            </FormLabel>
                             <FormControl>
-                              <div className="relative">
-                                <Wallet className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  placeholder="0x1234...abcd or bc1q..."
-                                  className="pl-10"
-                                  {...field}
-                                  onChange={(e) => {
-                                    field.onChange(e)
-                                    // Trigger validation on input change
-                                    const cryptoNetworkCombined = transakForm.getValues('cryptoNetworkCombined')
-                                    if (e.target.value && cryptoNetworkCombined) {
-                                      validateWalletAddress(e.target.value, cryptoNetworkCombined)
-                                    }
-                                  }}
-                                  data-testid="input-wallet-address"
-                                />
-                                {walletValidation.isValidating && (
-                                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
-                                )}
-                                {walletValidation.isValid === true && (
-                                  <CheckCircle className="absolute right-3 top-3 h-4 w-4 text-green-600" />
-                                )}
-                                {walletValidation.isValid === false && (
-                                  <AlertTriangle className="absolute right-3 top-3 h-4 w-4 text-red-600" />
-                                )}
-                              </div>
+                              <Select
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                disabled={isLoadingDepositAddresses || depositAddressOptions.length === 0}
+                                data-testid="select-wallet-address"
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={
+                                    isLoadingDepositAddresses 
+                                      ? "Loading deposit addresses..." 
+                                      : depositAddressOptions.length === 0 
+                                        ? "No deposit addresses available" 
+                                        : "Select a deposit address"
+                                  } />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {depositAddressOptions.map((option: any) => (
+                                    <SelectItem 
+                                      key={option.value} 
+                                      value={option.value}
+                                      data-testid={`option-wallet-${option.asset.toLowerCase()}`}
+                                    >
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{option.asset} Address</span>
+                                        <span className="text-xs text-muted-foreground font-mono">
+                                          {option.fullAddress}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </FormControl>
-                            {walletValidation.error && (
-                              <p className="text-sm text-red-600">{walletValidation.error}</p>
-                            )}
                             <FormMessage />
+                            {depositAddressesError && (
+                              <p className="text-sm text-red-500">
+                                Error loading deposit addresses. Please try refreshing the page.
+                              </p>
+                            )}
+                            {depositAddressOptions.length === 0 && !isLoadingDepositAddresses && !depositAddressesError && (
+                              <p className="text-sm text-muted-foreground">
+                                No deposit addresses available. Please complete KYB verification first.
+                              </p>
+                            )}
                           </FormItem>
                         )}
                       />
@@ -1064,7 +1059,7 @@ export function OfframpCrypto() {
 
                     <Button 
                       type="submit" 
-                      disabled={isCreatingOfframp || isLoadingQuote || !quoteDetails || walletValidation.isValid !== true}
+                      disabled={isCreatingOfframp || isLoadingQuote || !quoteDetails}
                       className="w-full"
                       data-testid="button-create-transak-offramp"
                     >
