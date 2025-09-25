@@ -56,9 +56,9 @@ export function useMerchantProfile() {
     }
   })
 
-  // Compute KYC completion status
+  // Compute KYC completion status - accept both 'verified' and 'approved' statuses
   const isKycComplete = query.data ? (
-    query.data.kybStatus === 'verified' && 
+    ['verified', 'approved'].includes(query.data.kybStatus) && 
     !!query.data.cybridCustomerGuid
   ) : false
 
