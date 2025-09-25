@@ -841,82 +841,96 @@ export function OfframpCrypto() {
                         )}
                       />
 
-                      <FormField
-                        control={transakForm.control}
-                        name="walletAddress"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              Your Wallet Address
-                              {isLoadingDepositAddresses && (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                      <div className="space-y-1">
+                        <FormField
+                          control={transakForm.control}
+                          name="walletAddress"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2 text-sm font-semibold">
+                                <Wallet className="h-4 w-4 text-blue-600" />
+                                Your Wallet Address
+                                {isLoadingDepositAddresses && (
+                                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                )}
+                              </FormLabel>
+                              <FormControl>
+                                <Select
+                                  value={field.value}
+                                  onValueChange={field.onChange}
+                                  disabled={isLoadingDepositAddresses || depositAddressOptions.length === 0}
+                                  data-testid="select-wallet-address"
+                                >
+                                  <SelectTrigger className="h-12 border-slate-300 focus:border-blue-500 hover:border-slate-400 transition-colors">
+                                    <SelectValue placeholder={
+                                      isLoadingDepositAddresses 
+                                        ? "Loading deposit addresses..." 
+                                        : depositAddressOptions.length === 0 
+                                          ? "No deposit addresses available" 
+                                          : "Select a deposit address"
+                                    } />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {depositAddressOptions.map((option: any) => (
+                                      <SelectItem 
+                                        key={option.value} 
+                                        value={option.value}
+                                        data-testid={`option-wallet-${option.asset.toLowerCase()}`}
+                                      >
+                                        <div className="flex flex-col py-1">
+                                          <span className="font-medium">{option.asset} Address</span>
+                                          <span className="text-xs text-muted-foreground font-mono">
+                                            {option.fullAddress}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                              <FormMessage />
+                              {depositAddressesError && (
+                                <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Error loading deposit addresses. Please try refreshing the page.
+                                </p>
                               )}
-                            </FormLabel>
-                            <FormControl>
-                              <Select
-                                value={field.value}
-                                onValueChange={field.onChange}
-                                disabled={isLoadingDepositAddresses || depositAddressOptions.length === 0}
-                                data-testid="select-wallet-address"
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder={
-                                    isLoadingDepositAddresses 
-                                      ? "Loading deposit addresses..." 
-                                      : depositAddressOptions.length === 0 
-                                        ? "No deposit addresses available" 
-                                        : "Select a deposit address"
-                                  } />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {depositAddressOptions.map((option: any) => (
-                                    <SelectItem 
-                                      key={option.value} 
-                                      value={option.value}
-                                      data-testid={`option-wallet-${option.asset.toLowerCase()}`}
-                                    >
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{option.asset} Address</span>
-                                        <span className="text-xs text-muted-foreground font-mono">
-                                          {option.fullAddress}
-                                        </span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </FormControl>
-                            <FormMessage />
-                            {depositAddressesError && (
-                              <p className="text-sm text-red-500">
-                                Error loading deposit addresses. Please try refreshing the page.
-                              </p>
-                            )}
-                            {depositAddressOptions.length === 0 && !isLoadingDepositAddresses && !depositAddressesError && (
-                              <p className="text-sm text-muted-foreground">
-                                No deposit addresses available. Please complete KYB verification first.
-                              </p>
-                            )}
-                          </FormItem>
-                        )}
-                      />
+                              {depositAddressOptions.length === 0 && !isLoadingDepositAddresses && !depositAddressesError && (
+                                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  No deposit addresses available. Please complete KYB verification first.
+                                </p>
+                              )}
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormField
                           control={transakForm.control}
                           name="fiatCurrency"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Fiat Currency</FormLabel>
+                              <FormLabel className="flex items-center gap-2 text-sm font-semibold">
+                                <DollarSign className="h-4 w-4 text-green-600" />
+                                Fiat Currency
+                              </FormLabel>
                               <FormControl>
                                 <Select value={field.value} onValueChange={field.onChange}>
-                                  <SelectTrigger data-testid="select-transak-fiat">
-                                    <SelectValue />
+                                  <SelectTrigger 
+                                    data-testid="select-transak-fiat"
+                                    className="h-12 border-slate-300 focus:border-green-500 hover:border-slate-400 transition-colors"
+                                  >
+                                    <SelectValue placeholder="Select currency" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {supportedFiat.map((fiat: any) => (
                                       <SelectItem key={fiat.key} value={fiat.value}>
-                                        {fiat.label}
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium">{fiat.value}</span>
+                                          <span className="text-muted-foreground">- {fiat.label.split(' - ')[1] || fiat.label}</span>
+                                        </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -932,16 +946,25 @@ export function OfframpCrypto() {
                           name="payoutMethod"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Payout Method</FormLabel>
+                              <FormLabel className="flex items-center gap-2 text-sm font-semibold">
+                                <CreditCard className="h-4 w-4 text-purple-600" />
+                                Payout Method
+                              </FormLabel>
                               <FormControl>
                                 <Select value={field.value} onValueChange={field.onChange}>
-                                  <SelectTrigger data-testid="select-transak-payout-method">
-                                    <SelectValue />
+                                  <SelectTrigger 
+                                    data-testid="select-transak-payout-method"
+                                    className="h-12 border-slate-300 focus:border-purple-500 hover:border-slate-400 transition-colors"
+                                  >
+                                    <SelectValue placeholder="Select payout method" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {transakPayoutMethods.map((method: any) => (
                                       <SelectItem key={method.value} value={method.value}>
-                                        {method.shortLabel || method.label}
+                                        <div className="flex items-center gap-2">
+                                          <CreditCard className="h-3 w-3 text-purple-600" />
+                                          <span>{method.shortLabel || method.label}</span>
+                                        </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -952,7 +975,7 @@ export function OfframpCrypto() {
                           )}
                         />
 
-                        {/* Payout Method Details */}
+                        {/* Enhanced Payout Method Details */}
                         {(() => {
                           const selectedPayoutMethod = transakForm.watch('payoutMethod');
                           const selectedMethod = transakPayoutMethods.find((method: any) => method.value === selectedPayoutMethod);
@@ -960,31 +983,39 @@ export function OfframpCrypto() {
                           if (!selectedMethod) return null;
                           
                           return (
-                            <div className="p-3 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                  <CreditCard className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                                  <span className="font-medium text-sm">{selectedMethod.label}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {selectedMethod.processingTime}
-                                  </Badge>
-                                  {selectedMethod.coverage && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {selectedMethod.coverage}
+                            <div className="col-span-full">
+                              <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200 dark:border-blue-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                                      <CreditCard className="h-4 w-4 text-purple-600" />
+                                    </div>
+                                    <span className="font-semibold text-sm">{selectedMethod.label}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Badge variant="outline" className="text-xs font-medium bg-white dark:bg-slate-800">
+                                      <Clock className="h-3 w-3 mr-1" />
+                                      {selectedMethod.processingTime}
                                     </Badge>
-                                  )}
+                                    {selectedMethod.coverage && (
+                                      <Badge variant="secondary" className="text-xs font-medium">
+                                        {selectedMethod.coverage}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {selectedMethod.description}
-                              </p>
-                              {selectedMethod.note && (
-                                <p className="text-xs text-amber-600 dark:text-amber-400">
-                                  {selectedMethod.note}
+                                <p className="text-sm text-slate-700 dark:text-slate-300">
+                                  {selectedMethod.description}
                                 </p>
-                              )}
+                                {selectedMethod.note && (
+                                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                                      {selectedMethod.note}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
@@ -995,16 +1026,27 @@ export function OfframpCrypto() {
                         name="customerEmail"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Customer Email (Optional)</FormLabel>
+                            <FormLabel className="flex items-center gap-2 text-sm font-semibold">
+                              <Banknote className="h-4 w-4 text-blue-600" />
+                              Customer Email
+                              <Badge variant="secondary" className="text-xs">Optional</Badge>
+                            </FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="customer@example.com"
-                                type="email"
-                                {...field}
-                                data-testid="input-customer-email"
-                              />
+                              <div className="relative">
+                                <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-blue-600" />
+                                <Input
+                                  placeholder="customer@example.com"
+                                  type="email"
+                                  className="h-12 pl-10 border-slate-300 focus:border-blue-500 hover:border-slate-400 transition-colors"
+                                  {...field}
+                                  data-testid="input-customer-email"
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Provide customer email for transaction notifications and receipts
+                            </p>
                           </FormItem>
                         )}
                       />
