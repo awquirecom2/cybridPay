@@ -136,8 +136,8 @@ export function requireMerchantKycVerified(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Merchant authentication required" });
   }
   
-  // Check KYC completion: kybStatus must be 'verified' and cybridCustomerGuid must be present
-  if (req.user.kybStatus !== 'verified' || !req.user.cybridCustomerGuid) {
+  // Check KYC completion: kybStatus must be 'verified' or 'approved' and cybridCustomerGuid must be present
+  if (!['verified', 'approved'].includes(req.user.kybStatus) || !req.user.cybridCustomerGuid) {
     return res.status(403).json({ 
       error: "KYC verification required to access this feature",
       code: "KYC_REQUIRED",
