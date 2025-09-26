@@ -19,16 +19,10 @@ export function KybOnboarding() {
   const [currentStep, setCurrentStep] = useState(1)
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({})
   
-  // Get real-time KYC status from API using list endpoint
+  // Get KYC status from API - no polling needed since webhooks update status real-time
   const { data: kycStatus, isLoading: kycLoading, error: kycError, refetch: refetchKycStatus } = useQuery({
     queryKey: ['/api/cybrid/kyc-status'],
-    refetchInterval: (query) => {
-      // Stop polling when status is completed or failed (final states)
-      const status = (query.state.data as any)?.status;
-      return (status === 'approved' || status === 'rejected') ? false : 5000;
-    },
-    refetchIntervalInBackground: true,
-    staleTime: 1000 // Consider data stale after 1 second
+    staleTime: 30000 // Cache for 30 seconds since webhooks handle real-time updates
   })
   
   // Map API status to component status with proper type checking
