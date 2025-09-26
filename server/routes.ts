@@ -995,6 +995,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isNowApproved = statusResult.status === 'approved';
       const shouldTriggerAutomation = wasNotApproved && isNowApproved && merchant.status === 'approved';
       
+      // Initialize automation flag
+      let needsAutomation = false;
+      
       // Update merchant record if status changed
       if (statusResult.status !== merchant.kybStatus) {
         const updateData: any = {
@@ -1011,10 +1014,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // TRIGGER AUTOMATION: Create trade account and deposit wallet when KYC gets approved
         // Only trigger if we don't already have trade accounts to prevent duplicates
-        const needsAutomation = shouldTriggerAutomation && 
-                               !merchant.cybridTradeAccountGuid && 
-                               merchant.tradeAccountStatus !== 'pending' &&
-                               merchant.tradeAccountStatus !== 'created';
+        needsAutomation = shouldTriggerAutomation && 
+                         !merchant.cybridTradeAccountGuid && 
+                         merchant.tradeAccountStatus !== 'pending' &&
+                         merchant.tradeAccountStatus !== 'created';
                                
         if (needsAutomation) {
           console.log(`🎯 POLLING TRIGGER: KYC approved for merchant ${merchant.name} (${merchant.id}), starting automation...`);
