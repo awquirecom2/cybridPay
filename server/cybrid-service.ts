@@ -1013,8 +1013,9 @@ export class CybridService {
         throw new Error(`Merchant ${merchantData.merchantId} not found`);
       }
       
-      if (merchant.status !== 'approved') {
-        throw new Error(`Cannot create Cybrid customer for non-approved merchant. Status: ${merchant.status}`);
+      // Allow all merchants except rejected/deactivated ones
+      if (merchant.status === 'rejected' || merchant.status === 'deactivated') {
+        throw new Error(`Cannot create Cybrid customer for rejected/deactivated merchant. Status: ${merchant.status}`);
       }
 
       // First check if customer already exists by external ID

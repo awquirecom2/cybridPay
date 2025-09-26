@@ -117,14 +117,15 @@ export function requireMerchantAuthenticated(req: any, res: any, next: any) {
   next();
 }
 
-// Strict middleware for post-approval features - requires approved status
+// Merchant authentication middleware - allows all authenticated merchants
 export function requireMerchant(req: any, res: any, next: any) {
   if (!req.isAuthenticated() || !req.user || getSessionType(req) !== 'merchant') {
     return res.status(401).json({ error: "Merchant authentication required" });
   }
   
-  if (req.user.status !== 'approved') {
-    return res.status(403).json({ error: "Merchant account not approved" });
+  // Block only rejected/deactivated merchants, allow all others
+  if (req.user.status === 'rejected' || req.user.status === 'deactivated') {
+    return res.status(403).json({ error: "Merchant account access denied" });
   }
   
   next();

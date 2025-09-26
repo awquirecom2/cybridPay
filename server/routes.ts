@@ -102,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phone: registrationData.phone || null,
         address: registrationData.address || null,
         description: registrationData.description || null,
-        status: "pending",
+        status: "approved",
         kybStatus: "pending",
         cybridCustomerType: signupToken.cybridCustomerType, // Use customer type from signup token
         // Set defaults for other fields
@@ -430,11 +430,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...merchantData,
         username: credentials.username,
         password: hashedPassword,
-        status: "pending",
+        status: "approved",
         kybStatus: "pending"
       });
 
-      // Prepare response object - no immediate Cybrid customer creation
+      // Prepare response object
       const response = {
         merchant: sanitizeMerchant(merchant),
         credentials: {
@@ -442,13 +442,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           password: credentials.password // Plain text password for admin to share
         },
         cybrid: {
-          status: 'pending_approval', // Will be created when merchant is approved
+          status: 'ready', // Cybrid customer can be created immediately
           customerGuid: null,
           error: null
         }
       };
 
-      console.log(`✅ Merchant created successfully: ${merchant.name} (${merchant.id}). Cybrid customer will be created upon approval.`);
+      console.log(`✅ Merchant created successfully: ${merchant.name} (${merchant.id}). Ready for Cybrid integration.`);
 
       // Always return success - merchant creation succeeded
       res.status(201).json(response);
@@ -475,39 +475,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
-      // DELAYED TRIGGER: Create Cybrid customer when status changes to "approved"
-      const isBeingApproved = currentMerchant.status !== 'approved' && updates.status === 'approved';
+      // Note: Since merchants are now approved by default, Cybrid customer creation 
+      // happens automatically or can be triggered manually when needed
       let cybridResult = null;
-
-      if (isBeingApproved) {
-        try {
-          console.log(`🎯 Merchant approved! Creating delayed Cybrid customer for: ${merchant.name} (${merchant.id})`);
-          
-          const cybridCustomer = await CybridService.ensureCustomer({
-            merchantId: merchant.id,
-            name: merchant.name,
-            email: merchant.email,
-            type: (merchant as any).cybridCustomerType || 'business' // Use stored customer type or default to business
-          });
-
-          cybridResult = {
-            success: true,
-            customerGuid: cybridCustomer.guid,
-            message: `Cybrid customer created successfully: ${cybridCustomer.guid}`
-          };
-
-          console.log(`✅ Delayed Cybrid customer creation successful for merchant ${merchant.id}`);
-
-        } catch (cybridError) {
-          console.error(`❌ Delayed Cybrid customer creation failed for merchant ${merchant.id}:`, cybridError);
-          
-          cybridResult = {
-            success: false,
-            customerGuid: null,
-            error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
-          };
-        }
-      }
 
       // Include Cybrid result in response if customer creation was triggered
       const response: any = { 
@@ -687,12 +657,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
-      // APPROVAL GATE: Only create Cybrid customers for approved merchants
-      if (merchant.status !== 'approved') {
+      // Block only rejected/deactivated merchants
+      if (merchant.status === 'rejected' || merchant.status === 'deactivated') {
         return res.status(400).json({ 
-          error: "Cannot create Cybrid customer for non-approved merchant",
+          error: "Cannot create Cybrid customer for rejected/deactivated merchant",
           merchantStatus: merchant.status,
-          message: "Merchant must be approved before creating Cybrid customer"
+          message: "Merchant account access denied"
         });
       }
 
@@ -802,10 +772,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
-      // Validate merchant is approved
-      if (merchant.status !== 'approved') {
+      // Block only rejected/deactivated merchants
+      if (merchant.status === 'rejected' || merchant.status === 'deactivated') {
         return res.status(400).json({ 
-          error: "Merchant must be approved before creating trade account",
+          error: "Cannot create trade account for rejected/deactivated merchant",
           merchantStatus: merchant.status
         });
       }
@@ -2022,10 +1992,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Merchant not found" });
       }
 
-      // Check if merchant is approved
-      if (merchant.status !== 'approved') {
+      // Block only rejected/deactivated merchants
+      if (merchant.status === 'rejected' || merchant.status === 'deactivated') {
         return res.status(400).json({
-          error: "Merchant must be approved before creating deposit addresses",
+          error: "Cannot create deposit address for rejected/deactivated merchant",
           merchantStatus: merchant.status
         });
       }
