@@ -255,6 +255,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Merchant endpoint to get their deposit addresses
   app.get("/api/merchant/deposit-addresses", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+      
       const merchantId = req.user.id;
       console.log(`Fetching deposit addresses for merchant: ${merchantId}`);
       
