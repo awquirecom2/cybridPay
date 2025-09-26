@@ -156,6 +156,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public endpoint to validate signup token
+  app.get("/api/signup/validate/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ error: "Token is required" });
+      }
+
+      // Get the signup token
+      const signupToken = await storage.getSignupToken(token);
+      if (!signupToken) {
+        return res.status(400).json({ error: "Invalid registration token" });
+      }
+
+      // Check if token is expired
+      if (signupToken.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Registration token has expired" });
+      }
+
+      // Check if token is already used
+      if (signupToken.used) {
+        return res.status(400).json({ error: "Registration token has already been used" });
+      }
+
+      // Token is valid
+      res.json({
+        success: true,
+        message: "Registration token is valid",
+        expiresAt: signupToken.expiresAt
+      });
+
+    } catch (error) {
+      console.error("Error validating signup token:", error);
+      res.status(500).json({ 
+        error: "Failed to validate token"
+      });
+    }
+  });
+
   // Merchant endpoint to get their deposit addresses
   app.get("/api/merchant/deposit-addresses", requireMerchant, requireMerchantKycVerified, async (req, res) => {
     try {

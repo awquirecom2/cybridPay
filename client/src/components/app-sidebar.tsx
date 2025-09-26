@@ -3,7 +3,7 @@ import {
   Users, Settings, CreditCard, Webhook, 
   Building, BarChart3, Wallet,
   Home, FileText, Shield, Globe, ArrowDownToLine, ArrowUpFromLine,
-  LogOut, ChevronUp, Link
+  LogOut, ChevronUp, Link as LinkIcon
 } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
@@ -124,7 +124,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
   const adminItems = [
     { title: "Dashboard", url: "/admin", icon: Home },
     { title: "Merchants", url: "/admin/merchants", icon: Users },
-    { title: "Signup Links", url: "/admin/signup-links", icon: Link },
+    { title: "Signup Links", url: "/admin/signup-links", icon: LinkIcon },
     { title: "Permissions", url: "/admin/permissions", icon: Shield },
     { title: "Fee Config", url: "/admin/fees", icon: CreditCard },
     { title: "Webhooks", url: "/admin/webhooks", icon: Webhook },

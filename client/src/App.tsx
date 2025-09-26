@@ -23,6 +23,7 @@ import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
 import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
 import { Accounts } from "@/components/merchant/accounts";
 import MerchantLogin from "@/pages/merchant-login";
+import MerchantSignup from "@/pages/merchant-signup";
 import AdminLogin from "@/pages/admin-login";
 import AdminPasswordReset from "@/pages/admin-password-reset";
 import NotFound from "@/pages/not-found";
@@ -47,6 +48,7 @@ function Router() {
       
       {/* Authentication Routes */}
       <Route path="/merchant/login" component={MerchantLogin} />
+      <Route path="/signup/:token" component={MerchantSignup} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/reset-password" component={AdminPasswordReset} />
       
