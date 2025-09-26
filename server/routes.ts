@@ -6,7 +6,7 @@ import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticat
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema, createSignupTokenSchema, publicMerchantRegistrationSchema } from "@shared/schema";
-import { randomBytes } from "crypto";
+import { randomBytes, createHmac, timingSafeEqual, createHash } from "crypto";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -1095,10 +1095,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: 'Webhook secret not configured' });
       }
 
-      const crypto = require('crypto');
       // Include timestamp in signature calculation to prevent replay attacks
       const signedData = `${timestamp}.${body}`;
-      const expectedSignature = crypto.createHmac('sha256', webhookSecret)
+      const expectedSignature = createHmac('sha256', webhookSecret)
         .update(signedData)
         .digest('hex');
       
@@ -1119,7 +1118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: 'Invalid signature' });
       }
       
-      if (!crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      if (!timingSafeEqual(expectedBuffer, receivedBuffer)) {
         console.warn('Cybrid webhook signature verification failed');
         return res.status(401).json({ error: 'Invalid signature' });
       }
@@ -1149,7 +1148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Received Cybrid webhook: ${payload.type} for ${payload.object?.guid}`);
 
       // Check for event ID to prevent duplicate processing (use payload data only, not headers)
-      const eventId = payload.id || payload.event_id || crypto.createHash('sha256').update(body).digest('hex').slice(0, 16);
+      const eventId = payload.id || payload.event_id || createHash('sha256').update(body).digest('hex').slice(0, 16);
       
       // Check if we've already processed this event
       const existingEvent = await storage.getWebhookEvent(eventId);
