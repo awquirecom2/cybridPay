@@ -143,12 +143,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         console.log(`🎯 Creating Cybrid customer for self-registered merchant: ${merchant.name} (${merchant.id}) with type: ${signupToken.cybridCustomerType}`);
         
-        // Create Cybrid customer directly using the type from signup token
+        // Create Cybrid customer directly using the type from signup token (with environment fallback)
+        const customerType = (signupToken.cybridCustomerType || process.env.DEFAULT_SELF_REGISTRATION_CUSTOMER_TYPE || 'individual') as 'business' | 'individual';
         const cybridCustomer = await CybridService.createCustomer({
           merchantId: merchant.id,
           name: merchant.name,
           email: merchant.email
-        }, signupToken.cybridCustomerType as 'business' | 'individual');
+        }, customerType);
 
         cybridResult = {
           success: true,
@@ -520,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         used: false,
         usedByMerchantId: null,
         createdByAdminId: (req.user as any)?.id || null,
-        cybridCustomerType: tokenData.cybridCustomerType,
+        cybridCustomerType: tokenData.cybridCustomerType || process.env.DEFAULT_SELF_REGISTRATION_CUSTOMER_TYPE || 'individual',
         notes: tokenData.notes || null
       });
 
