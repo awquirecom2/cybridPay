@@ -104,7 +104,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: registrationData.description || null,
         status: "pending",
         kybStatus: "pending",
-        cybridCustomerType: registrationData.cybridCustomerType,
+        cybridCustomerType: signupToken.cybridCustomerType, // Use customer type from signup token
         // Set defaults for other fields
         customFeeEnabled: false,
         customFeePercentage: "2.5",
@@ -138,8 +138,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Merchant self-registered successfully: ${merchant.name} (${merchant.email})`);
 
+      // 🚀 NEW: Automatically create Cybrid customer without admin approval
+      let cybridResult = null;
+      try {
+        console.log(`🎯 Creating Cybrid customer for self-registered merchant: ${merchant.name} (${merchant.id}) with type: ${signupToken.cybridCustomerType}`);
+        
+        // Create Cybrid customer directly using the type from signup token
+        const cybridCustomer = await CybridService.createCustomer({
+          merchantId: merchant.id,
+          name: merchant.name,
+          email: merchant.email
+        }, signupToken.cybridCustomerType as 'business' | 'individual');
+
+        cybridResult = {
+          success: true,
+          customerGuid: cybridCustomer.guid,
+          customerType: signupToken.cybridCustomerType,
+          message: `Cybrid ${signupToken.cybridCustomerType} customer created successfully`
+        };
+
+        console.log(`✅ Auto-created Cybrid customer for self-registered merchant ${merchant.id}: ${cybridCustomer.guid}`);
+
+      } catch (cybridError) {
+        console.error(`❌ Failed to auto-create Cybrid customer for self-registered merchant ${merchant.id}:`, cybridError);
+        
+        cybridResult = {
+          success: false,
+          customerGuid: null,
+          customerType: signupToken.cybridCustomerType,
+          error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
+        };
+      }
+
       // Return the credentials for the user to save
-      res.status(201).json({
+      const response: any = {
         success: true,
         message: "Registration successful! Please save your login credentials:",
         credentials: {
@@ -147,7 +179,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           password: credentials.password
         },
         merchant: sanitizeMerchant(merchant)
-      });
+      };
+
+      // Include Cybrid result in response
+      if (cybridResult) {
+        response.cybrid = cybridResult;
+      }
+
+      res.status(201).json(response);
 
     } catch (error) {
       console.error("Error in merchant self-registration:", error);
@@ -481,6 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         used: false,
         usedByMerchantId: null,
         createdByAdminId: (req.user as any)?.id || null,
+        cybridCustomerType: tokenData.cybridCustomerType,
         notes: tokenData.notes || null
       });
 

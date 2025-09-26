@@ -252,6 +252,7 @@ export const signupTokens = pgTable("signup_tokens", {
   used: boolean("used").default(false),
   usedByMerchantId: varchar("used_by_merchant_id").references(() => merchants.id),
   createdByAdminId: varchar("created_by_admin_id").references(() => admins.id),
+  cybridCustomerType: text("cybrid_customer_type").notNull().default("individual"), // Configure customer type per signup link
   notes: text("notes"), // Optional admin notes about the link
   createdAt: timestamp("created_at").default(sql`NOW()`),
   usedAt: timestamp("used_at")
@@ -266,6 +267,10 @@ export const insertSignupTokenSchema = createInsertSchema(signupTokens).omit({
 // Admin schema for creating signup tokens
 export const createSignupTokenSchema = z.object({
   expirationHours: z.number().min(1).max(720).default(168), // 1 hour to 30 days, default 7 days
+  cybridCustomerType: z.enum(["business", "individual"], {
+    required_error: "Customer type is required",
+    invalid_type_error: "Customer type must be either 'business' or 'individual'"
+  }).default("individual"),
   notes: z.string().optional()
 });
 
