@@ -205,7 +205,7 @@ export default function AdminLogin() {
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Secure admin access • CryptoPay Platform
+            Secure admin access • Ruupay Platform
           </p>
         </div>
       </div>

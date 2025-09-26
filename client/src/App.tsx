@@ -172,7 +172,7 @@ function AppLayout() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="dark" storageKey="cryptopay-theme">
+      <ThemeProvider defaultTheme="dark" storageKey="ruupay-theme">
         <TooltipProvider>
           <AppLayout />
           <Toaster />

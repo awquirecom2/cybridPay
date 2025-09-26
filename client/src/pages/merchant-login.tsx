@@ -167,7 +167,7 @@ export default function MerchantLogin() {
         </Card>
         
         <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>Secure crypto payment processing powered by CryptoPay</p>
+          <p>Secure crypto payment processing powered by Ruupay</p>
         </div>
       </div>
     </div>

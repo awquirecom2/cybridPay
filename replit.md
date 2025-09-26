@@ -1,6 +1,6 @@
 # Overview
 
-This is a cryptocurrency payment platform called "CryptoPay" that enables merchants to receive crypto payments and convert them to fiat currency. The platform provides two main portals: an Administration Portal for platform management and a Merchant Portal for business onboarding and payment processing. The system integrates with Transak for fiat-to-crypto conversion and Cybrid for custodial wallet services, creating a comprehensive fintech solution for cryptocurrency payment processing.
+This is a cryptocurrency payment platform called "Ruupay" that enables merchants to receive crypto payments and convert them to fiat currency. The platform provides two main portals: an Administration Portal for platform management and a Merchant Portal for business onboarding and payment processing. The system integrates with Transak for fiat-to-crypto conversion and Cybrid for custodial wallet services, creating a comprehensive fintech solution for cryptocurrency payment processing.
 
 # User Preferences
 

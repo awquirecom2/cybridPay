@@ -149,7 +149,7 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
             <Building className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-semibold text-lg">CryptoPay</span>
+            <span className="font-semibold text-lg">Ruupay</span>
             <Badge variant="outline" className="w-fit text-xs">
               {userRole.charAt(0).toUpperCase() + userRole.slice(1)} Portal
             </Badge>

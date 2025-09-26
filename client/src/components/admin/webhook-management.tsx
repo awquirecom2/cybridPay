@@ -22,7 +22,7 @@ export function WebhookManagement() {
       id: "evt_001",
       merchant: "TechCorp Inc",
       eventType: "payment.completed",
-      url: "https://techcorp.com/webhooks/cryptopay",
+      url: "https://techcorp.com/webhooks/ruupay",
       status: "success",
       attempts: 1,
       timestamp: "2024-01-21 14:30:22",
@@ -67,7 +67,7 @@ export function WebhookManagement() {
   const webhookConfig = [
     {
       merchant: "TechCorp Inc",
-      endpoint: "https://techcorp.com/webhooks/cryptopay",
+      endpoint: "https://techcorp.com/webhooks/ruupay",
       enabled: true,
       events: ["payment.completed", "payment.failed", "kyb.approved"],
       secret: "whsec_1234567890abcdef",

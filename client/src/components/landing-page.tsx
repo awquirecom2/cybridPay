@@ -35,7 +35,7 @@ export function LandingPage() {
               <Building className="h-5 w-5" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-xl">CryptoPay</span>
+              <span className="font-bold text-xl">Ruupay</span>
               <span className="text-xs text-muted-foreground">Payment Platform</span>
             </div>
           </div>
@@ -143,7 +143,7 @@ export function LandingPage() {
       <footer className="py-12 px-4 border-t">
         <div className="container mx-auto text-center">
           <p className="text-muted-foreground">
-            © 2024 CryptoPay. Professional cryptocurrency payment infrastructure.
+            © 2024 Ruupay. Professional cryptocurrency payment infrastructure.
           </p>
         </div>
       </footer>

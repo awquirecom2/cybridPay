@@ -16,8 +16,8 @@ export function PlatformSettings() {
   
   // Platform configuration state
   const [platformConfig, setPlatformConfig] = useState({
-    name: "CryptoPay",
-    supportEmail: "support@cryptopay.com",
+    name: "Ruupay",
+    supportEmail: "support@ruupay.com",
     contactPhone: "+1-555-0123",
     defaultCurrency: "USD",
     maintenanceMode: false,

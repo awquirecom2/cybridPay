@@ -54,7 +54,7 @@ export function UserManagement() {
     {
       id: "admin_001",
       name: "John Smith",
-      email: "john@cryptopay.com",
+      email: "john@ruupay.com",
       role: "super_admin",
       status: "active",
       lastLogin: "2024-01-21 15:30",
@@ -64,7 +64,7 @@ export function UserManagement() {
     {
       id: "admin_002", 
       name: "Sarah Johnson",
-      email: "sarah@cryptopay.com",
+      email: "sarah@ruupay.com",
       role: "platform_admin",
       status: "active",
       lastLogin: "2024-01-21 14:15",
@@ -74,7 +74,7 @@ export function UserManagement() {
     {
       id: "admin_003",
       name: "Mike Wilson",
-      email: "mike@cryptopay.com", 
+      email: "mike@ruupay.com", 
       role: "financial_admin",
       status: "active",
       lastLogin: "2024-01-21 12:45",
@@ -84,7 +84,7 @@ export function UserManagement() {
     {
       id: "admin_004",
       name: "Lisa Chen",
-      email: "lisa@cryptopay.com",
+      email: "lisa@ruupay.com",
       role: "support_agent",
       status: "active", 
       lastLogin: "2024-01-21 16:20",
