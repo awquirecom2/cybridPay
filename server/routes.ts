@@ -1052,54 +1052,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cybrid webhook endpoint for receiving verification status updates  
   app.post("/api/webhooks/cybrid", async (req: any, res) => {
     try {
-      // Debug: Log all headers to see what Cybrid is actually sending
-      console.log('🔍 Cybrid webhook received headers:', Object.keys(req.headers));
-      console.log('🔍 Full headers object:', req.headers);
-      
+      // Get signature from header (per Cybrid documentation)
       const signature = req.headers['x-cybrid-signature'] as string;
-      const timestamp = req.headers['x-cybrid-timestamp'] as string;
       const body = req.rawBody || req.body;
-      
-      console.log('🔍 Webhook body:', typeof body === 'string' ? body : JSON.stringify(body));
 
-      // Cybrid webhook signature verification (they don't send timestamp)
+      // Verify required webhook signature header
       if (!signature) {
-        console.warn('Cybrid webhook missing x-cybrid-signature header');
+        console.warn('Cybrid webhook missing X-Cybrid-Signature header');
         return res.status(400).json({ error: 'Missing signature header' });
       }
 
-      // Verify webhook signature with HMAC (Cybrid format - no timestamp)
-      const webhookSecret = process.env.CYBRID_WEBHOOK_SECRET;
-      if (!webhookSecret) {
+      // Verify webhook signature with HMAC (per Cybrid documentation)
+      const signingKey = process.env.CYBRID_WEBHOOK_SECRET;
+      if (!signingKey) {
         console.error('CYBRID_WEBHOOK_SECRET not configured');
         return res.status(500).json({ error: 'Webhook secret not configured' });
       }
 
-      // Convert Buffer body to string for signature verification
-      const bodyString = typeof body === 'string' ? body : Buffer.isBuffer(body) ? body.toString('utf8') : JSON.stringify(body);
-      
-      // Calculate expected signature (Cybrid format: just the body, no timestamp)
-      const expectedSignature = createHmac('sha256', webhookSecret)
-        .update(bodyString)
+      // Calculate expected signature exactly as shown in Cybrid docs
+      const expectedSignature = createHmac('sha256', signingKey)
+        .update(body) // Use raw body directly
         .digest('hex');
       
-      // Cybrid sends signature without 'sha256=' prefix, just the hex
-      const receivedSignature = signature;
+      // Compare signatures (both should be hex strings)
+      const isValidSignature = signature === expectedSignature;
       
-      // Validate signature lengths before comparison
-      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-      const receivedBuffer = Buffer.from(receivedSignature, 'hex');
-      
-      if (expectedBuffer.length !== receivedBuffer.length) {
-        console.warn('Cybrid webhook signature length mismatch');
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
-      
-      if (!timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      if (!isValidSignature) {
         console.warn('Cybrid webhook signature verification failed');
         console.log('Expected signature:', expectedSignature);
-        console.log('Received signature:', receivedSignature);
-        return res.status(401).json({ error: 'Invalid signature' });
+        console.log('Received signature:', signature);
+        console.log('Body type:', typeof body);
+        console.log('Body length:', Buffer.isBuffer(body) ? body.length : JSON.stringify(body).length);
+        return res.status(403).json({ error: 'Invalid signature' });
       }
 
       console.log('✅ Cybrid webhook signature verified successfully');
