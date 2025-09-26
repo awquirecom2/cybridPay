@@ -69,14 +69,7 @@ export function Accounts() {
   ]
 
   const handleCreateCustodianAccount = async () => {
-    if (!merchantStatus.kybCompleted) {
-      toast({
-        title: "KYB Required",
-        description: "Complete your KYB verification before creating a custodian account.",
-        variant: "destructive"
-      })
-      return
-    }
+    // KYB check is now informational only - merchants can proceed
 
     setIsCreatingCustodian(true)
     console.log('Creating Cybrid custodian account')
@@ -164,7 +157,7 @@ export function Accounts() {
     )
   }
 
-  // KYB not completed
+  // KYB check - now informational only
   if (!merchantStatus.kybCompleted) {
     return (
       <div className="space-y-6">
@@ -175,14 +168,14 @@ export function Accounts() {
           </p>
         </div>
 
-        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
+        <Card className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+            <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
               <AlertTriangle className="h-5 w-5" />
-              KYB Verification Required
+              Complete KYB Verification
             </CardTitle>
-            <CardDescription className="text-yellow-700 dark:text-yellow-300">
-              Complete your Know Your Business verification before creating accounts
+            <CardDescription className="text-blue-700 dark:text-blue-300">
+              Complete your Know Your Business verification to unlock all account features
             </CardDescription>
           </CardHeader>
           <CardContent>
