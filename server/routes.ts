@@ -1010,8 +1010,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateMerchant(merchant.id, updateData);
         
         // TRIGGER AUTOMATION: Create trade account and deposit wallet when KYC gets approved
-        if (shouldTriggerAutomation) {
+        // Only trigger if we don't already have trade accounts to prevent duplicates
+        const needsAutomation = shouldTriggerAutomation && 
+                               !merchant.cybridTradeAccountGuid && 
+                               merchant.tradeAccountStatus !== 'pending' &&
+                               merchant.tradeAccountStatus !== 'created';
+                               
+        if (needsAutomation) {
           console.log(`🎯 POLLING TRIGGER: KYC approved for merchant ${merchant.name} (${merchant.id}), starting automation...`);
+          
+          // Mark automation as pending immediately to prevent duplicates
+          await storage.updateMerchant(merchant.id, {
+            tradeAccountStatus: 'pending',
+            cybridLastAttemptAt: new Date()
+          });
           
           // Run automation in background - don't block the API response
           setImmediate(async () => {
@@ -1049,7 +1061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         outcome: statusResult.outcome,
         verificationGuid: statusResult.verificationGuid,
         personaUrl: statusResult.personaUrl,
-        automationTriggered: shouldTriggerAutomation // Let frontend know automation was triggered
+        automationTriggered: needsAutomation // Let frontend know automation was triggered
       });
       
     } catch (error) {

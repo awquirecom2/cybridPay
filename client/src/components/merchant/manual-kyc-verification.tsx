@@ -287,7 +287,15 @@ export function ManualKycVerification({
           <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800 dark:text-green-200">
-              Congratulations! Your identity has been verified and your merchant account is fully activated.
+              <div className="space-y-2">
+                <div>Congratulations! Your identity has been verified.</div>
+                {(kycStatus as any)?.automationTriggered && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Setting up your trading accounts automatically...</span>
+                  </div>
+                )}
+              </div>
             </AlertDescription>
           </Alert>
         )}
