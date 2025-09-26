@@ -349,11 +349,7 @@ export function MerchantManagement() {
         // Handle specific 400 error cases based on error message
         const errorMessage = serverMessage || ""
         
-        if (errorMessage.includes("must be approved")) {
-          title = "Merchant Not Approved"
-          description = "Trade accounts can only be created for approved merchants."
-          suggestions = "Please approve the merchant first, then try again."
-        } else if (errorMessage.includes("Cybrid customer")) {
+        if (errorMessage.includes("Cybrid customer")) {
           title = "Cybrid Customer Missing"
           description = "Merchant must have a Cybrid customer account before creating a trade account."
           suggestions = "Create a Cybrid customer for this merchant first."
@@ -446,11 +442,7 @@ export function MerchantManagement() {
         // Handle specific 400 error cases based on error message
         const errorMessage = serverMessage || ""
         
-        if (errorMessage.includes("must be approved")) {
-          title = "Merchant Not Approved"
-          description = "Deposit addresses can only be created for approved merchants."
-          suggestions = "Please approve the merchant first, then try again."
-        } else if (errorMessage.includes("Cybrid customer")) {
+        if (errorMessage.includes("Cybrid customer")) {
           title = "Cybrid Customer Missing"
           description = "Merchant must have a Cybrid customer account before creating deposit addresses."
           suggestions = "Create a Cybrid customer for this merchant first."
@@ -684,12 +676,6 @@ export function MerchantManagement() {
     // Update merchant status via API
     let newStatus = ''
     switch (action) {
-      case 'approve':
-        newStatus = 'approved'
-        break
-      case 'reject':
-        newStatus = 'rejected'
-        break
       case 'deactivate':
         newStatus = 'deactivated'
         break
@@ -706,19 +692,6 @@ export function MerchantManagement() {
     })
 
     switch (action) {
-      case 'approve':
-        toast({
-          title: "Merchant Approved",
-          description: `${merchant.name} has been approved and can now access the platform.`,
-        })
-        break
-      case 'reject':
-        toast({
-          title: "Merchant Rejected",
-          description: `${merchant.name} application has been rejected.`,
-          variant: "destructive"
-        })
-        break
       case 'deactivate':
         toast({
           title: "Merchant Deactivated",
@@ -1521,18 +1494,6 @@ export function MerchantManagement() {
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Merchant
                           </DropdownMenuItem>
-                          {merchant.status === 'pending' && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleMerchantAction('approve', merchant.id)}>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleMerchantAction('reject', merchant.id)}>
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Reject
-                              </DropdownMenuItem>
-                            </>
-                          )}
                           {merchant.status === 'approved' && (
                             <DropdownMenuItem 
                               onClick={() => handleMerchantAction('deactivate', merchant.id)}
