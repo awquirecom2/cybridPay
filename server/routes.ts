@@ -2129,8 +2129,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DEVELOPMENT: Test endpoint to simulate KYC completion webhook for automation testing
+  // DEVELOPMENT: Test endpoint to simulate KYC completion webhook for automation testing  
   if (process.env.NODE_ENV === 'development') {
+    // Manual automation trigger for merchants who completed KYC before the bug fix
+    app.post('/api/test/trigger-automation', async (req, res) => {
+      try {
+        const { merchantId } = req.body;
+        
+        if (!merchantId) {
+          return res.status(400).json({ error: 'merchantId required' });
+        }
+        
+        const merchant = await storage.getMerchant(merchantId);
+        if (!merchant) {
+          return res.status(404).json({ error: 'Merchant not found' });
+        }
+        
+        if (!merchant.cybridCustomerGuid) {
+          return res.status(400).json({ error: 'Merchant has no Cybrid customer GUID' });
+        }
+        
+        console.log(`🔧 MANUAL TRIGGER: Starting automation for merchant ${merchant.name} (${merchant.id})`);
+        
+        // Call the automation handler directly
+        const verificationData = {
+          customer_guid: merchant.cybridCustomerGuid,
+          guid: merchant.cybridVerificationGuid || `manual-trigger-${Date.now()}`,
+          outcome: 'passed',
+          state: 'completed'
+        };
+        
+        await handleIdentityVerificationCompleted(verificationData);
+        
+        res.json({
+          success: true,
+          message: `Manual automation triggered for merchant ${merchant.name}`,
+          merchantId: merchantId
+        });
+        
+      } catch (error) {
+        console.error('Error in manual automation trigger:', error);
+        res.status(500).json({ error: 'Manual automation failed' });
+      }
+    });
+
     app.post('/api/test/simulate-kyc-completion', requireAdmin, async (req, res) => {
       try {
         const { merchantId, outcome = 'passed' } = req.body;
