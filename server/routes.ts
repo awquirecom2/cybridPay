@@ -1097,44 +1097,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid JSON payload' });
       }
 
-      console.log(`Received Cybrid webhook: ${payload.type} for ${payload.object?.guid}`);
+      console.log(`Received Cybrid webhook: ${payload.event_type} for ${payload.object_guid}`);
 
-      // Check for event ID to prevent duplicate processing (use payload data only, not headers)
-      const eventId = payload.id || payload.event_id || createHash('sha256').update(body).digest('hex').slice(0, 16);
+      // Check for event ID to prevent duplicate processing (use Cybrid's guid field)
+      const eventId = payload.guid || createHash('sha256').update(body).digest('hex').slice(0, 16);
       
       // Check if we've already processed this event
       const existingEvent = await storage.getWebhookEvent(eventId);
       if (existingEvent) {
         console.log(`Webhook event ${eventId} already processed, returning success`);
-        return res.status(200).json({ received: true, type: payload.type, status: 'duplicate' });
+        return res.status(200).json({ received: true, event_type: payload.event_type, status: 'duplicate' });
       }
 
       // Store webhook event for idempotency
       await storage.createWebhookEvent({
         eventId: eventId,
-        eventType: payload.type,
+        eventType: payload.event_type,
         payload: payload
       });
 
       // Handle different webhook event types
-      switch (payload.type) {
+      switch (payload.event_type) {
         case 'identity_verification.completed':
         case 'identity_verification.passed':
-          await handleIdentityVerificationCompleted(payload.object);
+          await handleIdentityVerificationCompleted(payload);
           break;
         case 'identity_verification.failed':
         case 'identity_verification.rejected':
-          await handleIdentityVerificationFailed(payload.object);
+          await handleIdentityVerificationFailed(payload);
           break;
         case 'customer.storing':
-          await handleCustomerStoring(payload.object);
+          await handleCustomerStoring(payload);
           break;
         default:
-          console.log(`Unhandled Cybrid webhook event type: ${payload.type}`);
+          console.log(`Unhandled Cybrid webhook event type: ${payload.event_type}`);
       }
 
       // Return success response to Cybrid
-      res.status(200).json({ received: true, type: payload.type });
+      res.status(200).json({ received: true, event_type: payload.event_type });
 
     } catch (error) {
       console.error('Error processing Cybrid webhook:', error);
@@ -1143,11 +1143,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Webhook handler functions for Cybrid events
-  async function handleIdentityVerificationCompleted(verificationData: any) {
+  async function handleIdentityVerificationCompleted(webhookPayload: any) {
     try {
-      const customerGuid = verificationData.customer_guid;
-      const verificationGuid = verificationData.guid;
-      const outcome = verificationData.outcome;
+      // Extract object_guid from Cybrid webhook payload
+      const verificationGuid = webhookPayload.object_guid;
+      
+      console.log(`Identity verification completed for: ${verificationGuid}`);
+
+      // Fetch the full identity verification details from Cybrid API
+      const verificationDetails = await CybridService.getIdentityVerification(verificationGuid);
+      if (!verificationDetails) {
+        console.error(`Failed to fetch identity verification details for: ${verificationGuid}`);
+        return;
+      }
+
+      const customerGuid = verificationDetails.customer_guid;
+      const outcome = verificationDetails.outcome;
 
       console.log(`Identity verification completed: ${verificationGuid} with outcome: ${outcome}`);
 
