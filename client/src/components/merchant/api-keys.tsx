@@ -56,7 +56,7 @@ export function ApiKeys() {
       <div>
         <h1 className="text-3xl font-bold">Integration Credentials</h1>
         <p className="text-muted-foreground">
-          Configure your Transak API credentials to enable fiat-to-crypto payment functionality
+          Configure your Transak API credentials to enable fiat-to-crypto payment functionality. Cybrid integration is fully automated.
         </p>
       </div>
 
