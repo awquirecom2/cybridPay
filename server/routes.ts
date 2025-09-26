@@ -6,6 +6,7 @@ import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticat
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
 import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema, createSignupTokenSchema, publicMerchantRegistrationSchema } from "@shared/schema";
+import { randomBytes } from "crypto";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -471,7 +472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tokenData = createSignupTokenSchema.parse(req.body);
       
       // Generate a unique token
-      const token = require('crypto').randomBytes(32).toString('hex');
+      const token = randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + tokenData.expirationHours * 60 * 60 * 1000);
       
       const signupToken = await storage.createSignupToken({
