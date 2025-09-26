@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
@@ -749,32 +750,51 @@ export function MerchantManagement() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => bulkSyncKycMutation.mutate()}
-            disabled={bulkSyncKycMutation.isPending}
-            data-testid="button-sync-kyc"
-          >
-            {bulkSyncKycMutation.isPending ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4 mr-2" />
-            )}
-            Sync KYC Status
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => syncCustomerTypesMutation.mutate()}
-            disabled={syncCustomerTypesMutation.isPending}
-            data-testid="button-sync-customer-types"
-          >
-            {syncCustomerTypesMutation.isPending ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RotateCcw className="h-4 w-4 mr-2" />
-            )}
-            Sync Customer Types
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={() => bulkSyncKycMutation.mutate()}
+                  disabled={bulkSyncKycMutation.isPending}
+                  data-testid="button-sync-kyc"
+                >
+                  {bulkSyncKycMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                  )}
+                  Sync KYC (Cleanup)
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Manual cleanup sync for KYC statuses. <strong>Note:</strong> Webhooks now handle real-time KYC updates automatically. Use this only for reconciliation or troubleshooting.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={() => syncCustomerTypesMutation.mutate()}
+                  disabled={syncCustomerTypesMutation.isPending}
+                  data-testid="button-sync-customer-types"
+                >
+                  {syncCustomerTypesMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                  )}
+                  Sync Types (Cleanup)
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Manual sync for customer types from Cybrid. Use this to update business/individual classifications for existing merchants.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-merchant">
