@@ -1552,22 +1552,26 @@ export function MerchantManagement() {
                           )}
                           
                           {/* Automation Status Indicators */}
-                          {merchant.kybStatus === 'approved' && merchant.cybridTradeAccountGuid && (
+                          {merchant.kybStatus === 'approved' && merchant.cybridTradeAccountGuid && merchant.tradeAccountStatus === 'created' && (
                             <DropdownMenuItem disabled className="text-green-600">
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Trade Account: Auto-Created
                             </DropdownMenuItem>
                           )}
-                          {merchant.kybStatus === 'approved' && merchant.depositAddressGuid && (
+                          {merchant.kybStatus === 'approved' && merchant.depositAddressGuid && merchant.depositAddressStatus === 'created' && (
                             <DropdownMenuItem disabled className="text-green-600">
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Deposit Wallet: Auto-Created
                             </DropdownMenuItem>
                           )}
-                          {merchant.kybStatus === 'approved' && merchant.tradeAccountStatus === 'error' && (
+                          {merchant.kybStatus === 'approved' && (merchant.tradeAccountStatus === 'error' || merchant.depositAddressStatus === 'error') && (
                             <DropdownMenuItem disabled className="text-red-600">
                               <AlertCircle className="h-4 w-4 mr-2" />
-                              Automation Failed
+                              {merchant.tradeAccountStatus === 'error' && merchant.depositAddressStatus === 'error' 
+                                ? 'Automation Failed (Both)' 
+                                : merchant.tradeAccountStatus === 'error' 
+                                  ? 'Trade Account Failed' 
+                                  : 'Deposit Address Failed'}
                             </DropdownMenuItem>
                           )}
                           
@@ -1593,7 +1597,7 @@ export function MerchantManagement() {
                             </DropdownMenuItem>
                           )}
 
-                          {/* Create Deposit Address - Only show if merchant has active trade account but no deposit address */}
+                          {/* Create Deposit Address - Show for manual creation when needed or when automation failed */}
                           {merchant.status === 'approved' && 
                            merchant.cybridCustomerGuid && 
                            merchant.cybridIntegrationStatus === 'active' && 
@@ -1611,7 +1615,50 @@ export function MerchantManagement() {
                               ) : (
                                 <Wallet className="h-4 w-4 mr-2" />
                               )}
-                              Create USDC Deposit Address
+                              Create USDC Deposit Address {merchant.depositAddressStatus === 'error' ? '(Retry)' : '(Manual)'}
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Retry Trade Account Creation - Show when automation failed */}
+                          {merchant.status === 'approved' && 
+                           merchant.cybridCustomerGuid && 
+                           merchant.cybridIntegrationStatus === 'active' && 
+                           merchant.kybStatus === 'approved' && 
+                           merchant.tradeAccountStatus === 'error' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('create-trade-account', merchant.id)}
+                              disabled={createTradeAccountMutation.isPending}
+                              data-testid={`menu-retry-trade-account-${merchant.id}`}
+                              className="text-orange-600 focus:text-orange-600"
+                            >
+                              {createTradeAccountMutation.isPending ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <TrendingUp className="h-4 w-4 mr-2" />
+                              )}
+                              Retry Trade Account Creation
+                            </DropdownMenuItem>
+                          )}
+
+                          {/* Retry Deposit Address Creation - Show when trade account exists but deposit address failed */}
+                          {merchant.status === 'approved' && 
+                           merchant.cybridCustomerGuid && 
+                           merchant.cybridIntegrationStatus === 'active' && 
+                           merchant.cybridTradeAccountGuid &&
+                           merchant.tradeAccountStatus === 'created' &&
+                           merchant.depositAddressStatus === 'error' && (
+                            <DropdownMenuItem 
+                              onClick={() => handleMerchantAction('create-deposit-address', merchant.id)}
+                              disabled={createDepositAddressMutation.isPending}
+                              data-testid={`menu-retry-deposit-address-${merchant.id}`}
+                              className="text-orange-600 focus:text-orange-600"
+                            >
+                              {createDepositAddressMutation.isPending ? (
+                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Wallet className="h-4 w-4 mr-2" />
+                              )}
+                              Retry Deposit Address Creation
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
