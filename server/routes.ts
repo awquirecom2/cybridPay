@@ -440,8 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         used: false,
         usedByMerchantId: null,
         createdByAdminId: (req.user as any)?.id || null,
-        notes: tokenData.notes || null,
-        usedAt: null
+        notes: tokenData.notes || null
       });
 
       // Generate the signup URL

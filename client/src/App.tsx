@@ -13,6 +13,7 @@ import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { MerchantManagement } from "@/components/admin/merchant-management";
 import { FeeConfiguration } from "@/components/admin/fee-configuration";
 import { WebhookManagement } from "@/components/admin/webhook-management";
+import { SignupLinkManagement } from "@/components/admin/signup-link-management";
 import { PlatformSettings } from "@/components/admin/platform-settings";
 import { UserManagement } from "@/components/admin/user-management";
 import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
@@ -73,6 +74,11 @@ function Router() {
       <Route path="/admin/webhooks">
         <AdminProtectedRoute>
           <WebhookManagement />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/signup-links">
+        <AdminProtectedRoute>
+          <SignupLinkManagement />
         </AdminProtectedRoute>
       </Route>
       <Route path="/admin/settings">
