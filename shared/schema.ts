@@ -243,3 +243,76 @@ export const webhookEvents = pgTable("webhook_events", {
 });
 
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+// Signup tokens table for admin-generated merchant registration links
+export const signupTokens = pgTable("signup_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  usedByMerchantId: varchar("used_by_merchant_id").references(() => merchants.id),
+  createdByAdminId: varchar("created_by_admin_id").references(() => admins.id),
+  notes: text("notes"), // Optional admin notes about the link
+  createdAt: timestamp("created_at").default(sql`NOW()`),
+  usedAt: timestamp("used_at")
+});
+
+export const insertSignupTokenSchema = createInsertSchema(signupTokens).omit({
+  id: true,
+  createdAt: true,
+  usedAt: true
+});
+
+// Admin schema for creating signup tokens
+export const createSignupTokenSchema = z.object({
+  expirationHours: z.number().min(1).max(720).default(168), // 1 hour to 30 days, default 7 days
+  notes: z.string().optional()
+});
+
+// Public registration schema for merchants using signup tokens
+export const publicMerchantRegistrationSchema = insertMerchantSchema.omit({
+  username: true,
+  password: true,
+  status: true,
+  kybStatus: true,
+  // Remove all Cybrid fields - these are set during approval
+  cybridCustomerGuid: true,
+  cybridCustomerType: true,
+  cybridVerificationGuid: true,
+  cybridIntegrationStatus: true,
+  cybridLastError: true,
+  cybridLastAttemptAt: true,
+  cybridLastSyncedAt: true,
+  cybridTradeAccountGuid: true,
+  tradeAccountStatus: true,
+  tradeAccountAsset: true,
+  tradeAccountCreatedAt: true,
+  depositAddressGuid: true,
+  depositAddress: true,
+  depositAddressStatus: true,
+  depositAddressAsset: true,
+  depositAddressCreatedAt: true,
+  depositAddressesCreated: true,
+  // Remove admin-only fields
+  customFeeEnabled: true,
+  customFeePercentage: true,
+  customFlatFee: true,
+  payoutMethod: true,
+  bankAccountNumber: true,
+  bankRoutingNumber: true,
+  notes: true,
+  volume: true,
+  integrations: true,
+  dateOnboarded: true
+}).extend({
+  token: z.string().min(1, "Registration token is required"),
+  cybridCustomerType: z.enum(["business", "individual"], {
+    required_error: "Customer type is required",
+    invalid_type_error: "Customer type must be either 'business' or 'individual'"
+  }).default("business")
+});
+
+export type InsertSignupToken = z.infer<typeof insertSignupTokenSchema>;
+export type CreateSignupToken = z.infer<typeof createSignupTokenSchema>;
+export type PublicMerchantRegistration = z.infer<typeof publicMerchantRegistrationSchema>;
+export type SignupToken = typeof signupTokens.$inferSelect;
