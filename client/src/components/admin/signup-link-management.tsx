@@ -21,6 +21,7 @@ interface SignupToken {
   used: boolean;
   usedByMerchantId: string | null;
   createdByAdminId: string | null;
+  cybridCustomerType: string;
   notes: string | null;
   createdAt: string;
   usedAt: string | null;
@@ -40,6 +41,7 @@ export function SignupLinkManagement() {
   const [generatedSignupUrl, setGeneratedSignupUrl] = useState("")
   const [newLink, setNewLink] = useState({
     expirationHours: 168, // 7 days default
+    cybridCustomerType: "individual" as "individual" | "business",
     notes: ""
   })
 
@@ -55,7 +57,7 @@ export function SignupLinkManagement() {
 
   // Create signup link mutation
   const createLinkMutation = useMutation({
-    mutationFn: async (linkData: { expirationHours: number; notes?: string }) => {
+    mutationFn: async (linkData: { expirationHours: number; cybridCustomerType: "individual" | "business"; notes?: string }) => {
       const response = await apiRequest('POST', '/api/admin/signup-links', linkData)
       return await response.json() as CreateSignupLinkResponse
     },
@@ -67,7 +69,7 @@ export function SignupLinkManagement() {
       setGeneratedSignupUrl(data.signupUrl)
       setShowCreateDialog(false)
       setShowGeneratedLink(true)
-      setNewLink({ expirationHours: 168, notes: "" })
+      setNewLink({ expirationHours: 168, cybridCustomerType: "individual", notes: "" })
       queryClient.invalidateQueries({ queryKey: ['/api/admin/signup-links'] })
     },
     onError: (error) => {
@@ -82,6 +84,7 @@ export function SignupLinkManagement() {
   const handleCreateLink = () => {
     createLinkMutation.mutate({
       expirationHours: newLink.expirationHours,
+      cybridCustomerType: newLink.cybridCustomerType,
       notes: newLink.notes || undefined
     })
   }
@@ -179,6 +182,24 @@ export function SignupLinkManagement() {
                 </Select>
               </div>
               <div>
+                <Label htmlFor="customerType">Cybrid Customer Type</Label>
+                <Select
+                  value={newLink.cybridCustomerType}
+                  onValueChange={(value: "individual" | "business") => setNewLink(prev => ({ ...prev, cybridCustomerType: value }))}
+                >
+                  <SelectTrigger data-testid="select-customer-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="individual">Individual (Recommended for self-registration)</SelectItem>
+                    <SelectItem value="business">Business</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Individual customers can complete KYC verification automatically. Business customers require manual KYB verification.
+                </p>
+              </div>
+              <div>
                 <Label htmlFor="notes">Notes (optional)</Label>
                 <Textarea
                   id="notes"
@@ -272,6 +293,7 @@ export function SignupLinkManagement() {
                 <TableRow>
                   <TableHead>Status</TableHead>
                   <TableHead>Token</TableHead>
+                  <TableHead>Customer Type</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Expires</TableHead>
                   <TableHead>Notes</TableHead>
@@ -286,6 +308,11 @@ export function SignupLinkManagement() {
                     </TableCell>
                     <TableCell className="font-mono text-sm">
                       {token.token.slice(0, 8)}...{token.token.slice(-4)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={token.cybridCustomerType === 'individual' ? 'default' : 'secondary'} className="capitalize">
+                        {token.cybridCustomerType || 'individual'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(token.createdAt)}
