@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, KeyRound, RotateCcw, TrendingUp } from "lucide-react"
+import { Search, Filter, Plus, Edit, CheckCircle, XCircle, Clock, MoreVertical, UserPlus, Ban, RefreshCw, Wallet, AlertTriangle, AlertCircle, KeyRound, RotateCcw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1569,13 +1569,35 @@ export function MerchantManagement() {
                               {merchant.cybridCustomerGuid ? 'Retry Cybrid Setup' : 'Create Cybrid Customer'}
                             </DropdownMenuItem>
                           )}
-                          {/* Trade Account Management */}
+                          
+                          {/* Automation Status Indicators */}
+                          {merchant.kybStatus === 'approved' && merchant.cybridTradeAccountGuid && (
+                            <DropdownMenuItem disabled className="text-green-600">
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Trade Account: Auto-Created
+                            </DropdownMenuItem>
+                          )}
+                          {merchant.kybStatus === 'approved' && merchant.depositAddressGuid && (
+                            <DropdownMenuItem disabled className="text-green-600">
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Deposit Wallet: Auto-Created
+                            </DropdownMenuItem>
+                          )}
+                          {merchant.kybStatus === 'approved' && merchant.tradeAccountStatus === 'error' && (
+                            <DropdownMenuItem disabled className="text-red-600">
+                              <AlertCircle className="h-4 w-4 mr-2" />
+                              Automation Failed
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {/* Trade Account Management - Manual Creation (Only if automation hasn't run) */}
                           {merchant.status === 'approved' && 
                            merchant.cybridCustomerGuid && 
                            merchant.cybridIntegrationStatus === 'active' && 
                            merchant.kybStatus === 'approved' && 
                            !merchant.cybridTradeAccountGuid && 
-                           merchant.tradeAccountStatus !== 'pending' && (
+                           merchant.tradeAccountStatus !== 'pending' && 
+                           merchant.tradeAccountStatus !== 'error' && (
                             <DropdownMenuItem 
                               onClick={() => handleMerchantAction('create-trade-account', merchant.id)}
                               disabled={createTradeAccountMutation.isPending}
@@ -1586,7 +1608,7 @@ export function MerchantManagement() {
                               ) : (
                                 <TrendingUp className="h-4 w-4 mr-2" />
                               )}
-                              Create USDC Trade Account
+                              Create USDC Trade Account (Manual)
                             </DropdownMenuItem>
                           )}
 

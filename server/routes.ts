@@ -2077,7 +2077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // DEVELOPMENT: Test endpoint to simulate KYC completion webhook for automation testing
   if (process.env.NODE_ENV === 'development') {
-    app.post('/api/test/simulate-kyc-completion', async (req, res) => {
+    app.post('/api/test/simulate-kyc-completion', requireAdmin, async (req, res) => {
       try {
         const { merchantId, outcome = 'passed' } = req.body;
         
