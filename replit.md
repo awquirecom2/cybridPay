@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
 - **Component Library**: Comprehensive set including forms, data tables, charts, and specialized crypto components
 
 ## Key Business Features
+- **Self-Service Merchant Registration**: Configurable signup links with automatic Cybrid customer creation (individual/business types)
 - **KYB Onboarding**: Multi-step business verification with document upload
 - **Payment Processing**: Crypto receive and fiat offramp capabilities
 - **Merchant Management**: Admin tools for merchant approval and monitoring
