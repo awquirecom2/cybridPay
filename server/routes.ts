@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { initAuthCore, requireAdmin, requireMerchant, requireMerchantAuthenticated, requireMerchantKycVerified } from "./auth-core";
 import { setupMerchantAuth, hashPassword, generateMerchantCredentials } from "./merchant-auth";
 import { setupAdminAuth, hashPassword as hashAdminPassword, generateAdminCredentials } from "./admin-auth";
-import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema } from "@shared/schema";
+import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema, createTransakSessionSchema, cybridCustomerParamsSchema, cybridCustomerCreateSchema, cybridDepositAddressSchema, insertMerchantDepositAddressSchema, createTradeAccountSchema, createSignupTokenSchema, publicMerchantRegistrationSchema } from "@shared/schema";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
 
@@ -57,6 +57,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development"
     });
+  });
+
+  // Public merchant self-registration endpoint
+  app.post("/api/public/register", async (req, res) => {
+    try {
+      const registrationData = publicMerchantRegistrationSchema.parse(req.body);
+      
+      // Verify the signup token
+      const signupToken = await storage.getSignupToken(registrationData.token);
+      if (!signupToken) {
+        return res.status(400).json({ error: "Invalid or expired registration token" });
+      }
+
+      // Check if token is expired
+      if (signupToken.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Registration token has expired" });
+      }
+
+      // Check if token is already used
+      if (signupToken.used) {
+        return res.status(400).json({ error: "Registration token has already been used" });
+      }
+
+      // Check if email already exists
+      const existingMerchant = await storage.getMerchantByEmail(registrationData.email);
+      if (existingMerchant) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      // Generate merchant credentials
+      const credentials = generateMerchantCredentials();
+      const hashedPassword = await hashPassword(credentials.password);
+
+      // Create merchant with self-registration data
+      const merchant = await storage.createMerchant({
+        name: registrationData.name,
+        email: registrationData.email,
+        username: credentials.username,
+        password: hashedPassword,
+        businessType: registrationData.businessType || null,
+        website: registrationData.website || null,
+        phone: registrationData.phone || null,
+        address: registrationData.address || null,
+        description: registrationData.description || null,
+        status: "pending",
+        kybStatus: "pending",
+        cybridCustomerType: registrationData.cybridCustomerType,
+        // Set defaults for other fields
+        customFeeEnabled: false,
+        customFeePercentage: "2.5",
+        customFlatFee: "0.30",
+        payoutMethod: "bank_transfer",
+        bankAccountNumber: null,
+        bankRoutingNumber: null,
+        notes: null,
+        volume: "$0",
+        integrations: [],
+        cybridCustomerGuid: null,
+        cybridVerificationGuid: null,
+        cybridIntegrationStatus: "pending",
+        cybridLastError: null,
+        cybridLastAttemptAt: null,
+        cybridLastSyncedAt: null,
+        depositAddressesCreated: false,
+        cybridTradeAccountGuid: null,
+        tradeAccountStatus: "none",
+        tradeAccountAsset: null,
+        tradeAccountCreatedAt: null,
+        depositAddressGuid: null,
+        depositAddress: null,
+        depositAddressStatus: "no_address",
+        depositAddressAsset: null,
+        depositAddressCreatedAt: null
+      });
+
+      // Mark the signup token as used
+      await storage.markSignupTokenUsed(registrationData.token, merchant.id);
+
+      console.log(`✅ Merchant self-registered successfully: ${merchant.name} (${merchant.email})`);
+
+      // Return the credentials for the user to save
+      res.status(201).json({
+        success: true,
+        message: "Registration successful! Please save your login credentials:",
+        credentials: {
+          username: credentials.username,
+          password: credentials.password
+        },
+        merchant: sanitizeMerchant(merchant)
+      });
+
+    } catch (error) {
+      console.error("Error in merchant self-registration:", error);
+      res.status(400).json({ 
+        error: error instanceof Error ? error.message : "Failed to register merchant"
+      });
+    }
   });
 
   // Merchant endpoint to get their deposit addresses
@@ -325,6 +422,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating merchant:", error);
       res.status(400).json({ error: "Failed to update merchant" });
+    }
+  });
+
+  // Generate signup link for merchant self-registration
+  app.post("/api/admin/signup-links", requireAdmin, async (req, res) => {
+    try {
+      const tokenData = createSignupTokenSchema.parse(req.body);
+      
+      // Generate a unique token
+      const token = require('crypto').randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + tokenData.expirationHours * 60 * 60 * 1000);
+      
+      const signupToken = await storage.createSignupToken({
+        token,
+        expiresAt,
+        used: false,
+        usedByMerchantId: null,
+        createdByAdminId: (req.user as any)?.id || null,
+        notes: tokenData.notes || null,
+        usedAt: null
+      });
+
+      // Generate the signup URL
+      const baseUrl = process.env.BASE_URL || `http://localhost:5000`;
+      const signupUrl = `${baseUrl}/signup/${token}`;
+
+      res.status(201).json({
+        success: true,
+        token: signupToken,
+        signupUrl,
+        expiresAt: signupToken.expiresAt
+      });
+    } catch (error) {
+      console.error("Error creating signup token:", error);
+      res.status(400).json({ error: "Failed to create signup link" });
+    }
+  });
+
+  // Get all signup tokens for admin
+  app.get("/api/admin/signup-links", requireAdmin, async (req, res) => {
+    try {
+      const tokens = await storage.getAllSignupTokens();
+      res.json(tokens);
+    } catch (error) {
+      console.error("Error fetching signup tokens:", error);
+      res.status(500).json({ error: "Failed to fetch signup links" });
     }
   });
 

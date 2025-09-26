@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type MerchantDepositAddress, type InsertMerchantDepositAddress, type PaymentLink, type InsertPaymentLink, type WebhookEvent, users, merchants, admins, merchantCredentials, merchantDepositAddresses, webhookEvents } from "@shared/schema";
+import { type User, type InsertUser, type Merchant, type InsertMerchant, type Admin, type InsertAdmin, type MerchantCredentials, type InsertMerchantCredentials, type MerchantDepositAddress, type InsertMerchantDepositAddress, type PaymentLink, type InsertPaymentLink, type WebhookEvent, type SignupToken, type InsertSignupToken, users, merchants, admins, merchantCredentials, merchantDepositAddresses, webhookEvents, signupTokens } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
@@ -62,6 +62,13 @@ export interface IStorage {
   getPaymentLink(id: string): Promise<PaymentLink | undefined>;
   deletePaymentLink(id: string): Promise<boolean>;
   cleanupExpiredPaymentLinks(): Promise<void>;
+
+  // Signup token methods
+  createSignupToken(token: InsertSignupToken): Promise<SignupToken>;
+  getSignupToken(token: string): Promise<SignupToken | undefined>;
+  markSignupTokenUsed(token: string, merchantId: string): Promise<SignupToken | undefined>;
+  getAllSignupTokens(): Promise<SignupToken[]>;
+  deleteExpiredSignupTokens(): Promise<void>;
   
   sessionStore: session.Store;
 }
@@ -340,6 +347,38 @@ export class DatabaseStorage implements IStorage {
       payload: event.payload
     }).returning();
     return result[0];
+  }
+
+  // Signup token methods
+  async createSignupToken(insertToken: InsertSignupToken): Promise<SignupToken> {
+    const result = await db.insert(signupTokens).values(insertToken).returning();
+    return result[0];
+  }
+
+  async getSignupToken(token: string): Promise<SignupToken | undefined> {
+    const result = await db.select().from(signupTokens).where(eq(signupTokens.token, token));
+    return result[0];
+  }
+
+  async markSignupTokenUsed(token: string, merchantId: string): Promise<SignupToken | undefined> {
+    const result = await db.update(signupTokens)
+      .set({ 
+        used: true, 
+        usedByMerchantId: merchantId,
+        usedAt: new Date()
+      })
+      .where(eq(signupTokens.token, token))
+      .returning();
+    return result[0];
+  }
+
+  async getAllSignupTokens(): Promise<SignupToken[]> {
+    return await db.select().from(signupTokens);
+  }
+
+  async deleteExpiredSignupTokens(): Promise<void> {
+    const now = new Date();
+    await db.delete(signupTokens).where(sql`${signupTokens.expiresAt} < ${now}`);
   }
 }
 

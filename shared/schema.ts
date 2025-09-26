@@ -270,42 +270,15 @@ export const createSignupTokenSchema = z.object({
 });
 
 // Public registration schema for merchants using signup tokens
-export const publicMerchantRegistrationSchema = insertMerchantSchema.omit({
-  username: true,
-  password: true,
-  status: true,
-  kybStatus: true,
-  // Remove all Cybrid fields - these are set during approval
-  cybridCustomerGuid: true,
-  cybridCustomerType: true,
-  cybridVerificationGuid: true,
-  cybridIntegrationStatus: true,
-  cybridLastError: true,
-  cybridLastAttemptAt: true,
-  cybridLastSyncedAt: true,
-  cybridTradeAccountGuid: true,
-  tradeAccountStatus: true,
-  tradeAccountAsset: true,
-  tradeAccountCreatedAt: true,
-  depositAddressGuid: true,
-  depositAddress: true,
-  depositAddressStatus: true,
-  depositAddressAsset: true,
-  depositAddressCreatedAt: true,
-  depositAddressesCreated: true,
-  // Remove admin-only fields
-  customFeeEnabled: true,
-  customFeePercentage: true,
-  customFlatFee: true,
-  payoutMethod: true,
-  bankAccountNumber: true,
-  bankRoutingNumber: true,
-  notes: true,
-  volume: true,
-  integrations: true,
-  dateOnboarded: true
-}).extend({
+export const publicMerchantRegistrationSchema = z.object({
   token: z.string().min(1, "Registration token is required"),
+  name: z.string().min(1, "Business name is required"),
+  email: z.string().email("Valid email is required").min(1, "Email is required"),
+  businessType: z.string().optional(),
+  website: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  description: z.string().optional(),
   cybridCustomerType: z.enum(["business", "individual"], {
     required_error: "Customer type is required",
     invalid_type_error: "Customer type must be either 'business' or 'individual'"
