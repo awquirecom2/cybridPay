@@ -1052,36 +1052,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cybrid webhook endpoint for receiving verification status updates  
   app.post("/api/webhooks/cybrid", async (req: any, res) => {
     try {
+      // Debug: Log all headers to see what Cybrid is actually sending
+      console.log('🔍 Cybrid webhook received headers:', Object.keys(req.headers));
+      console.log('🔍 Full headers object:', req.headers);
+      
       const signature = req.headers['x-cybrid-signature'] as string;
       const timestamp = req.headers['x-cybrid-timestamp'] as string;
       const body = req.rawBody || req.body;
+      
+      console.log('🔍 Webhook body:', typeof body === 'string' ? body : JSON.stringify(body));
 
-      // Verify required webhook headers
-      if (!signature || !timestamp) {
-        console.warn('Cybrid webhook missing required headers');
-        return res.status(400).json({ error: 'Missing required webhook headers' });
+      // Cybrid webhook signature verification (they don't send timestamp)
+      if (!signature) {
+        console.warn('Cybrid webhook missing x-cybrid-signature header');
+        return res.status(400).json({ error: 'Missing signature header' });
       }
 
-      // Verify webhook signature with HMAC (includes timestamp to prevent replay)
+      // Verify webhook signature with HMAC (Cybrid format - no timestamp)
       const webhookSecret = process.env.CYBRID_WEBHOOK_SECRET;
       if (!webhookSecret) {
         console.error('CYBRID_WEBHOOK_SECRET not configured');
         return res.status(500).json({ error: 'Webhook secret not configured' });
       }
 
-      // Include timestamp in signature calculation to prevent replay attacks
-      const signedData = `${timestamp}.${body}`;
+      // Convert Buffer body to string for signature verification
+      const bodyString = typeof body === 'string' ? body : Buffer.isBuffer(body) ? body.toString('utf8') : JSON.stringify(body);
+      
+      // Calculate expected signature (Cybrid format: just the body, no timestamp)
       const expectedSignature = createHmac('sha256', webhookSecret)
-        .update(signedData)
+        .update(bodyString)
         .digest('hex');
       
-      // Validate signature format and remove prefix
-      if (!signature.startsWith('sha256=')) {
-        console.warn('Invalid Cybrid webhook signature format');
-        return res.status(401).json({ error: 'Invalid signature format' });
-      }
-      
-      const receivedSignature = signature.replace('sha256=', '');
+      // Cybrid sends signature without 'sha256=' prefix, just the hex
+      const receivedSignature = signature;
       
       // Validate signature lengths before comparison
       const expectedBuffer = Buffer.from(expectedSignature, 'hex');
@@ -1094,21 +1097,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!timingSafeEqual(expectedBuffer, receivedBuffer)) {
         console.warn('Cybrid webhook signature verification failed');
+        console.log('Expected signature:', expectedSignature);
+        console.log('Received signature:', receivedSignature);
         return res.status(401).json({ error: 'Invalid signature' });
       }
 
-      // Check timestamp to prevent replay attacks (5 minute window)
-      const webhookTimestamp = parseInt(timestamp, 10);
-      if (isNaN(webhookTimestamp)) {
-        console.warn('Invalid Cybrid webhook timestamp format');
-        return res.status(400).json({ error: 'Invalid timestamp format' });
-      }
-      
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (Math.abs(currentTime - webhookTimestamp) > 300) {
-        console.warn('Cybrid webhook timestamp too old or too far in future');
-        return res.status(400).json({ error: 'Invalid timestamp' });
-      }
+      console.log('✅ Cybrid webhook signature verified successfully');
 
       // Parse the webhook payload
       let payload;
