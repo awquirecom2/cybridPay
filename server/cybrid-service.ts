@@ -884,6 +884,28 @@ export class CybridService {
     }
   }
 
+  // List existing trade accounts for a customer
+  static async listTradeAccounts(customerGuid: string): Promise<CybridAccount[]> {
+    try {
+      const response = await this.makeRequest(`/api/accounts?customer_guid=${customerGuid}`) as any;
+      return response.objects || [];
+    } catch (error) {
+      console.error(`Failed to list trade accounts for customer ${customerGuid}:`, error);
+      throw error;
+    }
+  }
+
+  // List existing deposit addresses for a trade account
+  static async listDepositAddresses(accountGuid: string): Promise<CybridDepositAddress[]> {
+    try {
+      const response = await this.makeRequest(`/api/deposit_addresses?account_guid=${accountGuid}`) as any;
+      return response.objects || [];
+    } catch (error) {
+      console.error(`Failed to list deposit addresses for account ${accountGuid}:`, error);
+      throw error;
+    }
+  }
+
   // Create a single trading account for a merchant (used for admin trade account creation)
   static async createTradeAccount(customerGuid: string, asset: string = 'USDC'): Promise<CybridAccount> {
     // Normalize asset to uppercase

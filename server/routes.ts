@@ -1180,9 +1180,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🚀 Starting automated account creation for verified merchant ${merchant.id}`);
         
         try {
-          // Step 1: Create USDC trade account automatically
+          // Step 1: Create or get existing USDC trade account
           console.log(`Step 1: Creating USDC trade account for customer ${customerGuid}`);
-          const tradeAccount = await CybridService.createTradeAccount(customerGuid, 'USDC');
+          let tradeAccount;
+          
+          try {
+            tradeAccount = await CybridService.createTradeAccount(customerGuid, 'USDC');
+            console.log(`✅ Step 1a: USDC trade account created: ${tradeAccount.guid}`);
+          } catch (createError: any) {
+            // Handle "already exists" error gracefully
+            if (createError.message && createError.message.includes('already exists')) {
+              console.log(`ℹ️ Trade account already exists, fetching existing account...`);
+              
+              // Fetch existing trade accounts for this customer
+              const existingAccounts = await CybridService.listTradeAccounts(customerGuid);
+              const usdcAccount = existingAccounts.find((acc: any) => acc.asset === 'USDC');
+              
+              if (usdcAccount) {
+                tradeAccount = usdcAccount;
+                console.log(`✅ Step 1b: Using existing USDC trade account: ${tradeAccount.guid}`);
+              } else {
+                throw new Error('USDC trade account should exist but was not found');
+              }
+            } else {
+              // Re-throw other errors
+              throw createError;
+            }
+          }
           
           // Update merchant with trade account details
           await storage.updateMerchant(merchant.id, {
@@ -1192,11 +1216,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cybridLastSyncedAt: new Date()
           });
           
-          console.log(`✅ Step 1 complete: USDC trade account created: ${tradeAccount.guid}`);
-          
           // Step 2: Create deposit address for the trade account
           console.log(`Step 2: Creating deposit address for trade account ${tradeAccount.guid}`);
-          const depositAddress = await CybridService.createDepositAddress(tradeAccount.guid, 'USDC');
+          let depositAddress;
+          
+          try {
+            depositAddress = await CybridService.createDepositAddress(tradeAccount.guid, 'USDC');
+            console.log(`✅ Step 2a: Deposit address created: ${depositAddress.address}`);
+          } catch (depositError: any) {
+            // Check if deposit address already exists
+            if (depositError.message && depositError.message.includes('already exists')) {
+              console.log(`ℹ️ Deposit address already exists, fetching existing address...`);
+              
+              // Fetch existing deposit addresses for this account
+              const existingAddresses = await CybridService.listDepositAddresses(tradeAccount.guid);
+              const usdcAddress = existingAddresses.find((addr: any) => addr.asset === 'USDC');
+              
+              if (usdcAddress) {
+                depositAddress = usdcAddress;
+                console.log(`✅ Step 2b: Using existing deposit address: ${depositAddress.address}`);
+              } else {
+                throw new Error('USDC deposit address should exist but was not found');
+              }
+            } else {
+              // Re-throw other errors
+              throw depositError;
+            }
+          }
           
           // Update merchant with deposit address details
           await storage.updateMerchant(merchant.id, {
@@ -1207,8 +1253,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cybridLastSyncedAt: new Date()
           });
           
-          console.log(`✅ Step 2 complete: Deposit address created: ${depositAddress.address}`);
-          console.log(`🎉 AUTOMATION SUCCESS: Trade account and deposit wallet created for merchant ${merchant.id}`);
+          console.log(`✅ Step 2 complete: Deposit address ready: ${depositAddress.address}`);
+          console.log(`🎉 AUTOMATION SUCCESS: Trade account and deposit wallet ready for merchant ${merchant.id}`);
           
         } catch (automationError) {
           console.error(`❌ AUTOMATION FAILED for merchant ${merchant.id}:`, automationError);
