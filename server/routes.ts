@@ -993,7 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if this is a new status change to approved that should trigger automation
       const wasNotApproved = merchant.kybStatus !== 'approved';
       const isNowApproved = statusResult.status === 'approved';
-      const shouldTriggerAutomation = wasNotApproved && isNowApproved && merchant.status === 'approved';
+      const shouldTriggerAutomation = wasNotApproved && isNowApproved;
       
       // Initialize automation flag
       let needsAutomation = false;
