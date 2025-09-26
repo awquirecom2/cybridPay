@@ -1160,12 +1160,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (outcome === 'passed') {
         kybStatus = 'approved';
         
-        // Automatically create deposit addresses when verification is complete
+        // AUTOMATED SEQUENCE: Create trade account first, then deposit wallet
+        console.log(`🚀 Starting automated account creation for verified merchant ${merchant.id}`);
+        
         try {
-          await CybridService.createDepositAddresses(customerGuid);
-          console.log(`Deposit addresses created for verified merchant ${merchant.id}`);
-        } catch (addressError) {
-          console.error(`Failed to create deposit addresses for merchant ${merchant.id}:`, addressError);
+          // Step 1: Create USDC trade account automatically
+          console.log(`Step 1: Creating USDC trade account for customer ${customerGuid}`);
+          const tradeAccount = await CybridService.createTradeAccount(customerGuid, 'USDC');
+          
+          // Update merchant with trade account details
+          await storage.updateMerchant(merchant.id, {
+            cybridTradeAccountGuid: tradeAccount.guid,
+            tradeAccountAsset: 'USDC',
+            tradeAccountStatus: 'created',
+            cybridLastSyncedAt: new Date()
+          });
+          
+          console.log(`✅ Step 1 complete: USDC trade account created: ${tradeAccount.guid}`);
+          
+          // Step 2: Create deposit address for the trade account
+          console.log(`Step 2: Creating deposit address for trade account ${tradeAccount.guid}`);
+          const depositAddress = await CybridService.createDepositAddress(tradeAccount.guid, 'USDC');
+          
+          // Update merchant with deposit address details
+          await storage.updateMerchant(merchant.id, {
+            depositAddressGuid: depositAddress.guid,
+            depositAddress: depositAddress.address,
+            depositAddressAsset: 'USDC',
+            depositAddressStatus: 'created',
+            cybridLastSyncedAt: new Date()
+          });
+          
+          console.log(`✅ Step 2 complete: Deposit address created: ${depositAddress.address}`);
+          console.log(`🎉 AUTOMATION SUCCESS: Trade account and deposit wallet created for merchant ${merchant.id}`);
+          
+        } catch (automationError) {
+          console.error(`❌ AUTOMATION FAILED for merchant ${merchant.id}:`, automationError);
+          
+          // Update merchant record to indicate automation failure
+          await storage.updateMerchant(merchant.id, {
+            tradeAccountStatus: 'error',
+            depositAddressStatus: 'error',
+            cybridLastError: automationError instanceof Error ? automationError.message : 'Account creation failed',
+            cybridLastSyncedAt: new Date()
+          });
         }
         
       } else if (outcome === 'failed') {
@@ -2036,6 +2074,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to create deposit address" });
     }
   });
+
+  // DEVELOPMENT: Test endpoint to simulate KYC completion webhook for automation testing
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/api/test/simulate-kyc-completion', async (req, res) => {
+      try {
+        const { merchantId, outcome = 'passed' } = req.body;
+        
+        if (!merchantId) {
+          return res.status(400).json({ error: 'merchantId required' });
+        }
+        
+        // Get merchant details
+        const merchant = await storage.getMerchant(merchantId);
+        if (!merchant) {
+          return res.status(404).json({ error: 'Merchant not found' });
+        }
+        
+        if (!merchant.cybridCustomerGuid) {
+          return res.status(400).json({ error: 'Merchant has no Cybrid customer GUID' });
+        }
+        
+        console.log(`🧪 TEST: Simulating KYC completion for merchant ${merchantId} with outcome: ${outcome}`);
+        
+        // Simulate the webhook payload
+        const mockVerificationData = {
+          customer_guid: merchant.cybridCustomerGuid,
+          guid: `test-verification-${Date.now()}`,
+          outcome: outcome,
+          state: 'completed'
+        };
+        
+        // Call the same handler that processes real webhooks
+        await handleIdentityVerificationCompleted(mockVerificationData);
+        
+        res.json({
+          success: true,
+          message: `Simulated KYC completion for merchant ${merchant.name}`,
+          merchantId: merchantId,
+          outcome: outcome,
+          automationTriggered: outcome === 'passed'
+        });
+        
+      } catch (error) {
+        console.error('Error in KYC simulation:', error);
+        res.status(500).json({ error: 'Simulation failed' });
+      }
+    });
+  }
 
   const httpServer = createServer(app);
 
