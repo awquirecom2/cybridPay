@@ -1371,18 +1371,18 @@ export function MerchantManagement() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600" data-testid="text-approved-merchants">{merchants.filter(m => m.status === 'approved').length}</div>
+            <div className="text-2xl font-bold text-green-600" data-testid="text-active-merchants">{merchants.filter(m => m.status === 'approved').length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Review</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Deactivated</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600" data-testid="text-pending-merchants">{merchants.filter(m => m.status === 'pending').length}</div>
+            <div className="text-2xl font-bold text-red-600" data-testid="text-deactivated-merchants">{merchants.filter(m => m.status === 'deactivated').length}</div>
           </CardContent>
         </Card>
         <Card>
