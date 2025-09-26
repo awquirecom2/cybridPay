@@ -151,11 +151,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: merchant.email
         }, customerType);
 
+        // 🔧 CRITICAL FIX: Persist Cybrid customer GUID and status to merchant record
+        await storage.updateMerchant(merchant.id, {
+          cybridCustomerGuid: cybridCustomer.guid,
+          cybridIntegrationStatus: 'active',
+          cybridLastSyncedAt: new Date(),
+          cybridLastAttemptAt: new Date()
+        });
+
         cybridResult = {
           success: true,
           customerGuid: cybridCustomer.guid,
-          customerType: signupToken.cybridCustomerType,
-          message: `Cybrid ${signupToken.cybridCustomerType} customer created successfully`
+          customerType: customerType,
+          message: `Cybrid ${customerType} customer created successfully`
         };
 
         console.log(`✅ Auto-created Cybrid customer for self-registered merchant ${merchant.id}: ${cybridCustomer.guid}`);
@@ -163,10 +171,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (cybridError) {
         console.error(`❌ Failed to auto-create Cybrid customer for self-registered merchant ${merchant.id}:`, cybridError);
         
+        // 🔧 CRITICAL FIX: Persist error state to merchant record  
+        await storage.updateMerchant(merchant.id, {
+          cybridIntegrationStatus: 'error',
+          cybridLastError: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error',
+          cybridLastAttemptAt: new Date()
+        });
+        
         cybridResult = {
           success: false,
           customerGuid: null,
-          customerType: signupToken.cybridCustomerType,
+          customerType: (signupToken.cybridCustomerType || process.env.DEFAULT_SELF_REGISTRATION_CUSTOMER_TYPE || 'individual'),
           error: cybridError instanceof Error ? cybridError.message : 'Unknown Cybrid error'
         };
       }
