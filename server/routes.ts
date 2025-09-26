@@ -990,6 +990,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use list endpoint approach to get latest KYC status for customer
       const statusResult = await CybridService.getLatestKycStatus(merchant.cybridCustomerGuid);
       
+      // Check if this is a new status change to approved that should trigger automation
+      const wasNotApproved = merchant.kybStatus !== 'approved';
+      const isNowApproved = statusResult.status === 'approved';
+      const shouldTriggerAutomation = wasNotApproved && isNowApproved && merchant.status === 'approved';
+      
       // Update merchant record if status changed
       if (statusResult.status !== merchant.kybStatus) {
         const updateData: any = {
@@ -1003,6 +1008,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         await storage.updateMerchant(merchant.id, updateData);
+        
+        // TRIGGER AUTOMATION: Create trade account and deposit wallet when KYC gets approved
+        if (shouldTriggerAutomation) {
+          console.log(`🎯 POLLING TRIGGER: KYC approved for merchant ${merchant.name} (${merchant.id}), starting automation...`);
+          
+          // Run automation in background - don't block the API response
+          setImmediate(async () => {
+            try {
+              // Create verification data for the automation handler
+              const verificationData = {
+                customer_guid: merchant.cybridCustomerGuid,
+                guid: statusResult.verificationGuid || `polling-trigger-${Date.now()}`,
+                outcome: 'passed',
+                state: 'completed'
+              };
+              
+              // Use the same handler that processes webhooks
+              await handleIdentityVerificationCompleted(verificationData);
+              
+            } catch (automationError) {
+              console.error(`❌ POLLING AUTOMATION FAILED for merchant ${merchant.id}:`, automationError);
+              
+              // Update merchant record with error status
+              await storage.updateMerchant(merchant.id, {
+                tradeAccountStatus: 'error',
+                cybridLastError: automationError instanceof Error ? automationError.message : 'Automation failed during polling',
+                cybridLastAttemptAt: new Date()
+              }).catch(updateError => {
+                console.error('Failed to update error status:', updateError);
+              });
+            }
+          });
+        }
       }
       
       res.json({
@@ -1010,7 +1048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         state: statusResult.state,
         outcome: statusResult.outcome,
         verificationGuid: statusResult.verificationGuid,
-        personaUrl: statusResult.personaUrl
+        personaUrl: statusResult.personaUrl,
+        automationTriggered: shouldTriggerAutomation // Let frontend know automation was triggered
       });
       
     } catch (error) {
