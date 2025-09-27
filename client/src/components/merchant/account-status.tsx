@@ -98,7 +98,6 @@ export function AccountStatus() {
         apiKey: "",
         apiSecret: ""
       }))
-      setIsTransakDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: ['/api/merchant/credentials/transak'] })
       toast({
         title: "Transak Credentials Saved",
@@ -290,7 +289,13 @@ export function AccountStatus() {
         : "Configure your payment gateway credentials (optional)",
       action: !transakConfigured ? {
         label: "Setup Payment Gateway",
-        onClick: () => setIsTransakDialogOpen(true)
+        onClick: () => {
+          // Scroll to the Transak integration section
+          const transakSection = document.getElementById('transak-integration-section')
+          if (transakSection) {
+            transakSection.scrollIntoView({ behavior: 'smooth' })
+          }
+        }
       } : undefined
     }
   ]
@@ -571,7 +576,7 @@ export function AccountStatus() {
           </Card>
 
           {/* Transak Integration Section */}
-          <Card>
+          <Card id="transak-integration-section">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="h-5 w-5" />
