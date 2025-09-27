@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { CheckCircle, Clock, AlertTriangle, ExternalLink, Shield, Wallet, CreditCard, User, Building, Eye, EyeOff, Save, Globe } from "lucide-react"
+import { CheckCircle, Clock, AlertTriangle, ExternalLink, Shield, Wallet, CreditCard, User, Building, Eye, EyeOff, Save, Globe, Plus, Copy, Settings, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { useLocation } from "wouter"
 import { useToast } from "@/hooks/use-toast"
@@ -24,6 +25,25 @@ interface StatusItem {
   }
 }
 
+interface DepositAddress {
+  created_at: string;
+  updated_at: string;
+  guid: string;
+  bank_guid: string;
+  customer_guid: string;
+  account_guid: string;
+  asset: string;
+  state: string;
+  address: string;
+  format: string;
+  labels: string[];
+}
+
+interface DepositAddressesResponse {
+  success: boolean;
+  addresses: DepositAddress[];
+}
+
 export function AccountStatus() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
@@ -34,6 +54,8 @@ export function AccountStatus() {
     apiSecret: "",
     environment: "staging"
   })
+  const [isCreatingCustodian, setIsCreatingCustodian] = useState(false)
+  const [isConnectingBank, setIsConnectingBank] = useState(false)
 
   // Fetch merchant status from backend
   const { data: merchantData, isLoading } = useQuery({
@@ -92,6 +114,63 @@ export function AccountStatus() {
     saveTransakMutation.mutate(transakCredentials)
   }
 
+  // Helper functions from Accounts page
+  const handleCreateCustodianAccount = async () => {
+    setIsCreatingCustodian(true)
+    console.log('Creating crypto wallet account')
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsCreatingCustodian(false)
+      toast({
+        title: "Account Created",
+        description: "Your crypto wallet account has been created successfully.",
+      })
+    }, 2000)
+  }
+
+  const handleConnectBankAccount = async () => {
+    setIsConnectingBank(true)
+    console.log('Connecting bank account')
+    
+    // Simulate API call  
+    setTimeout(() => {
+      setIsConnectingBank(false)
+      toast({
+        title: "Bank Connected",
+        description: "Your bank account has been connected successfully.",
+      })
+    }, 2000)
+  }
+
+  const copyAddress = (address: string, currency: string) => {
+    navigator.clipboard.writeText(address)
+    toast({
+      title: "Address Copied",
+      description: `${currency} wallet address copied to clipboard.`,
+    })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      active: { variant: "default" as const, icon: CheckCircle, text: "Active" },
+      pending: { variant: "secondary" as const, icon: AlertTriangle, text: "Pending" },
+      verified: { variant: "default" as const, icon: CheckCircle, text: "Verified" },
+      completed: { variant: "default" as const, icon: CheckCircle, text: "Complete" },
+      in_progress: { variant: "secondary" as const, icon: Clock, text: "In Progress" },
+      error: { variant: "destructive" as const, icon: AlertTriangle, text: "Needs Attention" }
+    }
+    const config = variants[status as keyof typeof variants] || variants.pending
+    const Icon = config.icon
+    
+    return (
+      <Badge variant={config.variant} className="flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {config.text}
+      </Badge>
+    )
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -105,16 +184,6 @@ export function AccountStatus() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const configs = {
-      completed: { variant: "default" as const, text: "Complete" },
-      in_progress: { variant: "secondary" as const, text: "In Progress" },
-      error: { variant: "destructive" as const, text: "Needs Attention" },
-      pending: { variant: "outline" as const, text: "Pending" }
-    }
-    const config = configs[status as keyof typeof configs] || configs.pending
-    return <Badge variant={config.variant}>{config.text}</Badge>
-  }
 
   // Calculate automation status based on backend data
   const kycStatus = (kycData as any)?.status
@@ -212,7 +281,7 @@ export function AccountStatus() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Account Status</h1>
+          <h1 className="text-3xl font-bold">Account Overview</h1>
           <p className="text-muted-foreground">Loading your account setup progress...</p>
         </div>
       </div>
@@ -222,9 +291,9 @@ export function AccountStatus() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Account Status</h1>
+        <h1 className="text-3xl font-bold">Account Overview</h1>
         <p className="text-muted-foreground">
-          Track your automated merchant account setup progress
+          Track your automated merchant account setup progress and manage your crypto wallet infrastructure
         </p>
       </div>
 
@@ -318,8 +387,8 @@ export function AccountStatus() {
               <Button onClick={() => setLocation("/merchant/receive-crypto")} data-testid="button-receive-crypto">
                 View Payment Links
               </Button>
-              <Button variant="outline" onClick={() => setLocation("/merchant/accounts")} data-testid="button-view-accounts">
-                Manage Accounts
+              <Button variant="outline" onClick={() => setLocation("/merchant/offramp-crypto")} data-testid="button-offramp-crypto">
+                Offramp Crypto
               </Button>
             </div>
           </CardContent>
@@ -348,6 +417,150 @@ export function AccountStatus() {
           )}
         </CardContent>
       </Card>
+
+      {/* Wallet Account Details - Only show if wallet is set up */}
+      {walletHasAddresses && (
+        <>
+          <Separator className="my-8" />
+          
+          {/* Crypto Wallet Account Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Crypto Wallet Account
+              </CardTitle>
+              <CardDescription>
+                Your secure cryptocurrency wallet account with advanced security infrastructure
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Account ID</div>
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">wallet_account_12345</code>
+                </div>
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  {getStatusBadge('active')}
+                </div>
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Created</div>
+                  <div className="text-sm">{new Date('2024-01-15').toLocaleDateString()}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cryptocurrency Wallets */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cryptocurrency Wallets</CardTitle>
+              <CardDescription>
+                Your individual deposit addresses for different cryptocurrencies
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(depositAddressData as any)?.addresses?.length > 0 ? (
+                <div className="space-y-4">
+                  {(depositAddressData as any).addresses.map((address: DepositAddress) => (
+                    <div key={address.guid} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold">{address.asset}</div>
+                          <Badge variant="outline" className="text-xs">
+                            {address.asset === 'BTC' ? 'Bitcoin' : 'Ethereum'}
+                          </Badge>
+                          {address.state === 'created' && (
+                            <Badge variant="default" className="text-xs">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground font-mono">
+                          {address.address}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Created: {new Date(address.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => copyAddress(address.address, address.asset)}
+                          data-testid={`button-copy-address-${address.asset.toLowerCase()}`}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-6 text-muted-foreground">
+                  <Wallet className="h-12 w-12 mx-auto mb-4" />
+                  <p>No deposit addresses found</p>
+                  <p className="text-sm">Deposit addresses will appear here once your account is fully set up</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Connected Bank Accounts */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Connected Bank Accounts</CardTitle>
+                <CardDescription>
+                  Bank accounts for ACH and Wire payouts
+                </CardDescription>
+              </div>
+              <Button 
+                onClick={handleConnectBankAccount}
+                disabled={isConnectingBank}
+                data-testid="button-connect-bank"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                {isConnectingBank ? "Connecting..." : "Connect Bank"}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center p-6 text-muted-foreground">
+                <p>No bank accounts connected yet</p>
+                <p className="text-sm">Connect a bank account to enable ACH and Wire payouts</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Account Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Account Actions
+              </CardTitle>
+              <CardDescription>
+                Manage your account settings and security
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <Button variant="outline" className="w-full justify-start">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Account Details
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Security & Compliance Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Transak Configuration Dialog */}
       <Dialog open={isTransakDialogOpen} onOpenChange={setIsTransakDialogOpen}>

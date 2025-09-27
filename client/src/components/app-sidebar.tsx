@@ -133,11 +133,10 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   const merchantItems = [
     { title: "Dashboard", url: "/merchant", icon: Home },
-    { title: "Account Status", url: "/merchant/account-status", icon: Activity },
+    { title: "Account Overview", url: "/merchant/account-status", icon: Activity },
     { title: "Onboarding", url: "/merchant/onboarding", icon: FileText },
     { title: "Receive Crypto", url: "/merchant/receive-crypto", icon: ArrowDownToLine },
     { title: "Offramp Crypto", url: "/merchant/offramp-crypto", icon: ArrowUpFromLine },
-    { title: "Accounts", url: "/merchant/accounts", icon: Wallet },
   ]
 
   const items = userRole === "admin" ? adminItems : merchantItems
