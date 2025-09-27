@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query"
 import { useLocation } from "wouter"
 import { useToast } from "@/hooks/use-toast"
 import { apiRequest, queryClient } from "@/lib/queryClient"
+import { KycNotificationBanner } from "./kyc-notification-banner"
 
 interface StatusItem {
   title: string
@@ -362,6 +363,11 @@ export function AccountStatus() {
           Track your automated merchant account setup progress and manage your crypto wallet infrastructure
         </p>
       </div>
+
+      {/* KYC Notification Banner - Show when KYC is pending */}
+      {kycStatus !== 'approved' && kycStatus !== 'in_review' && kycStatus !== 'rejected' && (
+        <KycNotificationBanner />
+      )}
 
       {/* Overall Status Card */}
       <Card className={statusConfig.bgColor}>
