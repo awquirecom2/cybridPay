@@ -252,7 +252,7 @@ export function AccountStatus() {
 
   const automationSteps: StatusItem[] = [
     {
-      title: "KYC Verification",
+      title: "Identity Verification",
       description: "Identity verification for regulatory compliance",
       status: kycStatus === 'approved' ? 'completed' : 
               kycStatus === 'in_review' ? 'in_progress' : 
