@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppSidebar } from "@/components/app-sidebar";
+import { KycWarningListener } from "@/components/kyc-warning-listener";
 import { AdminProtectedRoute, MerchantProtectedRoute } from "@/components/protected-route";
 import { LandingPage } from "@/components/landing-page";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
@@ -176,6 +177,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark" storageKey="ruupay-theme">
         <TooltipProvider>
+          <KycWarningListener />
           <AppLayout />
           <Toaster />
         </TooltipProvider>
