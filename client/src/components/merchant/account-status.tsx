@@ -664,7 +664,7 @@ export function AccountStatus() {
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">API Configuration</h3>
                   <div className="flex gap-2">
-                    {(transakConfigured || (transakCredentials.apiKey && transakCredentials.apiSecret)) && (
+                    {transakConfigured && (
                       <Button
                         variant="outline"
                         size="sm"
