@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-let kycRequiredShown = false; // Simple deduplication for KYC warnings
+let kycRequiredShown = false; // Simple deduplication for KYC redirects
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -15,20 +15,12 @@ async function throwIfResNotOk(res: Response) {
           
           console.warn('KYC verification required:', errorData.message);
           
-          // Check if user has dismissed this warning in this session
-          const dismissedKey = 'kyc_warning_dismissed';
-          const isDismissed = sessionStorage.getItem(dismissedKey) === 'true';
-          
-          if (!isDismissed) {
-            // Emit custom event for UI components to catch and show dismissible warning
-            const event = new CustomEvent('kycWarningRequired', {
-              detail: {
-                message: errorData.message || 'Identity verification is required to access all features',
-                onboardingUrl: '/merchant/kyb-onboarding'
-              }
-            });
-            window.dispatchEvent(event);
-          }
+          // Simple redirect to KYB onboarding without complex toast handling
+          setTimeout(() => {
+            if (window.location.pathname !== '/merchant/kyb-onboarding') {
+              window.location.href = '/merchant/kyb-onboarding';
+            }
+          }, 1000);
         }
         throw new Error(`${res.status}: ${errorData.error || errorData.message || 'KYB verification required'}`);
       } catch (jsonError) {
