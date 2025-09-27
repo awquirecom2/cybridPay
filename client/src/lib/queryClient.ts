@@ -1,26 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-let kycRequiredShown = false; // Simple deduplication for KYC redirects
-
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     // Handle 403 KYC_REQUIRED responses
     if (res.status === 403) {
       try {
         const errorData = await res.json();
-        if (errorData.code === 'KYC_REQUIRED' && !kycRequiredShown) {
-          kycRequiredShown = true;
-          // Reset flag after 3 seconds to allow new handling if needed
-          setTimeout(() => { kycRequiredShown = false; }, 3000);
-          
+        if (errorData.code === 'KYC_REQUIRED') {
           console.warn('KYC verification required:', errorData.message);
-          
-          // Simple redirect to KYB onboarding without complex toast handling
-          setTimeout(() => {
-            if (window.location.pathname !== '/merchant/kyb-onboarding') {
-              window.location.href = '/merchant/kyb-onboarding';
-            }
-          }, 1000);
         }
         throw new Error(`${res.status}: ${errorData.error || errorData.message || 'KYB verification required'}`);
       } catch (jsonError) {
