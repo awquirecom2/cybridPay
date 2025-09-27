@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { CheckCircle, Clock, AlertTriangle, ExternalLink, Shield, Wallet, CreditCard, User, Building, Eye, EyeOff, Save, Globe, Plus, Copy, Settings, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { CheckCircle, Clock, AlertTriangle, ExternalLink, Shield, Wallet, CreditCard, User, Building, Eye, EyeOff, Save, Globe, Plus, Copy, Settings, Loader2, Key, TestTube } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { useLocation } from "wouter"
@@ -47,13 +46,13 @@ interface DepositAddressesResponse {
 export function AccountStatus() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
-  const [isTransakDialogOpen, setIsTransakDialogOpen] = useState(false)
-  const [showSecrets, setShowSecrets] = useState(false)
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   const [transakCredentials, setTransakCredentials] = useState({
     apiKey: "",
     apiSecret: "",
     environment: "staging"
   })
+  const [unsavedChanges, setUnsavedChanges] = useState(false)
   const [isCreatingCustodian, setIsCreatingCustodian] = useState(false)
   const [isConnectingBank, setIsConnectingBank] = useState(false)
 
@@ -70,9 +69,20 @@ export function AccountStatus() {
     queryKey: ['/api/merchant/deposit-addresses'],
   })
 
-  const { data: transakData } = useQuery({
+  const { data: transakData, isLoading: isLoadingTransak } = useQuery({
     queryKey: ['/api/merchant/credentials/transak'],
   })
+
+  // Update local state when credentials are loaded
+  useEffect(() => {
+    if (transakData) {
+      setTransakCredentials(prev => ({
+        ...prev,
+        environment: (transakData as any).environment || 'staging'
+        // API key and secret remain empty for security - only show if they exist
+      }))
+    }
+  }, [transakData])
 
   // Mutation for saving Transak credentials
   const saveTransakMutation = useMutation({
@@ -81,37 +91,88 @@ export function AccountStatus() {
       return await response.json()
     },
     onSuccess: () => {
-      setTransakCredentials({
+      setUnsavedChanges(false)
+      // Clear sensitive data from state for security
+      setTransakCredentials(prev => ({
+        ...prev,
         apiKey: "",
-        apiSecret: "",
-        environment: "staging"
-      })
+        apiSecret: ""
+      }))
       setIsTransakDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: ['/api/merchant/credentials/transak'] })
       toast({
-        title: "Payment Gateway Configured",
-        description: "Your Transak payment gateway has been successfully configured.",
+        title: "Transak Credentials Saved",
+        description: "Your Transak API credentials have been securely stored.",
       })
     },
     onError: (error: any) => {
       toast({
-        title: "Configuration Failed",
-        description: error.message || "Failed to save payment gateway credentials",
+        title: "Save Failed",
+        description: error.message || "Failed to save Transak credentials",
         variant: "destructive"
       })
     }
   })
 
+  // Mutation for testing Transak connection
+  const testTransakMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/transak/access-token')
+      return await response.json()
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Connection Successful",
+        description: `Successfully connected to Transak API. Token expires in ${data.expiresIn} seconds.`,
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to Transak API. Please check your credentials.",
+        variant: "destructive"
+      })
+    }
+  })
+
+  const toggleSecretVisibility = (keyId: string) => {
+    setShowSecrets(prev => ({ ...prev, [keyId]: !prev[keyId] }))
+  }
+
+  const handleTransakChange = (field: string, value: string) => {
+    setTransakCredentials(prev => ({ ...prev, [field]: value }))
+    setUnsavedChanges(true)
+  }
+
   const handleTransakSave = () => {
-    if (!transakCredentials.apiKey || !transakCredentials.apiSecret) {
+    // Build payload with only fields that have values
+    const payload: any = {
+      environment: transakCredentials.environment
+    }
+    
+    // Only include credentials if they are provided (allows environment-only updates)
+    if (transakCredentials.apiKey) {
+      payload.apiKey = transakCredentials.apiKey
+    }
+    if (transakCredentials.apiSecret) {
+      payload.apiSecret = transakCredentials.apiSecret
+    }
+    
+    // For new integrations, require both credentials
+    if (!(transakData as any)?.hasApiKey && (!transakCredentials.apiKey || !transakCredentials.apiSecret)) {
       toast({
         title: "Missing Information",
-        description: "Please provide both API key and API secret",
+        description: "Please provide both API key and API secret for initial setup",
         variant: "destructive"
       })
       return
     }
-    saveTransakMutation.mutate(transakCredentials)
+    
+    saveTransakMutation.mutate(payload)
+  }
+
+  const testTransakConnection = () => {
+    testTransakMutation.mutate()
   }
 
   // Helper functions from Accounts page
@@ -509,6 +570,224 @@ export function AccountStatus() {
             </CardContent>
           </Card>
 
+          {/* Transak Integration Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Transak Payment Integration
+              </CardTitle>
+              <CardDescription>
+                Configure fiat-to-crypto payment gateway for your customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Integration Status Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  {transakConfigured ? (
+                    <Badge variant="default" className="flex items-center gap-1 justify-center">
+                      <CheckCircle className="h-3 w-3" />
+                      Connected
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="flex items-center gap-1 justify-center">
+                      <AlertTriangle className="h-3 w-3" />
+                      Not Connected
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Environment</div>
+                  <div className="text-sm font-medium capitalize">{(transakData as any)?.environment || 'Not Set'}</div>
+                </div>
+                <div className="text-center p-3 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Last Updated</div>
+                  <div className="text-sm">
+                    {(transakData as any)?.createdAt ? new Date((transakData as any).createdAt).toLocaleDateString() : "Never"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Setup Instructions */}
+              {!transakConfigured && (
+                <div className="border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950 p-4">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      Getting Started with Transak
+                    </h3>
+                    <div className="text-sm space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                        <div>
+                          <p>Create account at <strong>dashboard.transak.com</strong></p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                        <div>
+                          <p>Submit KYB form for production access</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                        <div>
+                          <p>Go to <strong>Developers</strong> section in dashboard</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">4</span>
+                        <div>
+                          <p>Copy your <strong>API Key</strong> and <strong>API Secret</strong></p>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" asChild data-testid="button-transak-dashboard">
+                      <a href="https://dashboard.transak.com" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Open Transak Dashboard
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Configuration Form */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">API Configuration</h3>
+                  <div className="flex gap-2">
+                    {transakConfigured && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={testTransakConnection}
+                        disabled={testTransakMutation.isPending}
+                        data-testid="button-test-transak"
+                      >
+                        {testTransakMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <TestTube className="h-4 w-4 mr-2" />
+                        )}
+                        Test Connection
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Environment Selection */}
+                  <div className="space-y-2">
+                    <Label>Environment</Label>
+                    <Select 
+                      value={transakCredentials.environment} 
+                      onValueChange={(value) => handleTransakChange('environment', value)}
+                    >
+                      <SelectTrigger data-testid="select-transak-environment">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="staging">Staging</SelectItem>
+                        <SelectItem value="production">Production</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-end">
+                    {transakCredentials.environment === 'production' ? (
+                      <Badge variant="default" className="h-fit">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Live
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="h-fit">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Test
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* API Key */}
+                  <div className="space-y-2">
+                    <Label>API Key</Label>
+                    <Input
+                      value={transakCredentials.apiKey}
+                      onChange={(e) => handleTransakChange('apiKey', e.target.value)}
+                      placeholder="pk_live_..."
+                      className="font-mono text-sm"
+                      data-testid="input-transak-api-key"
+                    />
+                  </div>
+
+                  {/* API Secret */}
+                  <div className="space-y-2">
+                    <Label>API Secret</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type={showSecrets.transak_secret ? "text" : "password"}
+                        value={transakCredentials.apiSecret}
+                        onChange={(e) => handleTransakChange('apiSecret', e.target.value)}
+                        placeholder="sk_live_..."
+                        className="font-mono text-sm"
+                        data-testid="input-transak-api-secret"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleSecretVisibility('transak_secret')}
+                        data-testid="button-toggle-transak-secret"
+                      >
+                        {showSecrets.transak_secret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                {unsavedChanges && (
+                  <div className="flex items-center gap-2 text-amber-600 text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    You have unsaved changes
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleTransakSave}
+                    disabled={!unsavedChanges || saveTransakMutation.isPending}
+                    size="sm"
+                    data-testid="button-save-transak"
+                  >
+                    {saveTransakMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {saveTransakMutation.isPending ? "Saving..." : "Save Configuration"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Security Notice */}
+              <div className="border-l-4 border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950 p-4">
+                <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200 font-semibold">
+                  <AlertTriangle className="h-4 w-4" />
+                  Security Best Practices
+                </div>
+                <div className="text-yellow-700 dark:text-yellow-300 text-sm mt-2 space-y-1">
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Never share your API secrets with unauthorized parties</li>
+                    <li>Use production credentials only in production environments</li>
+                    <li>Regularly rotate your API keys for enhanced security</li>
+                    <li>Monitor API usage for suspicious activity</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Connected Bank Accounts */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -562,84 +841,6 @@ export function AccountStatus() {
         </>
       )}
 
-      {/* Transak Configuration Dialog */}
-      <Dialog open={isTransakDialogOpen} onOpenChange={setIsTransakDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              Configure Payment Gateway
-            </DialogTitle>
-            <DialogDescription>
-              Set up your Transak credentials to enable fiat-to-crypto payments for your customers.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Environment</Label>
-              <Select 
-                value={transakCredentials.environment} 
-                onValueChange={(value) => setTransakCredentials(prev => ({ ...prev, environment: value }))}
-              >
-                <SelectTrigger data-testid="select-transak-environment">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="staging">Staging</SelectItem>
-                  <SelectItem value="production">Production</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>API Key</Label>
-              <Input
-                value={transakCredentials.apiKey}
-                onChange={(e) => setTransakCredentials(prev => ({ ...prev, apiKey: e.target.value }))}
-                placeholder="pk_live_..."
-                className="font-mono text-sm"
-                data-testid="input-transak-api-key"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>API Secret</Label>
-              <div className="flex gap-2">
-                <Input
-                  type={showSecrets ? "text" : "password"}
-                  value={transakCredentials.apiSecret}
-                  onChange={(e) => setTransakCredentials(prev => ({ ...prev, apiSecret: e.target.value }))}
-                  placeholder="sk_live_..."
-                  className="font-mono text-sm"
-                  data-testid="input-transak-api-secret"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowSecrets(!showSecrets)}
-                  data-testid="button-toggle-transak-secret"
-                >
-                  {showSecrets ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <p>Get your credentials from the <a href="https://dashboard.transak.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Transak Dashboard</a></p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTransakDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleTransakSave} 
-              disabled={saveTransakMutation.isPending}
-              data-testid="button-save-transak"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saveTransakMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
