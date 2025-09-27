@@ -15,12 +15,7 @@ async function throwIfResNotOk(res: Response) {
           
           console.warn('KYC verification required:', errorData.message);
           
-          // Simple redirect to KYB onboarding without complex toast handling
-          setTimeout(() => {
-            if (window.location.pathname !== '/merchant/kyb-onboarding') {
-              window.location.href = '/merchant/kyb-onboarding';
-            }
-          }, 1000);
+          // Note: Auto-redirect removed - users can view account status and navigate manually
         }
         throw new Error(`${res.status}: ${errorData.error || errorData.message || 'KYB verification required'}`);
       } catch (jsonError) {
