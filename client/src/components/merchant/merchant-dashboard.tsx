@@ -3,11 +3,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { DollarSign, TrendingUp, Users, Wallet, ExternalLink, CheckCircle, Clock, Copy } from "lucide-react"
+import { DollarSign, TrendingUp, Users, Wallet, ExternalLink, CheckCircle, Clock, Copy, Shield } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useQuery } from "@tanstack/react-query"
 
 export function MerchantDashboard() {
   const { toast } = useToast()
+
+  // Check KYC status to conditionally show dashboard content
+  const { data: kycData } = useQuery({
+    queryKey: ['/api/cybrid/kyc-status'],
+  })
+
+  // Get KYC status - dashboard data only shows when approved
+  const kycStatus = (kycData as any)?.status
+  const isKycApproved = kycStatus === 'approved'
 
   // TODO: remove mock functionality - replace with real merchant data
   const revenueData = [
