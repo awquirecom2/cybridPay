@@ -117,169 +117,189 @@ export function MerchantDashboard() {
         </Card>
       )}
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-monthly-revenue">$18,650</div>
-            <p className="text-xs text-muted-foreground">
-              +12.5% from last month
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Transactions</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-transaction-count">147</div>
-            <p className="text-xs text-muted-foreground">
-              +8 from yesterday
-            </p>
-          </CardContent>
-        </Card>
+      {/* Dashboard Data - Only show when KYC is approved */}
+      {isKycApproved && (
+        <>
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">This Month</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-monthly-revenue">$18,650</div>
+                <p className="text-xs text-muted-foreground">
+                  +12.5% from last month
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-transaction-count">147</div>
+                <p className="text-xs text-muted-foreground">
+                  +8 from yesterday
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600" data-testid="text-success-rate">97.8%</div>
-            <p className="text-xs text-muted-foreground">
-              Above industry average
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-success-rate">97.8%</div>
+                <p className="text-xs text-muted-foreground">
+                  Above industry average
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Transaction</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-avg-transaction">$127</div>
-            <p className="text-xs text-muted-foreground">
-              +3.2% from last month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avg. Transaction</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-avg-transaction">$127</div>
+                <p className="text-xs text-muted-foreground">
+                  +3.2% from last month
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue Trend</CardTitle>
-            <CardDescription>Daily revenue and transaction volume</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tickFormatter={(value) => new Date(value).toLocaleDateString()} />
-                <YAxis />
-                <Tooltip 
-                  labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                  formatter={(value, name) => [
-                    name === 'revenue' ? `$${value.toLocaleString()}` : value,
-                    name === 'revenue' ? 'Revenue' : 'Transactions'
-                  ]}
-                />
-                <Area type="monotone" dataKey="revenue" stackId="1" stroke="#2563eb" fill="#2563eb" fillOpacity={0.6} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Revenue Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Trend</CardTitle>
+                <CardDescription>Daily revenue and transaction volume</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={(value) => new Date(value).toLocaleDateString()} />
+                    <YAxis />
+                    <Tooltip 
+                      labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                      formatter={(value, name) => [
+                        name === 'revenue' ? `$${value.toLocaleString()}` : value,
+                        name === 'revenue' ? 'Revenue' : 'Transactions'
+                      ]}
+                    />
+                    <Area type="monotone" dataKey="revenue" stackId="1" stroke="#2563eb" fill="#2563eb" fillOpacity={0.6} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-        {/* Account Balances */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Account Balances</CardTitle>
-              <CardDescription>Your crypto and fiat account balances</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" data-testid="button-view-accounts">
-              View All
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {accountBalances.map((account, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`balance-${index}`}>
-                  <div className="space-y-1">
-                    <p className="font-medium">{account.account}</p>
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono">
-                        {account.address}
-                      </code>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-6 w-6"
-                        onClick={() => copyToClipboard(account.address, 'Address')}
-                        data-testid={`button-copy-address-${index}`}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
+            {/* Account Balances */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Account Balances</CardTitle>
+                  <CardDescription>Your crypto and fiat account balances</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" data-testid="button-view-accounts">
+                  View All
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {accountBalances.map((account, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`balance-${index}`}>
+                      <div className="space-y-1">
+                        <p className="font-medium">{account.account}</p>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-muted px-1 py-0.5 rounded font-mono">
+                            {account.address}
+                          </code>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6"
+                            onClick={() => copyToClipboard(account.address, 'Address')}
+                            data-testid={`button-copy-address-${index}`}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-lg">${account.balance}</p>
+                        <p className="text-sm text-green-600">{account.change}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Orders */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Orders</CardTitle>
+                <CardDescription>Latest crypto received and payout activity</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" data-testid="button-view-all-orders">
+                View All
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`order-${order.id}`}>
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={order.category === 'Crypto Received' ? 'default' : 'secondary'} className="text-xs">
+                          {order.category}
+                        </Badge>
+                        {getStatusBadge(order.status)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {order.category === 'Crypto Received' 
+                          ? `From: ${order.customer}` 
+                          : `Method: ${order.method}`
+                        }
+                      </div>
+                      <p className="text-xs text-muted-foreground">{order.time}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold">{order.amount}</p>
+                      <p className="text-sm text-muted-foreground">{order.crypto}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">${account.balance}</p>
-                    <p className="text-sm text-green-600">{account.change}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Orders */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Orders</CardTitle>
-            <CardDescription>Latest crypto received and payout activity</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" data-testid="button-view-all-orders">
-            View All
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`order-${order.id}`}>
-                <div className="space-y-1 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={order.category === 'Crypto Received' ? 'default' : 'secondary'} className="text-xs">
-                      {order.category}
-                    </Badge>
-                    {getStatusBadge(order.status)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {order.category === 'Crypto Received' 
-                      ? `From: ${order.customer}` 
-                      : `Method: ${order.method}`
-                    }
-                  </div>
-                  <p className="text-xs text-muted-foreground">{order.time}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold">{order.amount}</p>
-                  <p className="text-sm text-muted-foreground">{order.crypto}</p>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Placeholder when KYC is not approved */}
+      {!isKycApproved && (
+        <div className="text-center py-12">
+          <Card className="max-w-md mx-auto">
+            <CardContent className="pt-6">
+              <Shield className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Complete Identity Verification</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your dashboard data will be available once you complete the identity verification process above.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
