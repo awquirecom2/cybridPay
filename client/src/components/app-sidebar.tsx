@@ -2,7 +2,7 @@ import { useState } from "react"
 import { 
   Users, Settings, CreditCard, Webhook, 
   Building, BarChart3, Wallet,
-  Home, FileText, Shield, Globe, ArrowDownToLine, ArrowUpFromLine,
+  Home, FileText, Shield, Activity, ArrowDownToLine, ArrowUpFromLine,
   LogOut, ChevronUp, Link as LinkIcon
 } from "lucide-react"
 import { Link, useLocation } from "wouter"
@@ -133,10 +133,10 @@ export function AppSidebar({ userRole }: AppSidebarProps) {
 
   const merchantItems = [
     { title: "Dashboard", url: "/merchant", icon: Home },
+    { title: "Account Status", url: "/merchant/account-status", icon: Activity },
     { title: "Onboarding", url: "/merchant/onboarding", icon: FileText },
     { title: "Receive Crypto", url: "/merchant/receive-crypto", icon: ArrowDownToLine },
     { title: "Offramp Crypto", url: "/merchant/offramp-crypto", icon: ArrowUpFromLine },
-    { title: "Manage Integrations", url: "/merchant/manage-integrations", icon: Globe },
     { title: "Accounts", url: "/merchant/accounts", icon: Wallet },
   ]
 

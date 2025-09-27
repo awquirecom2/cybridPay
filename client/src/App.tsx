@@ -18,7 +18,7 @@ import { PlatformSettings } from "@/components/admin/platform-settings";
 import { UserManagement } from "@/components/admin/user-management";
 import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
 import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
-import { ManageIntegrations } from "@/components/merchant/manage-integrations";
+import { AccountStatus } from "@/components/merchant/account-status";
 import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
 import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
 import { Accounts } from "@/components/merchant/accounts";
@@ -110,9 +110,9 @@ function Router() {
           <OfframpCrypto />
         </MerchantProtectedRoute>
       </Route>
-      <Route path="/merchant/manage-integrations">
+      <Route path="/merchant/account-status">
         <MerchantProtectedRoute>
-          <ManageIntegrations />
+          <AccountStatus />
         </MerchantProtectedRoute>
       </Route>
       <Route path="/merchant/accounts">
