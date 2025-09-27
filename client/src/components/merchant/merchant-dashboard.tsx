@@ -90,8 +90,8 @@ export function MerchantDashboard() {
         </p>
       </div>
 
-      {/* KYB Status Alert */}
-      {kybProgress.completed < kybProgress.total && (
+      {/* KYB Status Alert - Only show when KYC is not approved */}
+      {!isKycApproved && (
         <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
