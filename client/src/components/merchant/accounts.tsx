@@ -51,7 +51,7 @@ export function Accounts() {
   }
 
   const custodianAccount = {
-    id: "cybrid_account_12345",
+    id: "wallet_account_12345",
     status: "active",
     createdAt: "2024-01-15",
   }
@@ -72,7 +72,7 @@ export function Accounts() {
     // KYB check is now informational only - merchants can proceed
 
     setIsCreatingCustodian(true)
-    console.log('Creating Cybrid custodian account')
+    console.log('Creating crypto wallet account')
 
     try {
       // TODO: Implement real Cybrid custodian account creation
@@ -164,7 +164,7 @@ export function Accounts() {
         <div>
           <h1 className="text-3xl font-bold">Account Management</h1>
           <p className="text-muted-foreground">
-            Manage your Cybrid custodian account and connected bank accounts
+            Manage your crypto wallet account and connected bank accounts
           </p>
         </div>
 
@@ -198,7 +198,7 @@ export function Accounts() {
         <div>
           <h1 className="text-3xl font-bold">Account Management</h1>
           <p className="text-muted-foreground">
-            Create your Cybrid custodian account to securely store and manage cryptocurrency
+            Create your crypto wallet account to securely store and manage cryptocurrency
           </p>
         </div>
 
@@ -206,19 +206,19 @@ export function Accounts() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" />
-              Create Cybrid Custodian Account
+              Create Crypto Wallet Account
             </CardTitle>
             <CardDescription>
-              Set up your secure cryptocurrency custody solution with MPC wallet infrastructure
+              Set up your secure cryptocurrency wallet solution with advanced security infrastructure
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-muted/50 rounded-lg">
               <h3 className="font-semibold mb-2">What you'll get:</h3>
               <ul className="space-y-1 text-sm text-muted-foreground">
-                <li>• Multi-Party Computation (MPC) wallet security</li>
+                <li>• Advanced wallet security technology</li>
                 <li>• Individual deposit addresses for USDC, USDT, ETH, and BTC</li>
-                <li>• Qualified custodian asset protection</li>
+                <li>• Professional-grade asset protection</li>
                 <li>• Integrated compliance and monitoring</li>
                 <li>• Required for receiving crypto payments</li>
               </ul>
@@ -230,7 +230,7 @@ export function Accounts() {
               className="w-full"
               data-testid="button-create-custodian-account"
             >
-              {isCreatingCustodian ? "Creating Account..." : "Create Custodian Account"}
+              {isCreatingCustodian ? "Creating Account..." : "Create Wallet Account"}
             </Button>
           </CardContent>
         </Card>
@@ -257,7 +257,7 @@ export function Accounts() {
       <div>
         <h1 className="text-3xl font-bold">Account Management</h1>
         <p className="text-muted-foreground">
-          Manage your Cybrid custodian account and connected bank accounts for payouts
+          Manage your crypto wallet account and connected bank accounts for payouts
         </p>
       </div>
 
@@ -266,10 +266,10 @@ export function Accounts() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            Cybrid Custodian Account
+            Crypto Wallet Account
           </CardTitle>
           <CardDescription>
-            Your secure cryptocurrency custody account with MPC wallet infrastructure
+            Your secure cryptocurrency wallet account with advanced security infrastructure
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -371,7 +371,7 @@ export function Accounts() {
           <div>
             <CardTitle>Connected Bank Accounts</CardTitle>
             <CardDescription>
-              Bank accounts for ACH and Wire payouts via Cybrid
+              Bank accounts for ACH and Wire payouts
             </CardDescription>
           </div>
           <Button 
@@ -434,7 +434,7 @@ export function Accounts() {
           <div className="space-y-3">
             <Button variant="outline" className="w-full justify-start">
               <ExternalLink className="h-4 w-4 mr-2" />
-              View Account Details in Cybrid Dashboard
+              View Account Details
             </Button>
             <Button variant="outline" className="w-full justify-start">
               <Settings className="h-4 w-4 mr-2" />
