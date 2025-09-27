@@ -21,7 +21,6 @@ import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
 import { AccountStatus } from "@/components/merchant/account-status";
 import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
 import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
-import { Accounts } from "@/components/merchant/accounts";
 import MerchantLogin from "@/pages/merchant-login";
 import MerchantSignup from "@/pages/merchant-signup";
 import AdminLogin from "@/pages/admin-login";
@@ -113,11 +112,6 @@ function Router() {
       <Route path="/merchant/account-status">
         <MerchantProtectedRoute>
           <AccountStatus />
-        </MerchantProtectedRoute>
-      </Route>
-      <Route path="/merchant/accounts">
-        <MerchantProtectedRoute>
-          <Accounts />
         </MerchantProtectedRoute>
       </Route>
       
