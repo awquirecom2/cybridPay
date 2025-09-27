@@ -151,14 +151,14 @@ function AppLayout() {
 
     return (
       <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-screen w-full">
+        <div className="flex min-h-screen w-full">
           <AppSidebar userRole={userRole} />
           <div className="flex flex-col flex-1">
-            <header className="flex items-center justify-between p-4 border-b bg-card/50 backdrop-blur">
+            <header className="flex items-center justify-between p-4 border-b bg-card/50 backdrop-blur sticky top-0 z-10">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <ThemeToggle />
             </header>
-            <main className="flex-1 overflow-auto p-6">
+            <main className="flex-1 p-6">
               <Router />
             </main>
           </div>
