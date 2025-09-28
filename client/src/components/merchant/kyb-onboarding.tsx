@@ -44,13 +44,6 @@ export function KybOnboarding() {
   
   const form = useForm({
     defaultValues: {
-      businessName: "",
-      businessAddress: "", 
-      businessType: "",
-      registrationNumber: "",
-      taxId: "",
-      website: "",
-      description: "",
       directorName: "",
       directorEmail: "",
       directorPhone: ""
@@ -59,10 +52,9 @@ export function KybOnboarding() {
 
   // TODO: remove mock functionality - replace with real KYB submission
   const kybSteps = [
-    { id: 1, title: "Business Information", status: "current" },
-    { id: 2, title: "Document Upload", status: "pending" },
-    { id: 3, title: "Director Verification", status: "pending" },
-    { id: 4, title: "Review & Submit", status: "pending" }
+    { id: 1, title: "Document Upload", status: "current" },
+    { id: 2, title: "Director Verification", status: "pending" },
+    { id: 3, title: "Review & Submit", status: "pending" }
   ]
 
   const requiredDocuments = [
@@ -82,8 +74,8 @@ export function KybOnboarding() {
   }
 
   const handleStepSubmit = () => {
-    // Step 3 validation: Require KYC completion before proceeding
-    if (currentStep === 3 && kycVerificationStatus !== 'completed') {
+    // Step 2 validation: Require KYC completion before proceeding
+    if (currentStep === 2 && kycVerificationStatus !== 'completed') {
       toast({
         title: "Identity Verification Required",
         description: "Please complete identity verification before proceeding.",
@@ -92,7 +84,7 @@ export function KybOnboarding() {
       return;
     }
 
-    if (currentStep < 4) {
+    if (currentStep < 3) {
       setCurrentStep(currentStep + 1)
       console.log(`Step ${currentStep} completed, moving to step ${currentStep + 1}`)
       toast({
@@ -111,8 +103,8 @@ export function KybOnboarding() {
   const getStepStatus = (stepId: number) => {
     if (stepId < currentStep) return "completed"
     if (stepId === currentStep) {
-      // For step 3 (Director Verification), show as completed if KYC is done
-      if (stepId === 3 && kycVerificationStatus === 'completed') {
+      // For step 2 (Director Verification), show as completed if KYC is done
+      if (stepId === 2 && kycVerificationStatus === 'completed') {
         return "completed"
       }
       return "current"
@@ -121,137 +113,12 @@ export function KybOnboarding() {
   }
 
   const canProceedFromStep = (stepNumber: number) => {
-    if (stepNumber === 3) {
+    if (stepNumber === 2) {
       return kycVerificationStatus === 'completed';
     }
     return true;
   }
 
-  const renderBusinessInfo = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Business Information</CardTitle>
-        <CardDescription>
-          Provide details about your business entity and registration
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="businessName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Business Name *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Your Company Inc" {...field} data-testid="input-business-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="businessType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Business Type *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="LLC, Corporation, Partnership" {...field} data-testid="input-business-type" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="registrationNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Registration Number *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="12345678" {...field} data-testid="input-registration-number" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="taxId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tax ID / EIN *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="XX-XXXXXXX" {...field} data-testid="input-tax-id" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="md:col-span-2">
-              <FormField
-                control={form.control}
-                name="businessAddress"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Business Address *</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="123 Business St, City, State, ZIP, Country" 
-                        {...field} 
-                        data-testid="textarea-business-address" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="website"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Website</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://yourcompany.com" {...field} data-testid="input-website" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="md:col-span-2">
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Business Description *</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Describe your business activities and how you plan to use cryptocurrency payments" 
-                        {...field} 
-                        data-testid="textarea-business-description" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-        </Form>
-      </CardContent>
-    </Card>
-  )
 
   const renderDocumentUpload = () => (
     <Card>
@@ -458,12 +325,9 @@ export function KybOnboarding() {
       <CardContent>
         <div className="space-y-6">
           <div>
-            <h3 className="font-semibold mb-2">Business Information</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Name:</span> {form.getValues('businessName') || 'Not provided'}</div>
-              <div><span className="text-muted-foreground">Type:</span> {form.getValues('businessType') || 'Not provided'}</div>
-              <div><span className="text-muted-foreground">Registration:</span> {form.getValues('registrationNumber') || 'Not provided'}</div>
-              <div><span className="text-muted-foreground">Tax ID:</span> {form.getValues('taxId') || 'Not provided'}</div>
+            <h3 className="font-semibold mb-2">Identity Verification</h3>
+            <div className="text-sm">
+              <div>Your business information has been collected through the identity verification process.</div>
             </div>
           </div>
 
@@ -555,10 +419,9 @@ export function KybOnboarding() {
       </Card>
 
       {/* Step Content */}
-      {currentStep === 1 && renderBusinessInfo()}
-      {currentStep === 2 && renderDocumentUpload()}
-      {currentStep === 3 && renderDirectorInfo()}
-      {currentStep === 4 && renderReview()}
+      {currentStep === 1 && renderDocumentUpload()}
+      {currentStep === 2 && renderDirectorInfo()}
+      {currentStep === 3 && renderReview()}
 
       {/* Navigation */}
       <div className="flex justify-between">
@@ -575,7 +438,7 @@ export function KybOnboarding() {
           onClick={handleStepSubmit}
           data-testid="button-next-step"
         >
-          {currentStep === 4 ? 'Submit for Review' : 'Continue'}
+          {currentStep === 3 ? 'Submit for Review' : 'Continue'}
         </Button>
       </div>
     </div>
