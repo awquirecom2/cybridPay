@@ -16,8 +16,6 @@ import { ManualKycVerification } from "./manual-kyc-verification"
 
 export function KybOnboarding() {
   const { toast } = useToast()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({})
   
   // Get KYC status from API - no polling needed since webhooks update status real-time
   const { data: kycStatus, isLoading: kycLoading, error: kycError, refetch: refetchKycStatus } = useQuery({
@@ -57,133 +55,18 @@ export function KybOnboarding() {
     { id: 3, title: "Review & Submit", status: "pending" }
   ]
 
-  const requiredDocuments = [
-    { id: "certificate", name: "Certificate of Incorporation", uploaded: false },
-    { id: "articles", name: "Articles of Association", uploaded: false },
-    { id: "proof-address", name: "Proof of Business Address", uploaded: false },
-    { id: "director-id", name: "Director ID Document", uploaded: false }
-  ]
 
-  const handleFileUpload = (documentId: string, file: File) => {
-    setUploadedFiles(prev => ({ ...prev, [documentId]: file }))
-    console.log(`File uploaded for ${documentId}:`, file.name)
-    toast({
-      title: "Document uploaded",
-      description: `${file.name} has been uploaded successfully.`,
-    })
-  }
 
-  const handleStepSubmit = () => {
-    // Step 2 validation: Require KYC completion before proceeding
-    if (currentStep === 2 && kycVerificationStatus !== 'completed') {
-      toast({
-        title: "Identity Verification Required",
-        description: "Please complete identity verification before proceeding.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1)
-      console.log(`Step ${currentStep} completed, moving to step ${currentStep + 1}`)
-      toast({
-        title: "Step Completed",
-        description: `Step ${currentStep} completed successfully.`
-      });
-    } else {
-      console.log('KYB submission completed')
-      toast({
-        title: "KYB Submitted",
-        description: "Your KYB application has been submitted for review.",
-      })
-    }
-  }
 
   const getStepStatus = (stepId: number) => {
-    if (stepId < currentStep) return "completed"
-    if (stepId === currentStep) {
-      // For step 2 (Director Verification), show as completed if KYC is done
-      if (stepId === 2 && kycVerificationStatus === 'completed') {
-        return "completed"
-      }
-      return "current"
+    if (kycVerificationStatus === 'completed') {
+      return "completed"
     }
-    return "pending"
-  }
-
-  const canProceedFromStep = (stepNumber: number) => {
-    if (stepNumber === 2) {
-      return kycVerificationStatus === 'completed';
-    }
-    return true;
+    return "current"
   }
 
 
-  const renderDocumentUpload = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle>Document Upload</CardTitle>
-        <CardDescription>
-          Upload the required business documents for verification
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {requiredDocuments.map((doc) => (
-            <div key={doc.id} className="border border-dashed border-gray-300 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">{doc.name}</span>
-                </div>
-                {uploadedFiles[doc.id] && (
-                  <Badge variant="default" className="flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    Uploaded
-                  </Badge>
-                )}
-              </div>
-              
-              <div className="text-sm text-muted-foreground mb-3">
-                Accepted formats: PDF, JPG, PNG (max 10MB)
-              </div>
-              
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleFileUpload(doc.id, file)
-                }}
-                className="hidden"
-                id={`upload-${doc.id}`}
-                data-testid={`input-upload-${doc.id}`}
-              />
-              
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => document.getElementById(`upload-${doc.id}`)?.click()}
-                  data-testid={`button-upload-${doc.id}`}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploadedFiles[doc.id] ? 'Replace File' : 'Choose File'}
-                </Button>
-                
-                {uploadedFiles[doc.id] && (
-                  <span className="text-sm text-muted-foreground">
-                    {uploadedFiles[doc.id].name}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
+
 
   const handleKycComplete = (status: string) => {
     console.log('KYC verification completed with status:', status);
@@ -332,30 +215,19 @@ export function KybOnboarding() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-2">Documents</h3>
-            <div className="space-y-1">
-              {requiredDocuments.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-2 text-sm">
-                  {uploadedFiles[doc.id] ? (
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                  )}
-                  <span>{doc.name}</span>
-                  {uploadedFiles[doc.id] && (
-                    <span className="text-muted-foreground">({uploadedFiles[doc.id].name})</span>
-                  )}
+            <h3 className="font-semibold mb-2">Verification Status</h3>
+            <div className="text-sm">
+              {kycVerificationStatus === 'completed' ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Identity verification completed successfully</span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="font-semibold mb-2">Director Information</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div><span className="text-muted-foreground">Name:</span> {form.getValues('directorName') || 'Not provided'}</div>
-              <div><span className="text-muted-foreground">Email:</span> {form.getValues('directorEmail') || 'Not provided'}</div>
-              <div><span className="text-muted-foreground">Phone:</span> {form.getValues('directorPhone') || 'Not provided'}</div>
+              ) : (
+                <div className="flex items-center gap-2 text-yellow-600">
+                  <Clock className="h-4 w-4" />
+                  <span>Identity verification pending</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -363,9 +235,9 @@ export function KybOnboarding() {
             <div className="flex items-start gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div>
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">Review Timeline</h4>
+                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">Next Steps</h4>
                 <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                  Your KYB application will be reviewed within 3-5 business days. You'll receive email updates on the status.
+                  {kycVerificationStatus === 'completed' ? 'Your verification is complete. You can now access all platform features.' : 'Please complete identity verification to access all platform features.'}
                 </p>
               </div>
             </div>
@@ -389,10 +261,10 @@ export function KybOnboarding() {
         <CardContent className="pt-6">
           <div className="space-y-4">
             <div className="flex justify-between text-sm">
-              <span>Step {currentStep} of {kybSteps.length}</span>
-              <span>{Math.round((currentStep / kybSteps.length) * 100)}% Complete</span>
+              <span>Identity Verification</span>
+              <span>{kycVerificationStatus === 'completed' ? '100% Complete' : 'In Progress'}</span>
             </div>
-            <Progress value={(currentStep / kybSteps.length) * 100} className="w-full" />
+            <Progress value={kycVerificationStatus === 'completed' ? 100 : 50} className="w-full" />
             
             <div className="flex justify-between">
               {kybSteps.map((step) => (
@@ -419,28 +291,9 @@ export function KybOnboarding() {
       </Card>
 
       {/* Step Content */}
-      {currentStep === 1 && renderDocumentUpload()}
-      {currentStep === 2 && renderDirectorInfo()}
-      {currentStep === 3 && renderReview()}
+      {kycVerificationStatus !== 'completed' && renderDirectorInfo()}
+      {kycVerificationStatus === 'completed' && renderReview()}
 
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button 
-          variant="outline" 
-          onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-          disabled={currentStep === 1}
-          data-testid="button-previous-step"
-        >
-          Previous
-        </Button>
-        
-        <Button 
-          onClick={handleStepSubmit}
-          data-testid="button-next-step"
-        >
-          {currentStep === 3 ? 'Submit for Review' : 'Continue'}
-        </Button>
-      </div>
     </div>
   )
 }
