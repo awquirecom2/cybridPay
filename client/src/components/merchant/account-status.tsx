@@ -495,34 +495,6 @@ export function AccountStatus() {
         <>
           <Separator className="my-8" />
           
-          {/* Crypto Wallet Account Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                Crypto Wallet Account
-              </CardTitle>
-              <CardDescription>
-                Your secure cryptocurrency wallet account with advanced security infrastructure
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-3 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Account ID</div>
-                  <code className="text-xs bg-muted px-1 py-0.5 rounded">wallet_account_12345</code>
-                </div>
-                <div className="text-center p-3 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Status</div>
-                  {getStatusBadge('active')}
-                </div>
-                <div className="text-center p-3 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Created</div>
-                  <div className="text-sm">{new Date('2024-01-15').toLocaleDateString()}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Cryptocurrency Wallets */}
           <Card>
