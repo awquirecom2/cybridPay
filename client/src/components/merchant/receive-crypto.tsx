@@ -301,8 +301,11 @@ export function ReceiveCrypto() {
     }
   ]
 
-  // Filter methods based on API availability or use all USD methods
+  // Filter methods based on API availability or use all USD methods (excluding wire transfer)
   const paymentMethods = (() => {
+    // First filter out wire transfer from the base methods
+    const filteredUsdMethods = usdPaymentMethods.filter(method => method.value !== "pm_wire")
+    
     // Check if we have API data for USD payment methods
     const allMethodsMap = new Map<string, string>()
     
@@ -325,18 +328,18 @@ export function ReceiveCrypto() {
     }
     
     console.log('[ReceiveCrypto] Available payment method IDs from API:', Array.from(allMethodsMap.keys()))
-    console.log('[ReceiveCrypto] Hardcoded payment method IDs:', usdPaymentMethods.map(m => m.value))
+    console.log('[ReceiveCrypto] Hardcoded payment method IDs:', filteredUsdMethods.map(m => m.value))
     
     // Filter our USD methods to only include those supported by API (if available)
     if (allMethodsMap.size > 0) {
-      const validMethods = usdPaymentMethods.filter(method => allMethodsMap.has(method.value))
+      const validMethods = filteredUsdMethods.filter(method => allMethodsMap.has(method.value))
       console.log('[ReceiveCrypto] Using filtered valid methods:', validMethods.map(m => m.value))
       return validMethods
     }
     
-    // Return all USD methods if no API data available
-    console.log('[ReceiveCrypto] Using fallback hardcoded methods')
-    return usdPaymentMethods
+    // Return filtered USD methods if no API data available
+    console.log('[ReceiveCrypto] Using fallback hardcoded methods (excluding wire)')
+    return filteredUsdMethods
   })()
 
   // Prepare deposit address options for dropdown from Cybrid
