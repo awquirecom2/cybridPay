@@ -20,7 +20,7 @@ import { MerchantDashboard } from "@/components/merchant/merchant-dashboard";
 import { KybOnboarding } from "@/components/merchant/kyb-onboarding";
 import { AccountStatus } from "@/components/merchant/account-status";
 import { ReceiveCrypto } from "@/components/merchant/receive-crypto";
-import { OfframpCrypto } from "@/components/merchant/offramp-crypto";
+import { UnifiedCryptoPayout } from "@/components/merchant/unified-crypto-payout";
 import MerchantLogin from "@/pages/merchant-login";
 import MerchantSignup from "@/pages/merchant-signup";
 import AdminLogin from "@/pages/admin-login";
@@ -106,7 +106,7 @@ function Router() {
       </Route>
       <Route path="/merchant/offramp-crypto">
         <MerchantProtectedRoute>
-          <OfframpCrypto />
+          <UnifiedCryptoPayout />
         </MerchantProtectedRoute>
       </Route>
       <Route path="/merchant/account-status">
