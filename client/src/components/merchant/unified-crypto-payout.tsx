@@ -308,26 +308,73 @@ export function UnifiedCryptoPayout() {
     }
   }
 
-  // Mock unified handler - would route to appropriate provider
+  // Real unified handler - calls actual Transak API
   const handleUnifiedPayout = async (data: any) => {
     setIsCreatingPayout(true)
     
-    // Mock response for demo
-    setTimeout(() => {
+    try {
+      // Extract crypto currency and network from combined field
+      const [cryptoCurrency, network] = data.cryptoNetworkCombined.split('-')
+      
+      // Get merchant email from profile or use form data
+      const customerEmail = data.customerEmail || merchantProfile?.email || ''
+      
+      if (!customerEmail) {
+        throw new Error('Customer email is required')
+      }
+      
+      // Format request data according to createTransakSessionSchema
+      const requestData = {
+        quoteData: {
+          cryptoAmount: parseFloat(data.cryptoAmount),
+          cryptoCurrency: cryptoCurrency,
+          fiatCurrency: data.fiatCurrency,
+          network: network,
+          paymentMethod: data.payoutMethod
+        },
+        walletAddress: data.walletAddress,
+        customerEmail: customerEmail,
+        referrerDomain: "ruupay.com",
+        redirectURL: "https://ruupay.com/transaction-complete",
+        themeColor: "1f4a8c"
+      }
+      
+      console.log('[DEBUG] Creating payout session with data:', requestData)
+      
+      // Call the real API endpoint
+      const response = await apiRequest("POST", "/api/merchant/transak/create-offramp-session", requestData)
+      
+      // Parse the JSON response
+      const responseData = await response.json()
+      console.log('[DEBUG] Payout session response:', responseData)
+      
+      // Set the real payment link from Transak
+      setPaymentLink(responseData.widgetUrl)
+      
+      // Set payout details based on real response
       setPayoutDetails({
-        id: "payout_" + Math.random().toString(36).substr(2, 9),
+        id: responseData.widgetUrl ? responseData.widgetUrl.split('/').pop() || "payout_" + Math.random().toString(36).substr(2, 9) : "payout_" + Math.random().toString(36).substr(2, 9),
         cryptoAmount: data.cryptoAmount,
-        fiatAmount: (parseFloat(data.cryptoAmount) * 1.02).toFixed(2),
+        fiatAmount: (parseFloat(data.cryptoAmount) * 1.02).toFixed(2), // TODO: Use real conversion rate
         payoutMethod: data.payoutMethod,
         processingTime: getCurrentFeeInfo()?.processingTime || "1-3 business days",
         status: "Processing"
       })
+      
       setIsCreatingPayout(false)
       toast({
         title: "Payout Created",
         description: "Your crypto payout has been initiated successfully.",
       })
-    }, 2000)
+    } catch (error) {
+      console.error('[ERROR] Failed to create payout session:', error)
+      setIsCreatingPayout(false)
+      toast({
+        title: "Payout Failed",
+        description: error instanceof Error ? error.message : "Failed to create payout session. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   // Loading state
@@ -723,6 +770,39 @@ export function UnifiedCryptoPayout() {
                   </div>
                 </div>
               </div>
+
+              {paymentLink && (
+                <div className="space-y-3">
+                  <div className="p-4 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <ExternalLink className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-blue-900 dark:text-blue-100">Complete Your Payout</span>
+                    </div>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                      Click the link below to visit the payment portal and complete your crypto payout.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button 
+                        asChild 
+                        className="flex-1"
+                        data-testid="button-visit-payout-link"
+                      >
+                        <a href={paymentLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Visit Payout Link
+                        </a>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={copyPaymentLink}
+                        data-testid="button-copy-payout-link"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <Button variant="outline" onClick={resetForms} className="w-full">
                 Create Another Payout
