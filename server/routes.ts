@@ -1540,7 +1540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/merchant/credentials-v2/transak - Get metadata from database and check Secret Manager
+  // GET /api/merchant/credentials-v2/transak - Get metadata from database and check Secret Manager JSON
   app.get("/api/merchant/credentials-v2/transak", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.id;
@@ -1553,16 +1553,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           hasApiKey: false,
           hasApiSecret: false,
           isActive: false,
-          storage: 'secret_manager'
+          storage: 'secret_manager_json'
         });
       }
 
-      // Initialize Secret Manager to check if secrets exist
+      // Initialize Secret Manager to check if JSON secret exists
       const secretManager = new SecretManagerService();
-      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, 'transak');
+      const secretName = SecretManagerService.getMerchantCredentialsSecretName(merchantId);
       
-      const hasApiKey = await secretManager.secretExists(secretNames.apiKey);
-      const hasApiSecret = await secretManager.secretExists(secretNames.apiSecret);
+      const secretExists = await secretManager.secretExists(secretName);
+      
+      let hasApiKey = false;
+      let hasApiSecret = false;
+      
+      if (secretExists) {
+        try {
+          const credentialsJson = await secretManager.getJsonCredentials<{
+            transak?: { apiKey?: string; apiSecret?: string; environment?: string }
+          }>(secretName);
+          
+          hasApiKey = !!credentialsJson.transak?.apiKey;
+          hasApiSecret = !!credentialsJson.transak?.apiSecret;
+        } catch (error) {
+          console.error("Error parsing credentials JSON:", error);
+        }
+      }
       
       res.json({
         provider: 'transak',
@@ -1571,7 +1586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasApiSecret,
         isActive: credentials.isActive,
         createdAt: credentials.createdAt,
-        storage: 'secret_manager'
+        storage: 'secret_manager_json'
       });
     } catch (error) {
       console.error("Error fetching credentials from Secret Manager:", error);
@@ -1579,7 +1594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // DELETE /api/merchant/credentials-v2/:provider - Delete from both Secret Manager and database
+  // DELETE /api/merchant/credentials-v2/:provider - Delete from both Secret Manager JSON and database
   app.delete("/api/merchant/credentials-v2/:provider", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.id;
@@ -1587,11 +1602,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Initialize Secret Manager
       const secretManager = new SecretManagerService();
-      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, provider);
+      const secretName = SecretManagerService.getMerchantCredentialsSecretName(merchantId);
       
-      // Delete from Secret Manager (won't fail if doesn't exist)
-      await secretManager.deleteSecret(secretNames.apiKey);
-      await secretManager.deleteSecret(secretNames.apiSecret);
+      // Delete JSON secret from Secret Manager (won't fail if doesn't exist)
+      await secretManager.deleteSecret(secretName);
       
       // Delete from database
       const success = await storage.deleteMerchantCredentials(merchantId, provider);
@@ -1600,7 +1614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Credentials not found" });
       }
       
-      res.json({ success: true, storage: 'secret_manager' });
+      res.json({ success: true, storage: 'secret_manager_json' });
     } catch (error) {
       console.error("Error deleting credentials from Secret Manager:", error);
       res.status(500).json({ error: "Failed to delete credentials" });
