@@ -1481,7 +1481,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // V2 Credentials Endpoints (Google Secret Manager)
   // ==========================================
 
-  // POST /api/merchant/credentials-v2/transak - Store credentials in Google Secret Manager
+  // POST /api/merchant/credentials-v2/transak - Store credentials in Google Secret Manager as JSON
   app.post("/api/merchant/credentials-v2/transak", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.id;
@@ -1490,20 +1490,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Initialize Secret Manager service
       const secretManager = new SecretManagerService();
       
-      // Generate secret names for this merchant
-      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, 'transak');
+      // Generate secret name for this merchant's credentials
+      const secretName = SecretManagerService.getMerchantCredentialsSecretName(merchantId);
       
-      // Store credentials in Google Secret Manager
-      await secretManager.storeSecret(secretNames.apiKey, apiKey);
-      await secretManager.storeSecret(secretNames.apiSecret, apiSecret);
+      // Build credentials JSON structure
+      const credentialsJson = {
+        transak: {
+          apiKey,
+          apiSecret,
+          environment
+        }
+      };
+      
+      // Store credentials as JSON in Google Secret Manager
+      await secretManager.storeJsonCredentials(secretName, credentialsJson);
 
       // Store metadata in database (no sensitive data)
       const existing = await storage.getMerchantCredentials(merchantId, 'transak');
       
       if (existing) {
         await storage.updateMerchantCredentials(merchantId, 'transak', {
-          encryptedApiKey: 'STORED_IN_SECRET_MANAGER', // Placeholder to indicate storage location
-          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER',
+          encryptedApiKey: 'STORED_IN_SECRET_MANAGER_JSON',
+          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER_JSON',
           environment,
           isActive: true
         });
@@ -1511,8 +1519,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createMerchantCredentials({
           merchantId,
           provider: 'transak',
-          encryptedApiKey: 'STORED_IN_SECRET_MANAGER',
-          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER',
+          encryptedApiKey: 'STORED_IN_SECRET_MANAGER_JSON',
+          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER_JSON',
           environment,
           isActive: true
         });
@@ -1524,7 +1532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         environment,
         hasApiKey: true,
         hasApiSecret: true,
-        storage: 'secret_manager'
+        storage: 'secret_manager_json'
       });
     } catch (error) {
       console.error("Error saving credentials to Secret Manager:", error);
