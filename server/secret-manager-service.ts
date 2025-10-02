@@ -140,6 +140,34 @@ export class SecretManagerService {
   }
 
   /**
+   * Store JSON credentials object as a secret
+   * @param secretName - Unique identifier for the secret
+   * @param credentials - Object to store as JSON
+   */
+  async storeJsonCredentials(secretName: string, credentials: any): Promise<void> {
+    const jsonString = JSON.stringify(credentials);
+    await this.storeSecret(secretName, jsonString);
+  }
+
+  /**
+   * Retrieve and parse JSON credentials from a secret
+   * @param secretName - Unique identifier for the secret
+   * @returns Parsed JSON object
+   */
+  async getJsonCredentials<T = any>(secretName: string): Promise<T> {
+    const jsonString = await this.getSecret(secretName);
+    return JSON.parse(jsonString);
+  }
+
+  /**
+   * Generate secret name for merchant credentials (single JSON secret)
+   */
+  static getMerchantCredentialsSecretName(merchantId: string): string {
+    return `merchant-${merchantId}-credentials`;
+  }
+
+  /**
+   * @deprecated Use getMerchantCredentialsSecretName for single JSON secret
    * Generate secret names for merchant credentials
    */
   static getMerchantSecretNames(merchantId: string, provider: string) {
