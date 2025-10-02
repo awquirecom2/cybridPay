@@ -1621,7 +1621,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to get Transak service using platform-level credentials
+  // Helper function to get Transak service using merchant-specific credentials from Secret Manager
+  const getTransakServiceFromSecretManager = async (merchantId: string): Promise<TransakService> => {
+    try {
+      const secretManager = new SecretManagerService();
+      const secretName = SecretManagerService.getMerchantCredentialsSecretName(merchantId);
+      
+      // Retrieve merchant credentials JSON from Secret Manager
+      const credentialsJson = await secretManager.getJsonCredentials<{
+        transak: { apiKey: string; apiSecret: string; environment: 'staging' | 'production' }
+      }>(secretName);
+      
+      if (!credentialsJson.transak) {
+        throw new Error('Transak credentials not found in Secret Manager');
+      }
+      
+      const { apiKey, apiSecret, environment } = credentialsJson.transak;
+      
+      return new TransakService({
+        apiKey,
+        apiSecret,
+        environment
+      }, merchantId);
+    } catch (error: any) {
+      if (error.message.includes('not found')) {
+        throw new Error('Merchant Transak credentials not configured. Please add your credentials in Manage Integrations.');
+      }
+      throw error;
+    }
+  };
+
+  // Helper function to get Transak service using platform-level credentials (deprecated)
   const getTransakService = async (merchantId: string): Promise<TransakService> => {
     const apiKey = process.env.TRANSAK_API_KEY;
     const apiSecret = process.env.TRANSAK_API_SECRET;
