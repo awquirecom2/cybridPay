@@ -9,6 +9,7 @@ import { adminCreateMerchantSchema, insertAdminSchema, transakCredentialsSchema,
 import { randomBytes, createHmac, timingSafeEqual, createHash } from "crypto";
 import { TransakService, CredentialEncryption, PublicTransakService } from "./transak-service";
 import { CybridService } from "./cybrid-service";
+import { SecretManagerService } from "./secret-manager-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Utility functions to sanitize data (remove passwords)
@@ -1472,6 +1473,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting credentials:", error);
+      res.status(500).json({ error: "Failed to delete credentials" });
+    }
+  });
+
+  // ==========================================
+  // V2 Credentials Endpoints (Google Secret Manager)
+  // ==========================================
+
+  // POST /api/merchant/credentials-v2/transak - Store credentials in Google Secret Manager
+  app.post("/api/merchant/credentials-v2/transak", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const { apiKey, apiSecret, environment } = transakCredentialsSchema.parse(req.body);
+
+      // Initialize Secret Manager service
+      const secretManager = new SecretManagerService();
+      
+      // Generate secret names for this merchant
+      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, 'transak');
+      
+      // Store credentials in Google Secret Manager
+      await secretManager.storeSecret(secretNames.apiKey, apiKey);
+      await secretManager.storeSecret(secretNames.apiSecret, apiSecret);
+
+      // Store metadata in database (no sensitive data)
+      const existing = await storage.getMerchantCredentials(merchantId, 'transak');
+      
+      if (existing) {
+        await storage.updateMerchantCredentials(merchantId, 'transak', {
+          encryptedApiKey: 'STORED_IN_SECRET_MANAGER', // Placeholder to indicate storage location
+          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER',
+          environment,
+          isActive: true
+        });
+      } else {
+        await storage.createMerchantCredentials({
+          merchantId,
+          provider: 'transak',
+          encryptedApiKey: 'STORED_IN_SECRET_MANAGER',
+          encryptedApiSecret: 'STORED_IN_SECRET_MANAGER',
+          environment,
+          isActive: true
+        });
+      }
+
+      res.json({
+        success: true,
+        provider: 'transak',
+        environment,
+        hasApiKey: true,
+        hasApiSecret: true,
+        storage: 'secret_manager'
+      });
+    } catch (error) {
+      console.error("Error saving credentials to Secret Manager:", error);
+      res.status(400).json({ error: "Failed to save credentials to Secret Manager" });
+    }
+  });
+
+  // GET /api/merchant/credentials-v2/transak - Get metadata from database and check Secret Manager
+  app.get("/api/merchant/credentials-v2/transak", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const credentials = await storage.getMerchantCredentials(merchantId, 'transak');
+      
+      if (!credentials) {
+        return res.json({
+          provider: 'transak',
+          environment: 'staging',
+          hasApiKey: false,
+          hasApiSecret: false,
+          isActive: false,
+          storage: 'secret_manager'
+        });
+      }
+
+      // Initialize Secret Manager to check if secrets exist
+      const secretManager = new SecretManagerService();
+      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, 'transak');
+      
+      const hasApiKey = await secretManager.secretExists(secretNames.apiKey);
+      const hasApiSecret = await secretManager.secretExists(secretNames.apiSecret);
+      
+      res.json({
+        provider: 'transak',
+        environment: credentials.environment,
+        hasApiKey,
+        hasApiSecret,
+        isActive: credentials.isActive,
+        createdAt: credentials.createdAt,
+        storage: 'secret_manager'
+      });
+    } catch (error) {
+      console.error("Error fetching credentials from Secret Manager:", error);
+      res.status(500).json({ error: "Failed to fetch credentials" });
+    }
+  });
+
+  // DELETE /api/merchant/credentials-v2/:provider - Delete from both Secret Manager and database
+  app.delete("/api/merchant/credentials-v2/:provider", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.id;
+      const { provider } = req.params;
+      
+      // Initialize Secret Manager
+      const secretManager = new SecretManagerService();
+      const secretNames = SecretManagerService.getMerchantSecretNames(merchantId, provider);
+      
+      // Delete from Secret Manager (won't fail if doesn't exist)
+      await secretManager.deleteSecret(secretNames.apiKey);
+      await secretManager.deleteSecret(secretNames.apiSecret);
+      
+      // Delete from database
+      const success = await storage.deleteMerchantCredentials(merchantId, provider);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Credentials not found" });
+      }
+      
+      res.json({ success: true, storage: 'secret_manager' });
+    } catch (error) {
+      console.error("Error deleting credentials from Secret Manager:", error);
       res.status(500).json({ error: "Failed to delete credentials" });
     }
   });
