@@ -15,9 +15,9 @@ export function ManageIntegrations() {
   const { toast } = useToast()
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   
-  // Fetch existing Transak credentials from backend
+  // Fetch existing Transak credentials from backend (v2 uses Secret Manager)
   const { data: existingTransakCredentials, isLoading: isLoadingCredentials } = useQuery({
-    queryKey: ['/api/merchant/credentials/transak'],
+    queryKey: ['/api/merchant/credentials-v2/transak'],
   })
 
   // Stored credentials state
@@ -65,10 +65,10 @@ export function ManageIntegrations() {
     setUnsavedChanges(prev => ({ ...prev, transak: true }))
   }
 
-  // Mutation for saving Transak credentials
+  // Mutation for saving Transak credentials (v2 uses Secret Manager)
   const saveTransakMutation = useMutation({
     mutationFn: async (credentials: { apiKey: string; apiSecret: string; environment: string }) => {
-      const response = await apiRequest('POST', '/api/merchant/credentials/transak', credentials)
+      const response = await apiRequest('POST', '/api/merchant/credentials-v2/transak', credentials)
       return await response.json()
     },
     onSuccess: () => {
@@ -79,10 +79,10 @@ export function ManageIntegrations() {
         apiKey: "",
         apiSecret: ""
       }))
-      queryClient.invalidateQueries({ queryKey: ['/api/merchant/credentials/transak'] })
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant/credentials-v2/transak'] })
       toast({
         title: "Transak Credentials Saved",
-        description: "Your Transak API credentials have been securely stored.",
+        description: "Your Transak API credentials have been securely stored in Google Secret Manager.",
       })
     },
     onError: (error: any) => {
