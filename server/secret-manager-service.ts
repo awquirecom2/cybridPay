@@ -163,7 +163,7 @@ export class SecretManagerService {
    * Generate secret name for merchant credentials (single JSON secret)
    */
   static getMerchantCredentialsSecretName(merchantId: string): string {
-    return `merchant-${merchantId}-credentials`;
+    return `merchant-${merchantId}-transak`;
   }
 
   /**
